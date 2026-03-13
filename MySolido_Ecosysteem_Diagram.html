@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MySolido — Ecosysteem Positionering</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0a0e1a;
+    color: #e0e4ef;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 40px 20px 10px;
+  }
+
+  .header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.2rem;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .header p {
+    color: #7a82a0;
+    font-size: 0.95rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .diagram-container {
+    position: relative;
+    width: 100%;
+    max-width: 1100px;
+    height: 820px;
+    margin: 20px auto;
+    padding: 20px;
+  }
+
+  /* Connection lines via SVG */
+  .connections {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .connections line {
+    stroke-width: 1.5;
+    opacity: 0.4;
+  }
+
+  .connections line.solid-line { stroke: #4a90d9; }
+  .connections line.data-line { stroke: #f0a500; stroke-dasharray: 6 4; }
+  .connections line.user-line { stroke: #50c878; }
+  .connections line.gov-line { stroke: #c06cf0; }
+
+  /* Node styling */
+  .node {
+    position: absolute;
+    border-radius: 14px;
+    padding: 14px 18px;
+    z-index: 2;
+    cursor: default;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-align: center;
+    min-width: 130px;
+  }
+
+  .node:hover {
+    transform: scale(1.08);
+    z-index: 10;
+  }
+
+  .node h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+
+  .node p {
+    font-size: 0.7rem;
+    opacity: 0.8;
+    line-height: 1.35;
+  }
+
+  .node .icon {
+    font-size: 1.5rem;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  /* ── MYSOLIDO ── */
+  .node-mysolido {
+    background: linear-gradient(135deg, #1a6b3c, #0f9b4f);
+    border: 2px solid #50c878;
+    box-shadow: 0 0 30px rgba(80, 200, 120, 0.3), 0 0 60px rgba(80, 200, 120, 0.1);
+    min-width: 170px;
+  }
+  .node-mysolido h3 { font-size: 1.1rem; color: #fff; }
+  .node-mysolido p { color: #c8f0d8; font-size: 0.75rem; }
+
+  /* ── Layer: Standaarden (bovenaan) ── */
+  .node-standard {
+    background: linear-gradient(135deg, #1a2444, #243054);
+    border: 1px solid #3a4a7a;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .node-standard h3 { color: #8ab4f8; }
+  .node-standard p { color: #9aa4c0; }
+
+  /* ── Layer: Overheid & Institutioneel ── */
+  .node-gov {
+    background: linear-gradient(135deg, #2a1a44, #3a2460);
+    border: 1px solid #6a4a9a;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .node-gov h3 { color: #c8a0f0; }
+  .node-gov p { color: #a090c0; }
+
+  /* ── Layer: Infrastructuur ── */
+  .node-infra {
+    background: linear-gradient(135deg, #2a1a10, #443018);
+    border: 1px solid #8a6a30;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .node-infra h3 { color: #f0c050; }
+  .node-infra p { color: #c0a870; }
+
+  /* ── Layer: Identiteit ── */
+  .node-identity {
+    background: linear-gradient(135deg, #1a3040, #204050);
+    border: 1px solid #4a90a0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .node-identity h3 { color: #70d0e8; }
+  .node-identity p { color: #80b0c0; }
+
+  /* ── Layer: Gebruiker ── */
+  .node-user {
+    background: linear-gradient(135deg, #103020, #184028);
+    border: 1px solid #408060;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .node-user h3 { color: #80e0a0; }
+  .node-user p { color: #70b080; }
+
+  /* ── Layer: Markt / NL Bedrijven ── */
+  .node-market {
+    background: linear-gradient(135deg, #301a1a, #4a2020);
+    border: 1px solid #9a4040;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .node-market h3 { color: #f08080; }
+  .node-market p { color: #c07070; }
+
+  /* Layer labels */
+  .layer-label {
+    position: absolute;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    z-index: 0;
+    opacity: 0.25;
+  }
+
+  .layer-label.l1 { top: 28px; left: 30px; color: #8ab4f8; }
+  .layer-label.l2 { top: 155px; left: 30px; color: #c8a0f0; }
+  .layer-label.l3 { top: 310px; left: 30px; color: #f0c050; }
+  .layer-label.l4 { top: 460px; left: 30px; color: #70d0e8; }
+  .layer-label.l5 { top: 610px; left: 30px; color: #80e0a0; }
+  .layer-label.l6 { top: 720px; left: 30px; color: #f08080; }
+
+  /* Layer dividers */
+  .layer-divider {
+    position: absolute;
+    left: 5%;
+    width: 90%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    z-index: 0;
+  }
+
+  /* Legend */
+  .legend {
+    max-width: 700px;
+    margin: 0 auto 40px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    padding: 0 20px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: #7a82a0;
+  }
+
+  .legend-line {
+    width: 30px;
+    height: 2px;
+  }
+
+  .legend-line.solid { background: #4a90d9; }
+  .legend-line.data { background: repeating-linear-gradient(90deg, #f0a500 0, #f0a500 6px, transparent 6px, transparent 10px); }
+  .legend-line.user { background: #50c878; }
+  .legend-line.gov { background: #c06cf0; }
+
+  /* Tooltip */
+  .node .tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1e2e;
+    border: 1px solid #3a4060;
+    border-radius: 10px;
+    padding: 12px 16px;
+    min-width: 220px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: #c0c8e0;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    z-index: 100;
+    text-align: left;
+  }
+
+  .node:hover .tooltip {
+    display: block;
+  }
+
+  .tooltip strong {
+    color: #fff;
+  }
+
+  /* Annotations */
+  .annotation {
+    position: absolute;
+    background: rgba(80, 200, 120, 0.08);
+    border: 1px dashed rgba(80, 200, 120, 0.3);
+    border-radius: 20px;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .annotation-label {
+    position: absolute;
+    font-size: 0.65rem;
+    color: #50c878;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>MySolido Ecosysteem</h1>
+  <p>Positionering van MySolido binnen het Europese data-soevereiniteit landschap — van W3C-standaarden tot eindgebruiker</p>
+</div>
+
+<div class="diagram-container">
+
+  <!-- Layer dividers -->
+  <div class="layer-divider" style="top: 140px;"></div>
+  <div class="layer-divider" style="top: 290px;"></div>
+  <div class="layer-divider" style="top: 440px;"></div>
+  <div class="layer-divider" style="top: 590px;"></div>
+  <div class="layer-divider" style="top: 710px;"></div>
+
+  <!-- Layer labels -->
+  <div class="layer-label l1">Standaarden</div>
+  <div class="layer-label l2">Overheid & Institutioneel</div>
+  <div class="layer-label l3">Infrastructuur & Hosting</div>
+  <div class="layer-label l4">Identiteit & Toegang</div>
+  <div class="layer-label l5">Applicatie & Gebruiker</div>
+  <div class="layer-label l6">NL Marktpartijen</div>
+
+  <!-- MySolido highlight zone -->
+  <div class="annotation" style="top: 505px; left: 340px; width: 220px; height: 160px;"></div>
+
+  <!-- SVG Connections -->
+  <svg class="connections" viewBox="0 0 1100 820" preserveAspectRatio="xMidYMid meet">
+    <!-- W3C → Solid -->
+    <line x1="280" y1="85" x2="500" y2="85" class="solid-line"/>
+    <!-- W3C → RDF/OWL -->
+    <line x1="280" y1="85" x2="750" y2="85" class="solid-line"/>
+    <!-- Solid → Inrupt -->
+    <line x1="500" y1="105" x2="420" y2="210" class="solid-line"/>
+    <!-- Solid → CSS -->
+    <line x1="500" y1="105" x2="580" y2="350" class="solid-line"/>
+    <!-- Solid → SolidLab -->
+    <line x1="500" y1="105" x2="650" y2="210" class="solid-line"/>
+    <!-- EU → EUDI -->
+    <line x1="300" y1="220" x2="370" y2="500" class="gov-line"/>
+    <!-- EU → Athumi -->
+    <line x1="300" y1="230" x2="230" y2="350" class="gov-line"/>
+    <!-- Athumi → NL Datakluis -->
+    <line x1="230" y1="380" x2="380" y2="360" class="gov-line"/>
+    <!-- NL Datakluis → Jouw.id -->
+    <line x1="380" y1="380" x2="550" y2="500" class="data-line"/>
+    <!-- CSS → MySolido -->
+    <line x1="580" y1="370" x2="450" y2="580" class="solid-line"/>
+    <!-- Inrupt SDK → MySolido -->
+    <line x1="420" y1="240" x2="450" y2="560" class="solid-line"/>
+    <!-- EUDI → MySolido -->
+    <line x1="370" y1="510" x2="410" y2="570" class="gov-line"/>
+    <!-- itsme → MySolido -->
+    <line x1="230" y1="510" x2="400" y2="570" class="user-line"/>
+    <!-- MySolido → Gebruiker -->
+    <line x1="450" y1="610" x2="450" y2="650" class="user-line"/>
+    <!-- Gebruiker → MySolido -->
+    <line x1="450" y1="650" x2="450" y2="610" class="user-line"/>
+    <!-- Intermax → CSS -->
+    <line x1="800" y1="350" x2="640" y2="355" class="data-line"/>
+    <!-- NextLegal → NL Markt -->
+    <line x1="700" y1="750" x2="580" y2="660" class="data-line"/>
+    <!-- PWdiensten lijn -->
+    <line x1="550" y1="510" x2="500" y2="580" class="data-line"/>
+  </svg>
+
+  <!-- ═══ LAYER 1: Standaarden ═══ -->
+  <div class="node node-standard" style="top: 45px; left: 160px;">
+    <span class="icon">🌐</span>
+    <h3>W3C</h3>
+    <p>Open webstandaarden</p>
+    <div class="tooltip"><strong>World Wide Web Consortium</strong><br>Beheert de open standaarden waarop Solid is gebouwd. Garandeert dat niemand de technologie kan claimen.</div>
+  </div>
+
+  <div class="node node-standard" style="top: 45px; left: 420px;">
+    <span class="icon">🔷</span>
+    <h3>Solid Protocol</h3>
+    <p>Data-soevereiniteit standaard</p>
+    <div class="tooltip"><strong>Solid (Social Linked Data)</strong><br>Open protocol door Tim Berners-Lee. Pods, WebID, linked data. De technische basis waar MySolido op bouwt.</div>
+  </div>
+
+  <div class="node node-standard" style="top: 45px; left: 680px;">
+    <span class="icon">🔗</span>
+    <h3>RDF / OWL</h3>
+    <p>Linked data formaat</p>
+    <div class="tooltip"><strong>Resource Description Framework + Web Ontology Language</strong><br>Het dataformaat en de gemeenschappelijke taal waarmee apps elkaars data begrijpen.</div>
+  </div>
+
+  <!-- ═══ LAYER 2: Overheid & Institutioneel ═══ -->
+  <div class="node node-gov" style="top: 195px; left: 200px;">
+    <span class="icon">🇪🇺</span>
+    <h3>EU Commissie</h3>
+    <p>Data Act, eIDAS 2.0</p>
+    <div class="tooltip"><strong>Europese Unie</strong><br>Drijvende kracht achter EUDI wallets, Data Act, en digitale soevereiniteit wetgeving.</div>
+  </div>
+
+  <div class="node node-gov" style="top: 195px; left: 370px;">
+    <span class="icon">📦</span>
+    <h3>Inrupt</h3>
+    <p>Solid SDK & commercieel</p>
+    <div class="tooltip"><strong>Inrupt (Tim Berners-Lee)</strong><br>Commercieel bedrijf achter Solid. Levert SDK's en enterprise-oplossingen. Partner van Athumi.</div>
+  </div>
+
+  <div class="node node-gov" style="top: 195px; left: 570px;">
+    <span class="icon">🔬</span>
+    <h3>SolidLab VL</h3>
+    <p>€14M onderzoek imec</p>
+    <div class="tooltip"><strong>SolidLab Vlaanderen</strong><br>Onderzoeksprogramma (2022-2026) van imec, UGent, KU Leuven. Produceert herbruikbare libraries.</div>
+  </div>
+
+  <div class="node node-gov" style="top: 195px; left: 770px;">
+    <span class="icon">🏛️</span>
+    <h3>Tweede Kamer</h3>
+    <p>Digitale soevereiniteit</p>
+    <div class="tooltip"><strong>Nederlandse politiek</strong><br>Groeiende politieke wil voor soevereine Rijkscloud en onafhankelijkheid van Amerikaanse Big Tech.</div>
+  </div>
+
+  <!-- ═══ LAYER 3: Infrastructuur ═══ -->
+  <div class="node node-infra" style="top: 330px; left: 150px;">
+    <span class="icon">🇧🇪</span>
+    <h3>Athumi</h3>
+    <p>Vlaamse datakluisdienst</p>
+    <div class="tooltip"><strong>Athumi (Vlaams Datanutsbedrijf)</strong><br>Eerste overheid ter wereld met Solid pods voor burgers. Levert technologie aan Nederlandse Datakluis.</div>
+  </div>
+
+  <div class="node node-infra" style="top: 330px; left: 330px;">
+    <span class="icon">🇳🇱</span>
+    <h3>NL Datakluis</h3>
+    <p>Jouw.id — pilot fase</p>
+    <div class="tooltip"><strong>Stichting Nederlandse Datakluis</strong><br>Initiatief van 5 mediabedrijven (DPG, RTL, NPO, Mediahuis, Talpa). Breed beschikbaar in 2026.</div>
+  </div>
+
+  <div class="node node-infra" style="top: 330px; left: 510px;">
+    <span class="icon">⚙️</span>
+    <h3>CSS</h3>
+    <p>Community Solid Server</p>
+    <div class="tooltip"><strong>Community Solid Server v7.1.8</strong><br>Open source Solid server. Dit is wat MySolido onder de motorkap draait voor pod-opslag.</div>
+  </div>
+
+  <div class="node node-infra" style="top: 330px; left: 710px;">
+    <span class="icon">🖥️</span>
+    <h3>Intermax</h3>
+    <p>NL datacenter hosting</p>
+    <div class="tooltip"><strong>Intermax (NL)</strong><br>Nederlands datacenter. KNB, PWdiensten en steeds meer organisaties verhuizen hiernaar toe vanuit Amerikaanse cloud.</div>
+  </div>
+
+  <div class="node node-infra" style="top: 330px; left: 890px;">
+    <span class="icon">☁️</span>
+    <h3>Uniserver</h3>
+    <p>NL cloud Alkmaar</p>
+    <div class="tooltip"><strong>Uniserver (Alkmaar)</strong><br>Nederlands cloud-alternatief. NextLegal koos Uniserver boven Amerikaanse opties.</div>
+  </div>
+
+  <!-- ═══ LAYER 4: Identiteit ═══ -->
+  <div class="node node-identity" style="top: 480px; left: 150px;">
+    <span class="icon">📱</span>
+    <h3>itsme</h3>
+    <p>BE identificatie</p>
+    <div class="tooltip"><strong>itsme (België)</strong><br>Digitale identiteit voor overheid + commercieel. Gebruikt door Athumi voor pod-toegang.</div>
+  </div>
+
+  <div class="node node-identity" style="top: 480px; left: 310px;">
+    <span class="icon">🪪</span>
+    <h3>EUDI Wallet</h3>
+    <p>EU identiteit — eind 2026</p>
+    <div class="tooltip"><strong>EU Digital Identity Wallet</strong><br>Europese digitale identiteitsportemonnee. Combineert ID + selectieve attributen + credentials. Verwacht eind 2026.</div>
+  </div>
+
+  <div class="node node-identity" style="top: 480px; left: 490px;">
+    <span class="icon">🔐</span>
+    <h3>Jouw.id</h3>
+    <p>NL login + datavault</p>
+    <div class="tooltip"><strong>Jouw.id (NL Datakluis)</strong><br>Login-systeem met datavault. Deelt anonieme attributen met websites. Gebruiker houdt controle.</div>
+  </div>
+
+  <div class="node node-identity" style="top: 480px; left: 670px;">
+    <span class="icon">🛂</span>
+    <h3>PWdiensten</h3>
+    <p>ID-verificatie notarissen</p>
+    <div class="tooltip"><strong>PWdiensten</strong><br>Poortwachter: verifieert echtheid van paspoorten. 80%+ van notariskantoren. Net overgestapt naar NL servers.</div>
+  </div>
+
+  <div class="node node-identity" style="top: 480px; left: 850px;">
+    <span class="icon">🆔</span>
+    <h3>DigiD</h3>
+    <p>NL overheids-ID</p>
+    <div class="tooltip"><strong>DigiD</strong><br>Nederlandse overheidsidentificatie. Bewijst wie je bent (BSN). Alleen voor overheidsdiensten.</div>
+  </div>
+
+  <!-- ═══ MYSOLIDO (centraal) ═══ -->
+  <div class="node node-mysolido" style="top: 555px; left: 365px;">
+    <span class="icon">🛡️</span>
+    <h3>MySolido</h3>
+    <p>Jouw persoonlijke datakluis<br>op je eigen pc</p>
+    <div class="tooltip"><strong>MySolido — mysolido.com</strong><br>Software die op je eigen pc draait. Bewaart je documenten, medische gegevens, wachtwoorden, foto's. Jij bepaalt wie erbij mag. Gebouwd op Solid protocol.</div>
+  </div>
+
+  <!-- ═══ LAYER 5: Gebruiker ═══ -->
+  <div class="node node-user" style="top: 645px; left: 200px;">
+    <span class="icon">👨‍💻</span>
+    <h3>Tech Enthousiasteling</h3>
+    <p>Self-hoster, developer</p>
+    <div class="tooltip"><strong>Doelgroep 1</strong><br>Privacy-bewuste developers. Downloaden en installeren zelf. Eerste early adopters.</div>
+  </div>
+
+  <div class="node node-user" style="top: 645px; left: 390px;">
+    <span class="icon">👨‍👩‍👧‍👦</span>
+    <h3>Burger / Gezin</h3>
+    <p>Privacy-bewust gezin</p>
+    <div class="tooltip"><strong>Doelgroep 2</strong><br>Ouders die kinderfoto's beschermen. Mensen die medische dossiers, testament, verzekeringen veilig willen opslaan.</div>
+  </div>
+
+  <div class="node node-user" style="top: 645px; left: 580px;">
+    <span class="icon">🏢</span>
+    <h3>ZZP / MKB</h3>
+    <p>Bedrijfsdocumenten</p>
+    <div class="tooltip"><strong>Doelgroep 3</strong><br>Zzp'ers en kleine bedrijven die klantdata, contracten en administratie soeverein willen opslaan.</div>
+  </div>
+
+  <!-- ═══ LAYER 6: NL Marktpartijen ═══ -->
+  <div class="node node-market" style="top: 735px; left: 200px;">
+    <span class="icon">⚖️</span>
+    <h3>NextLegal</h3>
+    <p>Notaris-software</p>
+    <div class="tooltip"><strong>NextLegal / NextAssyst</strong><br>Software voor 40% van NL notariskantoren. Overgestapt naar Nederlandse cloudservers (Uniserver).</div>
+  </div>
+
+  <div class="node node-market" style="top: 735px; left: 400px;">
+    <span class="icon">🏥</span>
+    <h3>Zorg / Verzekeraars</h3>
+    <p>Medische dossiers</p>
+    <div class="tooltip"><strong>Zorgsector</strong><br>Potentiële afnemer: patiëntdossiers, recepten, verwijsbrieven. Hoog-sensitieve data die bij de burger hoort.</div>
+  </div>
+
+  <div class="node node-market" style="top: 735px; left: 610px;">
+    <span class="icon">🏦</span>
+    <h3>KNB / Kadaster</h3>
+    <p>Aktes & registraties</p>
+    <div class="tooltip"><strong>Koninklijke Notariële Beroepsorganisatie + Kadaster</strong><br>Verwerken miljoenen aktes per jaar. Al op Nederlandse servers (Intermax / KPN). Sturen data naar Belastingdienst.</div>
+  </div>
+
+  <div class="node node-market" style="top: 735px; left: 820px;">
+    <span class="icon">🌥️</span>
+    <h3>Dutch Cloud</h3>
+    <p>Community & lobby</p>
+    <div class="tooltip"><strong>Dutch Cloud Community</strong><br>Simon Besteman. Lobbyorganisatie voor NL/EU cloud-soevereiniteit. Overgestapt naar NextCloud, Soverin, Jitsi, Odoo.</div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-line solid"></div>
+    <span>Solid protocol verbinding</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line data"></div>
+    <span>Data-uitwisseling</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line user"></div>
+    <span>Gebruiker ↔ applicatie</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line gov"></div>
+    <span>Overheid / regulering</span>
+  </div>
+</div>
+
+</body>
+</html>
