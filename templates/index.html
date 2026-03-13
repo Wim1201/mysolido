@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySolido</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7f5; color: #333; }
+        .header { background: linear-gradient(135deg, #1a6b3c, #0f9b4f); color: white; padding: 20px 30px; }
+        .header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        .header p { font-size: 0.85rem; opacity: 0.8; }
+        .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        .flash { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
+        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .upload-box { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .upload-box h2 { font-size: 1rem; margin-bottom: 12px; color: #1a6b3c; }
+        .upload-box form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .upload-box input[type="file"] { flex: 1; min-width: 200px; }
+        .btn { background: #1a6b3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+        .btn:hover { background: #0f4d2a; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #a71d2a; }
+        .files { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .files h2 { font-size: 1rem; margin-bottom: 12px; color: #1a6b3c; }
+        .file-list { list-style: none; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .file-item:last-child { border-bottom: none; }
+        .file-name { display: flex; align-items: center; gap: 8px; }
+        .file-name .icon { font-size: 1.2rem; }
+        .file-name a { color: #333; text-decoration: none; }
+        .file-name a:hover { color: #1a6b3c; }
+        .empty { color: #999; font-style: italic; padding: 20px 0; }
+        .pod-url { font-size: 0.8rem; color: #999; margin-top: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MySolido</h1>
+        <p>Jouw persoonlijke datakluis op je eigen pc</p>
+    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+        <div class="upload-box">
+            <h2>Bestand uploaden</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" required>
+                <button type="submit" class="btn">Uploaden</button>
+            </form>
+        </div>
+        <div class="files">
+            <h2>Inhoud van je pod</h2>
+            {% if items %}
+                <ul class="file-list">
+                    {% for item in items %}
+                    <li class="file-item">
+                        <div class="file-name">
+                            <span class="icon">{% if item.is_folder %}&#128193;{% else %}&#128196;{% endif %}</span>
+                            <a href="{{ item.url }}" target="_blank">{{ item.name }}</a>
+                        </div>
+                        {% if not item.is_folder %}
+                        <form action="/delete" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
+                            <input type="hidden" name="resource_url" value="{{ item.url }}">
+                            <button type="submit" class="btn btn-danger">Verwijderen</button>
+                        </form>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="empty">Je pod is nog leeg. Upload je eerste bestand!</p>
+            {% endif %}
+        </div>
+        <p class="pod-url">Pod: {{ pod_url }}</p>
+    </div>
+</body>
+</html>
