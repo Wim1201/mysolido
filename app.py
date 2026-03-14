@@ -27,13 +27,14 @@ FOLDER_ICONS = {
     'gezin': '\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466',
     'abonnementen': '\U0001f4cb',
     'inbox': '\U0001f4e5',
+    'verzekeringen': '\U0001f6e1\ufe0f',
 }
 
 # Default folders to create on init
 DEFAULT_FOLDERS = [
     'identiteit', 'medisch', 'financieel', 'wonen', 'zakelijk',
     'werk', 'voertuigen', 'juridisch', 'media', 'wachtwoorden',
-    'gezin', 'abonnementen', 'inbox',
+    'gezin', 'abonnementen', 'inbox', 'verzekeringen',
 ]
 
 
@@ -103,8 +104,9 @@ def parse_container_contents(turtle_text, base_url):
 
     # Find all ldp:contains references using regex
     # Handles: ldp:contains <a/>, <b/>, <c/> across one or multiple lines
-    # First, collect all text after ldp:contains declarations
-    contains_pattern = re.compile(r'ldp:contains\s+(.+?)(?:[.;]|$)', re.DOTALL)
+    # Match until a '.' that ends the Turtle statement (followed by newline/end),
+    # not a '.' inside a filename like <test.txt>
+    contains_pattern = re.compile(r'ldp:contains\s+(.+?)\.\s*$', re.DOTALL | re.MULTILINE)
     contains_matches = contains_pattern.findall(turtle_text)
 
     # Extract all <resource> references from the matched text
@@ -164,6 +166,31 @@ def browse(folder_path):
     return browse_folder(folder_path)
 
 
+def get_all_folders():
+    """Geeft lijst van alle hoofdmappen met icoon en label voor de upload-dropdown"""
+    return [
+        {'name': name, 'icon': FOLDER_ICONS[name], 'label': name.capitalize()}
+        for name in DEFAULT_FOLDERS
+    ]
+
+
+def get_move_folders(folder_path, items):
+    """Bouw de mappenlijst voor de verplaats-dropdown: hoofdmappen + submappen van huidige locatie"""
+    folders = []
+    # Submappen uit de huidige listing
+    subfolders = [item for item in items if item['is_folder']]
+
+    for name in DEFAULT_FOLDERS:
+        icon = FOLDER_ICONS[name]
+        folders.append({'value': name, 'label': f'{icon} {name.capitalize()}', 'indent': 0})
+        # Als we in deze hoofdmap zitten (of een submap ervan), voeg submappen toe
+        if folder_path == name or folder_path.startswith(name + '/'):
+            for sub in subfolders:
+                sub_path = folder_path + '/' + sub['name']
+                folders.append({'value': sub_path, 'label': sub['name'], 'indent': 1})
+    return folders
+
+
 def browse_folder(folder_path):
     """Shared logic for browsing a folder"""
     # Ensure folder_path ends clean
@@ -181,12 +208,15 @@ def browse_folder(folder_path):
             # Parent path for "back" button
             parts = [p for p in folder_path.split('/') if p]
             parent_path = '/'.join(parts[:-1]) if parts else None
+            move_folders = get_move_folders(folder_path, items)
             return render_template('index.html',
                 items=items,
                 pod_url=SOLID_POD_URL,
                 folder_path=folder_path,
                 breadcrumbs=breadcrumbs,
                 parent_path=parent_path,
+                all_folders=get_all_folders(),
+                move_folders=move_folders,
             )
         elif response:
             flash(f'Kon map niet laden: {response.status_code}', 'error')
@@ -204,13 +234,15 @@ def browse_folder(folder_path):
         folder_path=folder_path,
         breadcrumbs=breadcrumbs,
         parent_path=parent_path,
+        all_folders=get_all_folders(),
+        move_folders=get_move_folders(folder_path, []),
     )
 
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    """Upload een bestand naar de huidige map"""
-    folder_path = request.form.get('folder_path', '').strip('/')
+    """Upload een bestand naar de gekozen map"""
+    folder_path = request.form.get('upload_folder', '').strip('/')
 
     if 'file' not in request.files:
         flash('Geen bestand geselecteerd', 'error')
@@ -295,6 +327,58 @@ def create_folder_route():
     else:
         flash('Map aanmaken mislukt: authenticatie error', 'error')
 
+    return redirect_to_folder(folder_path)
+
+
+@app.route('/move', methods=['POST'])
+def move():
+    """Verplaats een bestand naar een andere map"""
+    resource_url = request.form.get('resource_url', '')
+    target_folder = request.form.get('target_folder', '').strip('/')
+    folder_path = request.form.get('folder_path', '').strip('/')
+    filename = resource_url.rstrip('/').split('/')[-1]
+
+    if not resource_url or not filename:
+        flash('Geen bestand opgegeven', 'error')
+        return redirect_to_folder(folder_path)
+
+    # Build target URL
+    if target_folder:
+        target_url = SOLID_POD_URL + target_folder + '/' + filename
+    else:
+        target_url = SOLID_POD_URL + filename
+
+    if target_url == resource_url:
+        flash('Bestand staat al in deze map', 'error')
+        return redirect_to_folder(folder_path)
+
+    # Step 1: Download the file
+    get_response = pod_request('GET', resource_url)
+    if not get_response or get_response.status_code != 200:
+        status = get_response.status_code if get_response else 'geen response'
+        flash(f'Verplaatsen mislukt: kon bestand niet ophalen ({status})', 'error')
+        return redirect_to_folder(folder_path)
+
+    content_type = get_response.headers.get('Content-Type', 'application/octet-stream')
+
+    # Step 2: Upload to new location
+    put_response = pod_request('PUT', target_url,
+        data=get_response.content,
+        headers={'Content-Type': content_type}
+    )
+    if not put_response or put_response.status_code not in [200, 201, 205]:
+        status = put_response.status_code if put_response else 'geen response'
+        flash(f'Verplaatsen mislukt: kon bestand niet opslaan ({status})', 'error')
+        return redirect_to_folder(folder_path)
+
+    # Step 3: Delete original
+    del_response = pod_request('DELETE', resource_url)
+    if not del_response or del_response.status_code not in [200, 204, 205]:
+        flash(f'Let op: "{filename}" is gekopieerd maar het origineel kon niet verwijderd worden', 'error')
+        return redirect_to_folder(folder_path)
+
+    target_label = target_folder if target_folder else 'Pod root'
+    flash(f'"{filename}" verplaatst naar {target_label}', 'success')
     return redirect_to_folder(folder_path)
 
 
