@@ -5,3 +5,5 @@ __pycache__/
 ~
 files.zip
 ~$*
+shares.json
+audit_log.json

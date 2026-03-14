@@ -9,7 +9,13 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7f5; color: #333; }
         .header { background: linear-gradient(135deg, #1a6b3c, #0f9b4f); color: white; padding: 20px 30px; }
         .header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        .header h1 a { color: white; text-decoration: none; }
+        .header h1 a:hover { opacity: 0.9; }
         .header p { font-size: 0.85rem; opacity: 0.8; }
+        .header-nav { margin-top: 8px; display: flex; gap: 16px; }
+        .header-nav a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem; }
+        .header-nav a:hover { color: white; }
+        .header-nav a.active { color: white; font-weight: 600; border-bottom: 2px solid white; padding-bottom: 2px; }
         .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
         .flash { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
         .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
@@ -69,6 +75,15 @@
         .move-wrapper { position: relative; }
         .btn-move { background: #0d6efd; font-size: 0.8rem; padding: 5px 12px; }
         .btn-move:hover { background: #0b5ed7; }
+        .btn-share { background: #6f42c1; font-size: 0.8rem; padding: 5px 12px; }
+        .btn-share:hover { background: #5a32a3; }
+        .share-wrapper { position: relative; }
+        .share-dropdown { display: none; position: absolute; right: 0; top: 100%; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10; min-width: 280px; margin-top: 4px; padding: 12px; }
+        .share-dropdown.show { display: block; }
+        .share-dropdown label { display: block; font-size: 0.8rem; color: #555; margin-bottom: 4px; margin-top: 8px; }
+        .share-dropdown label:first-child { margin-top: 0; }
+        .share-dropdown input, .share-dropdown select { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; }
+        .share-dropdown .share-actions { display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end; }
         .move-dropdown { display: none; position: absolute; right: 0; top: 100%; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10; min-width: 220px; margin-top: 4px; }
         .move-dropdown.show { display: block; }
         .move-dropdown select { width: 100%; padding: 8px 12px; border: none; border-bottom: 1px solid #eee; font-size: 0.85rem; background: white; border-radius: 8px 8px 0 0; }
@@ -83,8 +98,13 @@
 </head>
 <body>
     <div class="header">
-        <h1>MySolido</h1>
+        <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
         <p>Jouw persoonlijke datakluis op je eigen pc</p>
+        <div class="header-nav">
+            <a href="{{ url_for('index') }}" class="active">Kluis</a>
+            <a href="{{ url_for('shares_overview') }}">Gedeeld</a>
+            <a href="{{ url_for('audit') }}">Logboek</a>
+        </div>
     </div>
     <div class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -187,6 +207,30 @@
                                 </div>
                             </div>
                             {% endif %}
+                            <div class="share-wrapper">
+                                <button type="button" class="btn btn-share" onclick="toggleShare(this)">&#x1F517; Delen</button>
+                                <div class="share-dropdown">
+                                    <form action="{{ url_for('share') }}" method="post">
+                                        <input type="hidden" name="resource_url" value="{{ item.url }}">
+                                        <input type="hidden" name="resource_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
+                                        <input type="hidden" name="folder_path" value="{{ folder_path }}">
+                                        <label>Rechtenniveau</label>
+                                        <select name="access_level" onchange="toggleWebidField(this)">
+                                            <option value="read">&#x1F50D; Alleen lezen</option>
+                                            <option value="readwrite">&#x270F;&#xFE0F; Lezen en schrijven</option>
+                                            <option value="public">&#x1F310; Openbaar (iedereen)</option>
+                                        </select>
+                                        <label class="webid-label">WebID</label>
+                                        <input type="url" name="webid" class="webid-input" placeholder="http://example.com/jan/profile/card#me">
+                                        <label>Verloopt op (optioneel)</label>
+                                        <input type="date" name="expires">
+                                        <div class="share-actions">
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">Annuleren</button>
+                                            <button type="submit" class="btn btn-sm" style="background: #6f42c1;">Delen</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                             <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
                                 <input type="hidden" name="resource_url" value="{{ item.url }}">
                                 <input type="hidden" name="folder_path" value="{{ folder_path }}">
@@ -205,18 +249,36 @@
     <script>
     function toggleMove(btn) {
         var dropdown = btn.closest('.move-wrapper').querySelector('.move-dropdown');
-        // Close all other open dropdowns first
-        document.querySelectorAll('.move-dropdown.show').forEach(function(d) {
-            if (d !== dropdown) d.classList.remove('show');
-        });
+        closeAllDropdowns(dropdown);
         dropdown.classList.toggle('show');
     }
-    // Close dropdown when clicking outside
+    function toggleShare(btn) {
+        var dropdown = btn.closest('.share-wrapper').querySelector('.share-dropdown');
+        closeAllDropdowns(dropdown);
+        dropdown.classList.toggle('show');
+    }
+    function toggleWebidField(select) {
+        var form = select.closest('form');
+        var webidLabel = form.querySelector('.webid-label');
+        var webidInput = form.querySelector('.webid-input');
+        if (select.value === 'public') {
+            webidLabel.style.display = 'none';
+            webidInput.style.display = 'none';
+            webidInput.removeAttribute('required');
+        } else {
+            webidLabel.style.display = '';
+            webidInput.style.display = '';
+            webidInput.setAttribute('required', '');
+        }
+    }
+    function closeAllDropdowns(except) {
+        document.querySelectorAll('.move-dropdown.show, .share-dropdown.show').forEach(function(d) {
+            if (d !== except) d.classList.remove('show');
+        });
+    }
     document.addEventListener('click', function(e) {
-        if (!e.target.closest('.move-wrapper')) {
-            document.querySelectorAll('.move-dropdown.show').forEach(function(d) {
-                d.classList.remove('show');
-            });
+        if (!e.target.closest('.move-wrapper') && !e.target.closest('.share-wrapper')) {
+            closeAllDropdowns();
         }
     });
     </script>

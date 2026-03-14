@@ -12,6 +12,9 @@
         .header h1 a { color: white; text-decoration: none; }
         .header h1 a:hover { opacity: 0.9; }
         .header p { font-size: 0.85rem; opacity: 0.8; }
+        .header-nav { margin-top: 8px; display: flex; gap: 16px; }
+        .header-nav a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem; }
+        .header-nav a:hover { color: white; }
         .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
         .btn { background: #1a6b3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; text-decoration: none; display: inline-block; }
         .btn:hover { background: #0f4d2a; }
@@ -28,6 +31,11 @@
     <div class="header">
         <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
         <p>Jouw persoonlijke datakluis op je eigen pc</p>
+        <div class="header-nav">
+            <a href="{{ url_for('index') }}">Kluis</a>
+            <a href="{{ url_for('shares_overview') }}">Gedeeld</a>
+            <a href="{{ url_for('audit') }}">Logboek</a>
+        </div>
     </div>
     <div class="container">
         <div class="toolbar">
