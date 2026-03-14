@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ filename }} - MySolido</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7f5; color: #333; }
+        .header { background: linear-gradient(135deg, #1a6b3c, #0f9b4f); color: white; padding: 20px 30px; }
+        .header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        .header h1 a { color: white; text-decoration: none; }
+        .header h1 a:hover { opacity: 0.9; }
+        .header p { font-size: 0.85rem; opacity: 0.8; }
+        .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        .btn { background: #1a6b3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #0f4d2a; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .toolbar-left { display: flex; align-items: center; gap: 12px; }
+        .back-link { color: #1a6b3c; text-decoration: none; font-size: 0.9rem; }
+        .back-link:hover { text-decoration: underline; }
+        .filename { font-weight: 600; font-size: 1rem; }
+        .player-card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; }
+        .player-card audio, .player-card video { max-width: 100%; border-radius: 8px; margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
+        <p>Jouw persoonlijke datakluis op je eigen pc</p>
+    </div>
+    <div class="container">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <a href="{% if folder_path %}{{ url_for('browse', folder_path=folder_path) }}{% else %}{{ url_for('index') }}{% endif %}" class="back-link">&#x2190; Terug</a>
+                <span class="filename">{{ filename }}</span>
+            </div>
+            <a href="{{ url_for('download_file', file_path=file_path) }}" class="btn">&#x2B07; Downloaden</a>
+        </div>
+        <div class="player-card">
+            {% if media_type == 'audio' %}
+                <p>&#x1F3B5; {{ filename }}</p>
+                <audio controls>
+                    <source src="{{ url_for('view_file', file_path=file_path) }}?raw=1" type="{{ content_type }}">
+                    Je browser ondersteunt dit audioformaat niet.
+                </audio>
+            {% elif media_type == 'video' %}
+                <video controls>
+                    <source src="{{ url_for('view_file', file_path=file_path) }}?raw=1" type="{{ content_type }}">
+                    Je browser ondersteunt dit videoformaat niet.
+                </video>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

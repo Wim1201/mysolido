@@ -1,5 +1,6 @@
 import re
-from flask import Flask, render_template, request, redirect, url_for, flash
+import os
+from flask import Flask, render_template, request, redirect, url_for, flash, Response
 import requests
 import base64
 
@@ -11,6 +12,24 @@ CSS_BASE_URL = 'http://localhost:3000'
 SOLID_POD_URL = 'http://localhost:3000/wim/'
 CLIENT_ID = '***REMOVED***'
 CLIENT_SECRET = '***REMOVED***'
+
+# Viewable file types for inline display
+VIEWABLE_TYPES = {
+    '.pdf': 'application/pdf',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.txt': 'text/plain',
+    '.html': 'text/html',
+    '.json': 'application/json',
+    '.csv': 'text/csv',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+}
 
 # Folder icons per category
 FOLDER_ICONS = {
@@ -380,6 +399,119 @@ def move():
     target_label = target_folder if target_folder else 'Pod root'
     flash(f'"{filename}" verplaatst naar {target_label}', 'success')
     return redirect_to_folder(folder_path)
+
+
+def search_pod(container_url, query, path='', depth=0, max_depth=5):
+    """Recursively search the pod for files matching the query"""
+    if depth >= max_depth:
+        return []
+
+    results = []
+    response = pod_request('GET', container_url, headers={'Accept': 'text/turtle'})
+    if not response or response.status_code != 200:
+        return results
+
+    items = parse_container_contents(response.text, container_url)
+    for item in items:
+        if item['is_folder']:
+            # Build the subfolder path
+            sub_path = path + '/' + item['name'] if path else item['name']
+            sub_url = item['url']
+            # Recurse into subfolder
+            results.extend(search_pod(sub_url, query, sub_path, depth + 1, max_depth))
+        else:
+            # Check if filename matches query (case-insensitive)
+            if query.lower() in item['name'].lower():
+                file_path = path + '/' + item['name'] if path else item['name']
+                results.append({
+                    'name': item['name'],
+                    'path': file_path,
+                    'folder_path': path,
+                    'url': item['url'],
+                    'icon': item['icon'],
+                })
+    return results
+
+
+@app.route('/search')
+def search():
+    """Search for files across all folders"""
+    query = request.args.get('q', '').strip()
+    results = []
+    if query:
+        try:
+            results = search_pod(SOLID_POD_URL, query)
+        except requests.ConnectionError:
+            flash('CSS server niet bereikbaar. Draait hij op poort 3000?', 'error')
+
+    return render_template('search.html',
+        query=query,
+        results=results,
+        pod_url=SOLID_POD_URL,
+        all_folders=get_all_folders(),
+    )
+
+
+@app.route('/view/<path:file_path>')
+def view_file(file_path):
+    """View a file inline in the browser"""
+    file_url = SOLID_POD_URL + file_path
+    response = pod_request('GET', file_url)
+
+    if not response or response.status_code != 200:
+        flash('Bestand kon niet worden geopend', 'error')
+        return redirect(url_for('index'))
+
+    content_type = response.headers.get('Content-Type', 'application/octet-stream')
+    filename = file_path.split('/')[-1]
+    ext = os.path.splitext(filename)[1].lower()
+
+    # For media types that need an HTML wrapper (audio/video), render a template
+    # Unless ?raw=1 is passed (used by <source> tags to get the actual media data)
+    if ext in ('.mp3', '.wav', '.mp4', '.webm') and not request.args.get('raw'):
+        folder_path = '/'.join(file_path.split('/')[:-1])
+        return render_template('view.html',
+            filename=filename,
+            file_path=file_path,
+            folder_path=folder_path,
+            media_type='audio' if ext in ('.mp3', '.wav') else 'video',
+            content_type=VIEWABLE_TYPES.get(ext, content_type),
+        )
+
+    # For viewable types, serve inline
+    if ext in VIEWABLE_TYPES:
+        return Response(
+            response.content,
+            content_type=content_type,
+            headers={'Content-Disposition': f'inline; filename="{filename}"'}
+        )
+
+    # For everything else, trigger download
+    return Response(
+        response.content,
+        content_type=content_type,
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+@app.route('/download/<path:file_path>')
+def download_file(file_path):
+    """Force download a file from the pod"""
+    file_url = SOLID_POD_URL + file_path
+    response = pod_request('GET', file_url)
+
+    if not response or response.status_code != 200:
+        flash('Bestand kon niet worden gedownload', 'error')
+        return redirect(url_for('index'))
+
+    content_type = response.headers.get('Content-Type', 'application/octet-stream')
+    filename = file_path.split('/')[-1]
+
+    return Response(
+        response.content,
+        content_type=content_type,
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
 
 
 @app.route('/debug')
