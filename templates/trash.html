@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_restore, icon_delete, icon_file, icon_trash %}
+
+{% block title %}Prullenbak - MySolido{% endblock %}
+
+{% block content %}
+    <div class="trash-card">
+        <h2>{{ icon_trash() }} Prullenbak</h2>
+        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 16px;">
+            Items worden na 30 dagen automatisch definitief verwijderd.
+        </p>
+        {% if trash_items %}
+            <ul class="trash-list">
+                {% for item in trash_items %}
+                <li class="trash-item">
+                    <div class="trash-info">
+                        <div class="trash-filename">
+                            {{ icon_file() }} {{ item.filename }}
+                        </div>
+                        <div class="trash-details">
+                            Oorspronkelijk: {{ item.original_folder or item.original_path }}
+                            &middot; Verwijderd: {{ item.deleted_at[:10] }}
+                        </div>
+                    </div>
+                    <div class="trash-actions">
+                        <form action="{{ url_for('trash_restore') }}" method="post">
+                            <input type="hidden" name="trash_id" value="{{ item.trash_id }}">
+                            <button type="submit" class="btn btn-sm" title="Herstellen">{{ icon_restore() }} Herstel</button>
+                        </form>
+                        <form action="{{ url_for('trash_permanent_delete') }}" method="post" onsubmit="return confirm('Weet je zeker? Dit kan niet ongedaan worden.')">
+                            <input type="hidden" name="trash_id" value="{{ item.trash_id }}">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Definitief verwijderen">{{ icon_delete() }}</button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="empty">De prullenbak is leeg.</p>
+        {% endif %}
+    </div>
+{% endblock %}

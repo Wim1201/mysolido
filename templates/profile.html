@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_user, icon_settings, icon_file, icon_folder %}
+
+{% block title %}Profiel - MySolido{% endblock %}
+
+{% block content %}
+    <div class="profile-card">
+        <svg class="profile-avatar" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <h2 style="font-size: 1.2rem;">MySolido Gebruiker</h2>
+        <p class="profile-webid">{{ webid }}</p>
+        <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px;">Pod: {{ pod_url }}</p>
+
+        <div class="profile-stats">
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.file_count }}</div>
+                <div class="stat-label">Bestanden</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.folder_count }}</div>
+                <div class="stat-label">Mappen</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.total_size_formatted }}</div>
+                <div class="stat-label">Totale grootte</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 16px;">
+        <a href="{{ url_for('settings') }}" class="btn">{{ icon_settings() }} Instellingen</a>
+    </div>
+{% endblock %}

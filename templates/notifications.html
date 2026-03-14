@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_bell, icon_share, icon_hourglass, icon_trash, icon_info %}
+
+{% block title %}Notificaties - MySolido{% endblock %}
+
+{% block content %}
+    <div class="notifications-card">
+        <h2>{{ icon_bell() }} Notificaties</h2>
+        {% if notifications %}
+            <div class="notification-actions">
+                <form action="{{ url_for('notification_mark_read') }}" method="post">
+                    <button type="submit" class="btn btn-secondary btn-sm">Alles als gelezen markeren</button>
+                </form>
+            </div>
+            <ul class="notification-list">
+                {% for notif in notifications %}
+                <li class="notification-item {% if not notif.read %}unread{% endif %}">
+                    <span class="notification-icon">
+                        {% if notif.type == 'share_expired' %}{{ icon_hourglass() }}
+                        {% elif notif.type == 'trash_auto_deleted' %}{{ icon_trash() }}
+                        {% else %}{{ icon_info() }}
+                        {% endif %}
+                    </span>
+                    <div class="notification-content">
+                        <div class="notification-message">{{ notif.message }}</div>
+                        <div class="notification-time">{{ notif.created_at[:16].replace('T', ' ') }}</div>
+                    </div>
+                    {% if not notif.read %}
+                    <form action="{{ url_for('notification_mark_read') }}" method="post">
+                        <input type="hidden" name="notification_id" value="{{ notif.id }}">
+                        <button type="submit" class="btn btn-sm btn-secondary" style="font-size: 0.7rem; padding: 2px 8px;">Gelezen</button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="empty">Geen notificaties.</p>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,286 +1,251 @@
-<!DOCTYPE html>
-<html lang="nl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MySolido</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7f5; color: #333; }
-        .header { background: linear-gradient(135deg, #1a6b3c, #0f9b4f); color: white; padding: 20px 30px; }
-        .header h1 { font-size: 1.5rem; margin-bottom: 4px; }
-        .header h1 a { color: white; text-decoration: none; }
-        .header h1 a:hover { opacity: 0.9; }
-        .header p { font-size: 0.85rem; opacity: 0.8; }
-        .header-nav { margin-top: 8px; display: flex; gap: 16px; }
-        .header-nav a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem; }
-        .header-nav a:hover { color: white; }
-        .header-nav a.active { color: white; font-weight: 600; border-bottom: 2px solid white; padding-bottom: 2px; }
-        .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
-        .flash { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
-        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left, icon_chevron_right, icon_download, icon_upload, icon_delete, icon_share, icon_move, icon_search, icon_plus, icon_folder, icon_file, icon_package, icon_eye, icon_edit, icon_globe, icon_lock, icon_hourglass, icon_append, folder_icon %}
 
-        /* Breadcrumbs */
-        .breadcrumbs { background: white; border-radius: 12px; padding: 12px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .breadcrumbs a { color: #1a6b3c; text-decoration: none; font-size: 0.9rem; }
-        .breadcrumbs a:hover { text-decoration: underline; }
-        .breadcrumbs .separator { color: #999; font-size: 0.8rem; }
-        .breadcrumbs .current { color: #333; font-weight: 600; font-size: 0.9rem; }
-        .btn-back { display: inline-flex; align-items: center; gap: 4px; background: #e9ecef; color: #333; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; text-decoration: none; margin-right: 10px; }
-        .btn-back:hover { background: #dee2e6; }
+{% block title %}{% if folder_path %}{{ folder_path.split('/')[-1] }} - {% endif %}MySolido{% endblock %}
 
-        /* Actions bar */
-        .actions-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-        .action-card { background: white; border-radius: 12px; padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); flex: 1; min-width: 280px; }
-        .action-card h2 { font-size: 0.95rem; margin-bottom: 10px; color: #1a6b3c; }
-        .action-card form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .action-card input[type="file"] { flex: 1; min-width: 180px; }
-        .action-card input[type="text"] { flex: 1; min-width: 140px; padding: 7px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
-        .action-card input[type="text"]:focus { outline: none; border-color: #1a6b3c; box-shadow: 0 0 0 2px rgba(26,107,60,0.15); }
+{% block content %}
+    {% if not folder_path %}
+    {# === DASHBOARD VIEW === #}
 
-        .btn { background: #1a6b3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
-        .btn:hover { background: #0f4d2a; }
-        .btn-danger { background: #dc3545; }
-        .btn-danger:hover { background: #a71d2a; }
-        .btn-secondary { background: #6c757d; }
-        .btn-secondary:hover { background: #545b62; }
-        .btn-init { background: #0d6efd; }
-        .btn-init:hover { background: #0b5ed7; }
-
-        /* File list */
-        .files { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .files h2 { font-size: 1rem; margin-bottom: 12px; color: #1a6b3c; }
-        .file-list { list-style: none; }
-        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .file-item:last-child { border-bottom: none; }
-        .file-name { display: flex; align-items: center; gap: 8px; }
-        .file-name .icon { font-size: 1.2rem; }
-        .file-name a { color: #333; text-decoration: none; }
-        .file-name a:hover { color: #1a6b3c; }
-        .folder-link { font-weight: 500; }
-        .empty { color: #999; font-style: italic; padding: 20px 0; }
-        .pod-url { font-size: 0.8rem; color: #999; margin-top: 20px; text-align: center; }
-
-        /* Search bar */
-        .search-bar { background: white; border-radius: 12px; padding: 12px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .search-bar form { display: flex; gap: 8px; }
-        .search-bar input[type="search"] { flex: 1; padding: 8px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
-        .search-bar input[type="search"]:focus { outline: none; border-color: #1a6b3c; box-shadow: 0 0 0 2px rgba(26,107,60,0.15); }
-        .btn-download { background: #198754; font-size: 0.8rem; padding: 5px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
-        .btn-download:hover { background: #146c43; }
-
-        /* File actions */
-        .file-actions { display: flex; gap: 6px; align-items: center; }
-        .move-wrapper { position: relative; }
-        .btn-move { background: #0d6efd; font-size: 0.8rem; padding: 5px 12px; }
-        .btn-move:hover { background: #0b5ed7; }
-        .btn-share { background: #6f42c1; font-size: 0.8rem; padding: 5px 12px; }
-        .btn-share:hover { background: #5a32a3; }
-        .share-wrapper { position: relative; }
-        .share-dropdown { display: none; position: absolute; right: 0; top: 100%; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10; min-width: 280px; margin-top: 4px; padding: 12px; }
-        .share-dropdown.show { display: block; }
-        .share-dropdown label { display: block; font-size: 0.8rem; color: #555; margin-bottom: 4px; margin-top: 8px; }
-        .share-dropdown label:first-child { margin-top: 0; }
-        .share-dropdown input, .share-dropdown select { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; }
-        .share-dropdown .share-actions { display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end; }
-        .move-dropdown { display: none; position: absolute; right: 0; top: 100%; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10; min-width: 220px; margin-top: 4px; }
-        .move-dropdown.show { display: block; }
-        .move-dropdown select { width: 100%; padding: 8px 12px; border: none; border-bottom: 1px solid #eee; font-size: 0.85rem; background: white; border-radius: 8px 8px 0 0; }
-        .move-dropdown .move-actions { display: flex; gap: 6px; padding: 8px; justify-content: flex-end; }
-        .move-dropdown .btn-sm { font-size: 0.8rem; padding: 4px 12px; border-radius: 4px; }
-
-        /* Init banner */
-        .init-banner { background: #e7f3ff; border: 1px solid #b6d4fe; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .init-banner p { font-size: 0.9rem; color: #084298; }
-        .init-banner a { font-size: 0.85rem; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
-        <p>Jouw persoonlijke datakluis op je eigen pc</p>
-        <div class="header-nav">
-            <a href="{{ url_for('index') }}" class="active">Kluis</a>
-            <a href="{{ url_for('shares_overview') }}">Gedeeld</a>
-            <a href="{{ url_for('audit') }}">Logboek</a>
+    <!-- Stats -->
+    <div class="stats-bar">
+        <div class="stat-item">
+            <div class="stat-value">{{ folder_count }}</div>
+            <div class="stat-label">Mappen</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ file_count }}</div>
+            <div class="stat-label">Bestanden</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ items|length }}</div>
+            <div class="stat-label">Items in root</div>
         </div>
     </div>
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endwith %}
 
-        <!-- Breadcrumb navigation -->
-        <div class="breadcrumbs">
-            {% if parent_path is not none %}
-                <a href="{% if parent_path %}{{ url_for('browse', folder_path=parent_path) }}{% else %}{{ url_for('index') }}{% endif %}" class="btn-back">&#x2190; Terug</a>
-            {% endif %}
-            {% for crumb in breadcrumbs %}
-                {% if not loop.last %}
-                    <a href="{% if crumb.path %}{{ url_for('browse', folder_path=crumb.path) }}{% else %}{{ url_for('index') }}{% endif %}">{{ crumb.name }}</a>
-                    <span class="separator">&#x203A;</span>
-                {% else %}
-                    <span class="current">{{ crumb.name }}</span>
-                {% endif %}
+    <!-- Search bar -->
+    <div class="search-bar">
+        <form action="{{ url_for('search') }}" method="get">
+            <input type="search" name="q" placeholder="Zoek in je kluis...">
+            <button type="submit" class="btn">{{ icon_search() }} Zoeken</button>
+        </form>
+    </div>
+
+    <!-- Init banner (only when no items) -->
+    {% if not items %}
+    <div class="init-banner">
+        <p>Welkom! Maak de standaardmappen aan om te beginnen.</p>
+        <a href="{{ url_for('init_folders') }}" class="btn btn-init">Standaardmappen aanmaken</a>
+    </div>
+    {% endif %}
+
+    <!-- Upload Zone -->
+    <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+        <select name="upload_folder" class="upload-folder-select">
+            <option value="">{{ icon_package() }} Pod root</option>
+            {% for folder in all_folders %}
+            <option value="{{ folder.name }}">{{ folder.label }}</option>
             {% endfor %}
+        </select>
+        <div class="upload-zone">
+            {{ icon_upload() }}
+            <p>Sleep een bestand hierheen of klik om te uploaden</p>
+            <input type="file" name="file" required>
         </div>
+    </form>
 
-        <!-- Search bar -->
-        <div class="search-bar">
-            <form action="{{ url_for('search') }}" method="get">
-                <input type="search" name="q" placeholder="Zoek in je kluis..." value="">
-                <button type="submit" class="btn">Zoeken</button>
+    <!-- Folder Grid -->
+    {% if items %}
+    <h2 style="font-size: 1rem; color: var(--color-primary); margin-bottom: 12px;">Mappen</h2>
+    <div class="folder-grid">
+        {% for name in default_folders %}
+        <a href="{{ url_for('browse', folder_path=name) }}" class="folder-card" style="--folder-color: {{ folder_styles[name].color }}">
+            {{ folder_icon(name) }}
+            <div class="folder-card-name">{{ name.capitalize() }}</div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Recent files from audit log -->
+    {% if recent_files %}
+    <div class="files recent-section">
+        <h2>Recente uploads</h2>
+        <ul class="file-list">
+            {% for entry in recent_files %}
+            <li class="file-item">
+                <div class="file-name">
+                    <span class="icon">{{ icon_file() }}</span>
+                    <span>{{ entry.details.file }} <small style="color: var(--color-text-muted);">({{ entry.details.folder }})</small></span>
+                </div>
+                <span style="font-size: 0.75rem; color: var(--color-text-muted);">{{ entry.timestamp[:10] }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Other items in root (files) -->
+    {% set root_files = items|selectattr('is_folder', 'equalto', false)|list %}
+    {% if root_files %}
+    <div class="files" style="margin-top: 16px;">
+        <h2>Bestanden in root</h2>
+        <ul class="file-list">
+            {% for item in root_files %}
+            <li class="file-item">
+                <div class="file-name">
+                    <span class="icon">{{ icon_file() }}</span>
+                    <a href="{{ url_for('view_file', file_path=item.name) }}">{{ item.name }}</a>
+                </div>
+                <div class="file-actions">
+                    <a href="{{ url_for('download_file', file_path=item.name) }}" class="btn btn-download">{{ icon_download() }} Download</a>
+                    <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
+                        <input type="hidden" name="resource_url" value="{{ item.url }}">
+                        <input type="hidden" name="folder_path" value="">
+                        <button type="submit" class="btn btn-danger btn-sm">{{ icon_delete() }}</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <p class="pod-url">Pod: {{ pod_url }}</p>
+
+    {% else %}
+    {# === FOLDER BROWSER VIEW === #}
+
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs">
+        {% if parent_path is not none %}
+            <a href="{% if parent_path %}{{ url_for('browse', folder_path=parent_path) }}{% else %}{{ url_for('index') }}{% endif %}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
+        {% endif %}
+        {% for crumb in breadcrumbs %}
+            {% if not loop.last %}
+                <a href="{% if crumb.path %}{{ url_for('browse', folder_path=crumb.path) }}{% else %}{{ url_for('index') }}{% endif %}">{{ crumb.name }}</a>
+                <span class="separator">{{ icon_chevron_right() }}</span>
+            {% else %}
+                <span class="current">{{ crumb.name }}</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Search bar -->
+    <div class="search-bar">
+        <form action="{{ url_for('search') }}" method="get">
+            <input type="search" name="q" placeholder="Zoek in je kluis...">
+            <button type="submit" class="btn">{{ icon_search() }} Zoeken</button>
+        </form>
+    </div>
+
+    <!-- Actions: upload + create folder -->
+    <div class="actions-bar">
+        <div class="action-card">
+            <h2>{{ icon_upload() }} Bestand uploaden</h2>
+            <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+                <select name="upload_folder" class="upload-folder-select">
+                    <option value="">Pod root</option>
+                    {% for folder in all_folders %}
+                    <option value="{{ folder.name }}" {% if folder_path == folder.name or folder_path.startswith(folder.name + '/') %}selected{% endif %}>{{ folder.label }}</option>
+                    {% endfor %}
+                </select>
+                <input type="file" name="file" required>
+                <button type="submit" class="btn">Uploaden</button>
             </form>
         </div>
-
-        <!-- Init banner (only on root when no items) -->
-        {% if not folder_path and not items %}
-        <div class="init-banner">
-            <p>Welkom! Maak de standaardmappen aan om te beginnen.</p>
-            <a href="{{ url_for('init_folders') }}" class="btn btn-init">Standaardmappen aanmaken</a>
+        <div class="action-card">
+            <h2>{{ icon_plus() }} Nieuwe map</h2>
+            <form action="{{ url_for('create_folder_route') }}" method="post">
+                <input type="hidden" name="folder_path" value="{{ folder_path }}">
+                <input type="text" name="folder_name" placeholder="Mapnaam..." required>
+                <button type="submit" class="btn btn-secondary">Map aanmaken</button>
+            </form>
         </div>
-        {% endif %}
-
-        <!-- Actions: upload + create folder -->
-        <div class="actions-bar">
-            <div class="action-card">
-                <h2>Bestand uploaden</h2>
-                <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
-                    <select name="upload_folder" style="width: 100%; padding: 7px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; margin-bottom: 8px; background: white;">
-                        <option value="" {% if not folder_path %}selected{% endif %}>📦 Pod root</option>
-                        {% for folder in all_folders %}
-                        <option value="{{ folder.name }}" {% if folder_path == folder.name %}selected{% endif %}>{{ folder.icon }} {{ folder.label }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="file" name="file" required>
-                    <button type="submit" class="btn">Uploaden</button>
-                </form>
-            </div>
-            <div class="action-card">
-                <h2>Nieuwe map</h2>
-                <form action="{{ url_for('create_folder_route') }}" method="post">
-                    <input type="hidden" name="folder_path" value="{{ folder_path }}">
-                    <input type="text" name="folder_name" placeholder="Mapnaam..." required>
-                    <button type="submit" class="btn btn-secondary">Map aanmaken</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- File/folder listing -->
-        <div class="files">
-            <h2>Inhoud{% if folder_path %} van {{ folder_path.split('/')[-1] }}{% endif %}</h2>
-            {% if items %}
-                <ul class="file-list">
-                    {% for item in items %}
-                    <li class="file-item">
-                        <div class="file-name">
-                            <span class="icon">{{ item.icon }}</span>
-                            {% if item.is_folder %}
-                                <a href="{{ url_for('browse', folder_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="folder-link">{{ item.name }}</a>
-                            {% else %}
-                                <a href="{{ url_for('view_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}">{{ item.name }}</a>
-                            {% endif %}
-                        </div>
-                        <div class="file-actions">
-                            {% if not item.is_folder %}
-                            <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-download">&#x2B07; Download</a>
-                            <div class="move-wrapper">
-                                <button type="button" class="btn btn-move" onclick="toggleMove(this)">Verplaatsen</button>
-                                <div class="move-dropdown">
-                                    <form action="{{ url_for('move') }}" method="post">
-                                        <input type="hidden" name="resource_url" value="{{ item.url }}">
-                                        <input type="hidden" name="folder_path" value="{{ folder_path }}">
-                                        <select name="target_folder">
-                                            <option value="">📦 Pod root</option>
-                                            {% for folder in move_folders %}
-                                            <option value="{{ folder.value }}">{% if folder.indent %}&nbsp;&nbsp;&nbsp;&nbsp;↳ {% endif %}{{ folder.label }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        <div class="move-actions">
-                                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">Annuleren</button>
-                                            <button type="submit" class="btn btn-sm">Verplaats</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                            {% endif %}
-                            <div class="share-wrapper">
-                                <button type="button" class="btn btn-share" onclick="toggleShare(this)">&#x1F517; Delen</button>
-                                <div class="share-dropdown">
-                                    <form action="{{ url_for('share') }}" method="post">
-                                        <input type="hidden" name="resource_url" value="{{ item.url }}">
-                                        <input type="hidden" name="resource_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
-                                        <input type="hidden" name="folder_path" value="{{ folder_path }}">
-                                        <label>Rechtenniveau</label>
-                                        <select name="access_level" onchange="toggleWebidField(this)">
-                                            <option value="read">&#x1F50D; Alleen lezen</option>
-                                            <option value="readwrite">&#x270F;&#xFE0F; Lezen en schrijven</option>
-                                            <option value="public">&#x1F310; Openbaar (iedereen)</option>
-                                        </select>
-                                        <label class="webid-label">WebID</label>
-                                        <input type="url" name="webid" class="webid-input" placeholder="http://example.com/jan/profile/card#me">
-                                        <label>Verloopt op (optioneel)</label>
-                                        <input type="date" name="expires">
-                                        <div class="share-actions">
-                                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">Annuleren</button>
-                                            <button type="submit" class="btn btn-sm" style="background: #6f42c1;">Delen</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                            <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
-                                <input type="hidden" name="resource_url" value="{{ item.url }}">
-                                <input type="hidden" name="folder_path" value="{{ folder_path }}">
-                                <button type="submit" class="btn btn-danger">Verwijderen</button>
-                            </form>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="empty">Deze map is leeg.</p>
-            {% endif %}
-        </div>
-        <p class="pod-url">Pod: {{ pod_url }}</p>
     </div>
-    <script>
-    function toggleMove(btn) {
-        var dropdown = btn.closest('.move-wrapper').querySelector('.move-dropdown');
-        closeAllDropdowns(dropdown);
-        dropdown.classList.toggle('show');
-    }
-    function toggleShare(btn) {
-        var dropdown = btn.closest('.share-wrapper').querySelector('.share-dropdown');
-        closeAllDropdowns(dropdown);
-        dropdown.classList.toggle('show');
-    }
-    function toggleWebidField(select) {
-        var form = select.closest('form');
-        var webidLabel = form.querySelector('.webid-label');
-        var webidInput = form.querySelector('.webid-input');
-        if (select.value === 'public') {
-            webidLabel.style.display = 'none';
-            webidInput.style.display = 'none';
-            webidInput.removeAttribute('required');
-        } else {
-            webidLabel.style.display = '';
-            webidInput.style.display = '';
-            webidInput.setAttribute('required', '');
-        }
-    }
-    function closeAllDropdowns(except) {
-        document.querySelectorAll('.move-dropdown.show, .share-dropdown.show').forEach(function(d) {
-            if (d !== except) d.classList.remove('show');
-        });
-    }
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.move-wrapper') && !e.target.closest('.share-wrapper')) {
-            closeAllDropdowns();
-        }
-    });
-    </script>
-</body>
-</html>
+
+    <!-- File/folder listing -->
+    <div class="files">
+        <h2>Inhoud van {{ folder_path.split('/')[-1] }}</h2>
+        {% if items %}
+            <ul class="file-list">
+                {% for item in items %}
+                <li class="file-item">
+                    <div class="file-name">
+                        <span class="icon">
+                            {% if item.is_folder %}
+                                {{ folder_icon(item.name) }}
+                            {% else %}
+                                {{ icon_file() }}
+                            {% endif %}
+                        </span>
+                        {% if item.is_folder %}
+                            <a href="{{ url_for('browse', folder_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="folder-link">{{ item.name }}</a>
+                        {% else %}
+                            <a href="{{ url_for('view_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}">{{ item.name }}</a>
+                        {% endif %}
+                    </div>
+                    <div class="file-actions">
+                        {% if not item.is_folder %}
+                        <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-download">{{ icon_download() }} Download</a>
+                        <div class="move-wrapper">
+                            <button type="button" class="btn btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaatsen</button>
+                            <div class="move-dropdown">
+                                <form action="{{ url_for('move') }}" method="post">
+                                    <input type="hidden" name="resource_url" value="{{ item.url }}">
+                                    <input type="hidden" name="folder_path" value="{{ folder_path }}">
+                                    <select name="target_folder">
+                                        <option value="">Pod root</option>
+                                        {% for folder in move_folders %}
+                                        <option value="{{ folder.value }}">{% if folder.indent %}&nbsp;&nbsp;&nbsp;&nbsp;&#x21B3; {% endif %}{{ folder.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="move-actions">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">Annuleren</button>
+                                        <button type="submit" class="btn btn-sm">Verplaats</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="share-wrapper">
+                            <button type="button" class="btn btn-share" onclick="toggleShare(this)">{{ icon_share() }} Delen</button>
+                            <div class="share-dropdown">
+                                <form action="{{ url_for('share') }}" method="post">
+                                    <input type="hidden" name="resource_url" value="{{ item.url }}">
+                                    <input type="hidden" name="resource_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
+                                    <input type="hidden" name="folder_path" value="{{ folder_path }}">
+                                    <label>Rechtenniveau</label>
+                                    <select name="access_level" onchange="toggleWebidField(this)">
+                                        <option value="read">{{ icon_eye() }} Alleen lezen</option>
+                                        <option value="readwrite">{{ icon_edit() }} Lezen en schrijven</option>
+                                        <option value="append">{{ icon_append() }} Alleen toevoegen</option>
+                                        <option value="public">{{ icon_globe() }} Openbaar (iedereen)</option>
+                                    </select>
+                                    <label class="webid-label">WebID</label>
+                                    <input type="url" name="webid" class="webid-input" placeholder="http://example.com/jan/profile/card#me">
+                                    <label>Verloopt op (optioneel)</label>
+                                    <input type="date" name="expires">
+                                    <div class="share-actions">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">Annuleren</button>
+                                        <button type="submit" class="btn btn-sm" style="background: var(--color-purple);">Delen</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
+                            <input type="hidden" name="resource_url" value="{{ item.url }}">
+                            <input type="hidden" name="folder_path" value="{{ folder_path }}">
+                            <button type="submit" class="btn btn-danger btn-sm">{{ icon_delete() }}</button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="empty">Deze map is leeg.</p>
+        {% endif %}
+    </div>
+    <p class="pod-url">Pod: {{ pod_url }}</p>
+    {% endif %}
+{% endblock %}
