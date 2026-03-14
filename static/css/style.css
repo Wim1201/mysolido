@@ -389,7 +389,7 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
 /* --- Dashboard: Folder Grid --- */
 .folder-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(5, 1fr);
     gap: 12px;
     margin-bottom: 24px;
 }
@@ -783,7 +783,7 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
     .container { padding-bottom: 80px; }
     .actions-bar { flex-direction: column; }
     .action-card { min-width: 100%; }
-    .folder-grid { grid-template-columns: repeat(2, 1fr); }
+    .folder-grid { grid-template-columns: repeat(4, 1fr); }
     .file-actions { flex-wrap: wrap; }
     .file-item { flex-direction: column; align-items: flex-start; gap: 8px; }
     .stats-bar { flex-direction: column; }
@@ -793,7 +793,7 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
 }
 
 @media (max-width: 480px) {
-    .folder-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .folder-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .folder-card { padding: 12px; }
     .folder-card svg { width: 24px; height: 24px; }
     .header { padding: 12px 16px; }
