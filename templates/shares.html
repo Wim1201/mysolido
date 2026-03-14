@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gedeeld - MySolido</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7f5; color: #333; }
+        .header { background: linear-gradient(135deg, #1a6b3c, #0f9b4f); color: white; padding: 20px 30px; }
+        .header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        .header h1 a { color: white; text-decoration: none; }
+        .header h1 a:hover { opacity: 0.9; }
+        .header p { font-size: 0.85rem; opacity: 0.8; }
+        .header-nav { margin-top: 8px; display: flex; gap: 16px; }
+        .header-nav a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem; }
+        .header-nav a:hover { color: white; }
+        .header-nav a.active { color: white; font-weight: 600; border-bottom: 2px solid white; padding-bottom: 2px; }
+        .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        .flash { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
+        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .btn { background: #1a6b3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
+        .btn:hover { background: #0f4d2a; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #a71d2a; }
+
+        .shares-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .shares-card h2 { font-size: 1rem; margin-bottom: 16px; color: #1a6b3c; }
+        .share-list { list-style: none; }
+        .share-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; gap: 12px; }
+        .share-item:last-child { border-bottom: none; }
+        .share-info { flex: 1; min-width: 0; }
+        .share-resource { font-weight: 500; font-size: 0.95rem; word-break: break-all; }
+        .share-details { font-size: 0.8rem; color: #666; margin-top: 4px; }
+        .share-details span { margin-right: 12px; }
+        .empty { color: #999; font-style: italic; padding: 20px 0; }
+        .back-link { display: inline-block; margin-bottom: 16px; color: #1a6b3c; text-decoration: none; font-size: 0.9rem; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
+        <p>Jouw persoonlijke datakluis op je eigen pc</p>
+        <div class="header-nav">
+            <a href="{{ url_for('index') }}">Kluis</a>
+            <a href="{{ url_for('shares_overview') }}" class="active">Gedeeld</a>
+            <a href="{{ url_for('audit') }}">Logboek</a>
+        </div>
+    </div>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        <div class="shares-card">
+            <h2>Gedeelde bestanden en mappen</h2>
+            {% if shares %}
+                <ul class="share-list">
+                    {% for share in shares %}
+                    <li class="share-item">
+                        <div class="share-info">
+                            <div class="share-resource">{{ share.resource_path or share.resource_url.split('/')[-1] }}</div>
+                            <div class="share-details">
+                                <span>
+                                    {% if share.webid == 'public' %}
+                                        &#x1F310; Openbaar
+                                    {% else %}
+                                        &#x1F464; {{ share.webid }}
+                                    {% endif %}
+                                </span>
+                                <span>
+                                    {% if 'acl:Write' in share.modes %}
+                                        &#x270F;&#xFE0F; Lezen + schrijven
+                                    {% else %}
+                                        &#x1F50D; Alleen lezen
+                                    {% endif %}
+                                </span>
+                                {% if share.expires %}
+                                    <span>&#x23F3; Verloopt: {{ share.expires[:10] }}</span>
+                                {% endif %}
+                                <span style="color: #999;">{{ share.created[:10] }}</span>
+                            </div>
+                        </div>
+                        <form action="{{ url_for('revoke') }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze toegang wilt intrekken?')">
+                            <input type="hidden" name="resource_url" value="{{ share.resource_url }}">
+                            <input type="hidden" name="resource_path" value="{{ share.resource_path }}">
+                            <input type="hidden" name="webid" value="{{ share.webid }}">
+                            <button type="submit" class="btn btn-danger" style="font-size: 0.8rem; padding: 5px 12px;">Intrekken</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="empty">Je hebt nog niets gedeeld.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

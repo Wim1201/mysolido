@@ -3,6 +3,8 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
 import requests
 import base64
+from audit import log_action, get_audit_log
+from shares import add_share, remove_share, get_all_shares, get_shares_for_resource, check_expired_shares
 
 app = Flask(__name__)
 app.secret_key = 'mysolido-dev-key-2026'
@@ -10,6 +12,7 @@ app.secret_key = 'mysolido-dev-key-2026'
 # === CONFIGURATIE ===
 CSS_BASE_URL = 'http://localhost:3000'
 SOLID_POD_URL = 'http://localhost:3000/wim/'
+OWNER_WEBID = 'http://localhost:3000/wim/profile/card#me'
 CLIENT_ID = 'mysolido-app_0297c523-c780-4102-b7cb-f5ad8cd6e294'
 CLIENT_SECRET = 'd9e70d02c091217415164422add9b819aa4bc5e861242d90e3b2b09526e810514940f32f6c9fb3275982ddab5135bea3881ddad347df571f10a65bf4f308e180'
 
@@ -212,6 +215,15 @@ def get_move_folders(folder_path, items):
 
 def browse_folder(folder_path):
     """Shared logic for browsing a folder"""
+    # Check for expired shares and auto-revoke
+    expired = check_expired_shares()
+    for s in expired:
+        write_acl(s['resource_url'])
+        display_webid = 'iedereen (openbaar)' if s['webid'] == 'public' else s['webid']
+        resource_name = s['resource_url'].rstrip('/').split('/')[-1]
+        flash(f'Toegang van {display_webid} tot "{resource_name}" is verlopen en ingetrokken', 'success')
+        log_action('revoke_expired', {'resource': s.get('resource_path', ''), 'webid': s['webid']})
+
     # Ensure folder_path ends clean
     folder_path = folder_path.strip('/')
     if folder_path:
@@ -286,6 +298,7 @@ def upload():
 
     if response and response.status_code in [200, 201, 205]:
         flash(f'"{file.filename}" succesvol geupload!', 'success')
+        log_action('upload', {'file': file.filename, 'folder': folder_path or 'root'})
     elif response:
         flash(f'Upload mislukt: {response.status_code}', 'error')
     else:
@@ -309,6 +322,7 @@ def delete():
     if response and response.status_code in [200, 204, 205]:
         name = resource_url.rstrip('/').split('/')[-1]
         flash(f'"{name}" verwijderd', 'success')
+        log_action('delete', {'resource': name, 'folder': folder_path or 'root'})
     elif response:
         flash(f'Verwijderen mislukt: {response.status_code}', 'error')
     else:
@@ -341,6 +355,7 @@ def create_folder_route():
 
     if response and response.status_code in [200, 201, 205]:
         flash(f'Map "{normalized}" aangemaakt!', 'success')
+        log_action('create_folder', {'name': normalized, 'path': folder_path or 'root'})
     elif response:
         flash(f'Map aanmaken mislukt: {response.status_code}', 'error')
     else:
@@ -398,6 +413,7 @@ def move():
 
     target_label = target_folder if target_folder else 'Pod root'
     flash(f'"{filename}" verplaatst naar {target_label}', 'success')
+    log_action('move', {'file': filename, 'from': folder_path or 'root', 'to': target_folder or 'root'})
     return redirect_to_folder(folder_path)
 
 
@@ -441,6 +457,7 @@ def search():
     if query:
         try:
             results = search_pod(SOLID_POD_URL, query)
+            log_action('search', {'query': query, 'results': len(results)})
         except requests.ConnectionError:
             flash('CSS server niet bereikbaar. Draait hij op poort 3000?', 'error')
 
@@ -512,6 +529,136 @@ def download_file(file_path):
         content_type=content_type,
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
+
+
+def build_acl_content(resource_url):
+    """Build ACL Turtle content from all active shares for this resource"""
+    is_container = resource_url.endswith('/')
+    shares = get_shares_for_resource(resource_url)
+
+    # Owner entry (always present)
+    acl = '@prefix acl: <http://www.w3.org/ns/auth/acl#>.\n'
+    acl += '@prefix foaf: <http://xmlns.com/foaf/0.1/>.\n\n'
+    acl += '<#owner>\n'
+    acl += '    a acl:Authorization;\n'
+    acl += f'    acl:agent <{OWNER_WEBID}>;\n'
+    acl += f'    acl:accessTo <{resource_url}>;\n'
+    if is_container:
+        acl += f'    acl:default <{resource_url}>;\n'
+    acl += '    acl:mode acl:Read, acl:Write, acl:Control.\n'
+
+    # Add one entry per active share
+    for i, share in enumerate(shares, 1):
+        acl += f'\n<#shared{i}>\n'
+        acl += '    a acl:Authorization;\n'
+        if share['webid'] == 'public':
+            acl += '    acl:agentClass foaf:Agent;\n'
+        else:
+            acl += f'    acl:agent <{share["webid"]}>;\n'
+        acl += f'    acl:accessTo <{resource_url}>;\n'
+        if is_container:
+            acl += f'    acl:default <{resource_url}>;\n'
+        acl += f'    acl:mode {", ".join(share["modes"])}.\n'
+
+    return acl
+
+
+def write_acl(resource_url):
+    """Write or delete ACL for a resource based on its active shares"""
+    acl_url = resource_url + '.acl'
+    shares = get_shares_for_resource(resource_url)
+
+    if not shares:
+        # No shares left, remove the ACL so it falls back to parent
+        pod_request('DELETE', acl_url)
+        return
+
+    acl_content = build_acl_content(resource_url)
+    pod_request('PUT', acl_url,
+        data=acl_content,
+        headers={'Content-Type': 'text/turtle'}
+    )
+
+
+@app.route('/share', methods=['POST'])
+def share():
+    """Share a resource with a WebID"""
+    resource_url = request.form.get('resource_url', '')
+    resource_path = request.form.get('resource_path', '')
+    folder_path = request.form.get('folder_path', '').strip('/')
+    webid = request.form.get('webid', '').strip()
+    access_level = request.form.get('access_level', 'read')
+    expires = request.form.get('expires', '').strip() or None
+
+    if not resource_url:
+        flash('Geen resource opgegeven', 'error')
+        return redirect_to_folder(folder_path)
+
+    # Determine modes based on access level
+    if access_level == 'public':
+        webid = 'public'
+        modes = ['acl:Read']
+    elif access_level == 'readwrite':
+        modes = ['acl:Read', 'acl:Write']
+    else:
+        modes = ['acl:Read']
+
+    if not webid:
+        flash('Vul een WebID in of kies openbaar', 'error')
+        return redirect_to_folder(folder_path)
+
+    # Add to shares.json
+    add_share(resource_url, resource_path, webid, modes, expires)
+
+    # Write ACL with ALL active shares for this resource
+    write_acl(resource_url)
+
+    resource_name = resource_url.rstrip('/').split('/')[-1]
+    display_webid = 'iedereen (openbaar)' if webid == 'public' else webid
+    flash(f'"{resource_name}" gedeeld met {display_webid}', 'success')
+    log_action('share', {'resource': resource_path, 'webid': webid, 'modes': modes})
+
+    return redirect_to_folder(folder_path)
+
+
+@app.route('/shares')
+def shares_overview():
+    """Show overview of all shared resources"""
+    all_shares = get_all_shares()
+    return render_template('shares.html', shares=all_shares)
+
+
+@app.route('/revoke', methods=['POST'])
+def revoke():
+    """Revoke access for a specific WebID to a resource"""
+    resource_url = request.form.get('resource_url', '')
+    webid = request.form.get('webid', '')
+    resource_path = request.form.get('resource_path', '')
+
+    if not resource_url or not webid:
+        flash('Ongeldige verzoek', 'error')
+        return redirect(url_for('shares_overview'))
+
+    # Remove from shares.json
+    remove_share(resource_url, webid)
+
+    # Rewrite ACL with remaining shares (or delete if none left)
+    write_acl(resource_url)
+
+    resource_name = resource_url.rstrip('/').split('/')[-1]
+    display_webid = 'iedereen (openbaar)' if webid == 'public' else webid
+    flash(f'Toegang van {display_webid} tot "{resource_name}" ingetrokken', 'success')
+    log_action('revoke', {'resource': resource_path, 'webid': webid})
+
+    return redirect(url_for('shares_overview'))
+
+
+@app.route('/audit')
+def audit():
+    """Show the audit log"""
+    action_filter = request.args.get('filter', '')
+    log = get_audit_log(action_filter if action_filter else None, limit=100)
+    return render_template('audit.html', log=log, current_filter=action_filter)
 
 
 @app.route('/debug')
