@@ -1,10 +1,14 @@
 import re
 import os
+import io
+import zipfile
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
 import requests
 import base64
 from audit import log_action, get_audit_log
 from shares import add_share, remove_share, get_all_shares, get_shares_for_resource, check_expired_shares
+from trash import move_to_trash, restore_from_trash, permanent_delete, get_all_trash, cleanup_expired
+from notifications import add_notification, get_all_notifications, get_unread_count, mark_as_read, mark_all_read
 
 app = Flask(__name__)
 app.secret_key = 'mysolido-dev-key-2026'
@@ -34,30 +38,52 @@ VIEWABLE_TYPES = {
     '.webm': 'video/webm',
 }
 
-# Folder icons per category
-FOLDER_ICONS = {
-    'identiteit': '\U0001faaa',
-    'medisch': '\U0001f3e5',
-    'financieel': '\U0001f4b0',
-    'wonen': '\U0001f3e0',
-    'zakelijk': '\U0001f4bc',
-    'werk': '\U0001f454',
-    'voertuigen': '\U0001f697',
-    'juridisch': '\u2696\ufe0f',
-    'media': '\U0001f4f8',
-    'wachtwoorden': '\U0001f511',
-    'gezin': '\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466',
-    'abonnementen': '\U0001f4cb',
-    'inbox': '\U0001f4e5',
-    'verzekeringen': '\U0001f6e1\ufe0f',
-}
-
 # Default folders to create on init
 DEFAULT_FOLDERS = [
     'identiteit', 'medisch', 'financieel', 'wonen', 'zakelijk',
     'werk', 'voertuigen', 'juridisch', 'media', 'wachtwoorden',
     'gezin', 'abonnementen', 'inbox', 'verzekeringen',
 ]
+
+# Folder styles with icon name and colors for light/dark themes
+FOLDER_STYLES = {
+    'identiteit':    {'icon': 'shield',       'color': '#6366f1', 'color_dark': '#818cf8'},
+    'medisch':       {'icon': 'heart',        'color': '#ef4444', 'color_dark': '#f87171'},
+    'financieel':    {'icon': 'banknotes',    'color': '#f59e0b', 'color_dark': '#fbbf24'},
+    'wonen':         {'icon': 'house',        'color': '#10b981', 'color_dark': '#34d399'},
+    'zakelijk':      {'icon': 'briefcase',    'color': '#3b82f6', 'color_dark': '#60a5fa'},
+    'werk':          {'icon': 'tie',          'color': '#8b5cf6', 'color_dark': '#a78bfa'},
+    'voertuigen':    {'icon': 'car',          'color': '#f97316', 'color_dark': '#fb923c'},
+    'juridisch':     {'icon': 'gavel',        'color': '#64748b', 'color_dark': '#94a3b8'},
+    'media':         {'icon': 'camera',       'color': '#ec4899', 'color_dark': '#f472b6'},
+    'wachtwoorden':  {'icon': 'key',          'color': '#eab308', 'color_dark': '#facc15'},
+    'gezin':         {'icon': 'family',       'color': '#14b8a6', 'color_dark': '#2dd4bf'},
+    'abonnementen':  {'icon': 'clipboard',    'color': '#a855f7', 'color_dark': '#c084fc'},
+    'inbox':         {'icon': 'inbox',        'color': '#0ea5e9', 'color_dark': '#38bdf8'},
+    'verzekeringen': {'icon': 'shield_check', 'color': '#22c55e', 'color_dark': '#4ade80'},
+}
+
+
+@app.context_processor
+def inject_globals():
+    """Inject global template variables"""
+    nav_map = {
+        'index': 'kluis',
+        'browse': 'kluis',
+        'search': 'zoeken',
+        'shares_overview': 'gedeeld',
+        'trash_overview': 'prullenbak',
+        'audit': 'logboek',
+        'profile': 'profiel',
+        'settings': 'profiel',
+        'notifications_page': '',
+    }
+    active = nav_map.get(request.endpoint, '')
+    return {
+        'folder_styles': FOLDER_STYLES,
+        'unread_count': get_unread_count(),
+        'active_nav': active,
+    }
 
 
 def get_access_token():
@@ -115,43 +141,39 @@ def create_container(url):
 
 
 def get_folder_icon(folder_name):
-    """Get the icon for a folder name, checking parent folders too"""
+    """Get the icon name for a folder"""
     name_lower = folder_name.lower()
-    return FOLDER_ICONS.get(name_lower, '\U0001f4c1')
+    style = FOLDER_STYLES.get(name_lower)
+    if style:
+        return style['icon']
+    return 'folder'
 
 
 def parse_container_contents(turtle_text, base_url):
     """Parse Turtle response to extract container contents"""
     items = []
 
-    # Find all ldp:contains references using regex
-    # Handles: ldp:contains <a/>, <b/>, <c/> across one or multiple lines
-    # Match until a '.' that ends the Turtle statement (followed by newline/end),
-    # not a '.' inside a filename like <test.txt>
     contains_pattern = re.compile(r'ldp:contains\s+(.+?)\.\s*$', re.DOTALL | re.MULTILINE)
     contains_matches = contains_pattern.findall(turtle_text)
 
-    # Extract all <resource> references from the matched text
     resources = []
     for match in contains_matches:
         resources.extend(re.findall(r'<([^>]+)>', match))
 
     for resource in resources:
-        # Build full URL if relative
         if not resource.startswith('http'):
             full_url = base_url.rstrip('/') + '/' + resource.lstrip('/')
         else:
             full_url = resource
         name = resource.rstrip('/').split('/')[-1]
         is_folder = resource.endswith('/')
-        icon = get_folder_icon(name) if is_folder else '\U0001f4c4'
+        icon = get_folder_icon(name) if is_folder else 'file'
         items.append({
             'name': name,
             'url': full_url,
             'is_folder': is_folder,
             'icon': icon,
         })
-    # Sort: folders first, then files, alphabetically
     items.sort(key=lambda x: (not x['is_folder'], x['name'].lower()))
     return items
 
@@ -191,26 +213,30 @@ def browse(folder_path):
 def get_all_folders():
     """Geeft lijst van alle hoofdmappen met icoon en label voor de upload-dropdown"""
     return [
-        {'name': name, 'icon': FOLDER_ICONS[name], 'label': name.capitalize()}
+        {'name': name, 'icon': FOLDER_STYLES.get(name, {}).get('icon', 'folder'), 'label': name.capitalize()}
         for name in DEFAULT_FOLDERS
     ]
 
 
 def get_move_folders(folder_path, items):
-    """Bouw de mappenlijst voor de verplaats-dropdown: hoofdmappen + submappen van huidige locatie"""
+    """Bouw de mappenlijst voor de verplaats-dropdown"""
     folders = []
-    # Submappen uit de huidige listing
     subfolders = [item for item in items if item['is_folder']]
 
     for name in DEFAULT_FOLDERS:
-        icon = FOLDER_ICONS[name]
-        folders.append({'value': name, 'label': f'{icon} {name.capitalize()}', 'indent': 0})
-        # Als we in deze hoofdmap zitten (of een submap ervan), voeg submappen toe
+        style = FOLDER_STYLES.get(name, {})
+        folders.append({'value': name, 'label': name.capitalize(), 'indent': 0})
         if folder_path == name or folder_path.startswith(name + '/'):
             for sub in subfolders:
                 sub_path = folder_path + '/' + sub['name']
                 folders.append({'value': sub_path, 'label': sub['name'], 'indent': 1})
     return folders
+
+
+def get_recent_files(limit=5):
+    """Get recent file uploads from audit log"""
+    log = get_audit_log('upload', limit=limit)
+    return log
 
 
 def browse_folder(folder_path):
@@ -223,8 +249,8 @@ def browse_folder(folder_path):
         resource_name = s['resource_url'].rstrip('/').split('/')[-1]
         flash(f'Toegang van {display_webid} tot "{resource_name}" is verlopen en ingetrokken', 'success')
         log_action('revoke_expired', {'resource': s.get('resource_path', ''), 'webid': s['webid']})
+        add_notification('share_expired', f'Toegang van {display_webid} tot "{resource_name}" is verlopen')
 
-    # Ensure folder_path ends clean
     folder_path = folder_path.strip('/')
     if folder_path:
         container_url = SOLID_POD_URL + folder_path + '/'
@@ -236,10 +262,13 @@ def browse_folder(folder_path):
         if response and response.status_code == 200:
             items = parse_container_contents(response.text, container_url)
             breadcrumbs = build_breadcrumbs(folder_path)
-            # Parent path for "back" button
             parts = [p for p in folder_path.split('/') if p]
             parent_path = '/'.join(parts[:-1]) if parts else None
             move_folders = get_move_folders(folder_path, items)
+            # Count stats for dashboard
+            file_count = sum(1 for i in items if not i['is_folder'])
+            folder_count = sum(1 for i in items if i['is_folder'])
+            recent_files = get_recent_files() if not folder_path else []
             return render_template('index.html',
                 items=items,
                 pod_url=SOLID_POD_URL,
@@ -248,6 +277,10 @@ def browse_folder(folder_path):
                 parent_path=parent_path,
                 all_folders=get_all_folders(),
                 move_folders=move_folders,
+                file_count=file_count,
+                folder_count=folder_count,
+                recent_files=recent_files,
+                default_folders=DEFAULT_FOLDERS,
             )
         elif response:
             flash(f'Kon map niet laden: {response.status_code}', 'error')
@@ -267,6 +300,10 @@ def browse_folder(folder_path):
         parent_path=parent_path,
         all_folders=get_all_folders(),
         move_folders=get_move_folders(folder_path, []),
+        file_count=0,
+        folder_count=0,
+        recent_files=[],
+        default_folders=DEFAULT_FOLDERS,
     )
 
 
@@ -309,7 +346,7 @@ def upload():
 
 @app.route('/delete', methods=['POST'])
 def delete():
-    """Verwijder een resource uit de pod"""
+    """Verplaats een resource naar de prullenbak"""
     resource_url = request.form.get('resource_url')
     folder_path = request.form.get('folder_path', '').strip('/')
 
@@ -317,17 +354,62 @@ def delete():
         flash('Geen resource opgegeven', 'error')
         return redirect_to_folder(folder_path)
 
-    response = pod_request('DELETE', resource_url)
+    name = resource_url.rstrip('/').split('/')[-1]
+    is_folder = resource_url.endswith('/')
 
-    if response and response.status_code in [200, 204, 205]:
-        name = resource_url.rstrip('/').split('/')[-1]
-        flash(f'"{name}" verwijderd', 'success')
-        log_action('delete', {'resource': name, 'folder': folder_path or 'root'})
-    elif response:
-        flash(f'Verwijderen mislukt: {response.status_code}', 'error')
-    else:
-        flash('Verwijderen mislukt: authenticatie error', 'error')
+    if is_folder:
+        # Folders: direct verwijderen (niet naar prullenbak)
+        response = pod_request('DELETE', resource_url)
+        if response and response.status_code in [200, 204, 205]:
+            flash(f'Map "{name}" verwijderd', 'success')
+            log_action('delete', {'resource': name, 'folder': folder_path or 'root'})
+        elif response:
+            flash(f'Verwijderen mislukt: {response.status_code}', 'error')
+        else:
+            flash('Verwijderen mislukt: authenticatie error', 'error')
+        return redirect_to_folder(folder_path)
 
+    # Files: verplaats naar prullenbak
+    # Step 1: Ensure _trash/ container exists
+    trash_container = SOLID_POD_URL + '_trash/'
+    if not container_exists(trash_container):
+        create_container(trash_container)
+
+    # Step 2: Download the file
+    get_response = pod_request('GET', resource_url)
+    if not get_response or get_response.status_code != 200:
+        flash(f'Verwijderen mislukt: kon bestand niet ophalen', 'error')
+        return redirect_to_folder(folder_path)
+
+    content_type = get_response.headers.get('Content-Type', 'application/octet-stream')
+
+    # Step 3: Generate trash entry
+    import uuid
+    trash_id = uuid.uuid4().hex[:12]
+    trash_filename = f'{trash_id}_{name}'
+    trash_url = trash_container + trash_filename
+
+    # Step 4: Upload to _trash/
+    put_response = pod_request('PUT', trash_url,
+        data=get_response.content,
+        headers={'Content-Type': content_type}
+    )
+    if not put_response or put_response.status_code not in [200, 201, 205]:
+        flash(f'Verplaatsen naar prullenbak mislukt', 'error')
+        return redirect_to_folder(folder_path)
+
+    # Step 5: Delete original
+    del_response = pod_request('DELETE', resource_url)
+    if not del_response or del_response.status_code not in [200, 204, 205]:
+        flash(f'Let op: "{name}" is naar prullenbak gekopieerd maar het origineel kon niet verwijderd worden', 'error')
+        return redirect_to_folder(folder_path)
+
+    # Step 6: Record in trash.json
+    resource_path = folder_path + '/' + name if folder_path else name
+    move_to_trash(resource_url, resource_path, name, folder_path or 'root', trash_url)
+
+    flash(f'"{name}" naar prullenbak verplaatst', 'success')
+    log_action('trash', {'resource': name, 'folder': folder_path or 'root'})
     return redirect_to_folder(folder_path)
 
 
@@ -376,7 +458,6 @@ def move():
         flash('Geen bestand opgegeven', 'error')
         return redirect_to_folder(folder_path)
 
-    # Build target URL
     if target_folder:
         target_url = SOLID_POD_URL + target_folder + '/' + filename
     else:
@@ -386,7 +467,6 @@ def move():
         flash('Bestand staat al in deze map', 'error')
         return redirect_to_folder(folder_path)
 
-    # Step 1: Download the file
     get_response = pod_request('GET', resource_url)
     if not get_response or get_response.status_code != 200:
         status = get_response.status_code if get_response else 'geen response'
@@ -395,7 +475,6 @@ def move():
 
     content_type = get_response.headers.get('Content-Type', 'application/octet-stream')
 
-    # Step 2: Upload to new location
     put_response = pod_request('PUT', target_url,
         data=get_response.content,
         headers={'Content-Type': content_type}
@@ -405,7 +484,6 @@ def move():
         flash(f'Verplaatsen mislukt: kon bestand niet opslaan ({status})', 'error')
         return redirect_to_folder(folder_path)
 
-    # Step 3: Delete original
     del_response = pod_request('DELETE', resource_url)
     if not del_response or del_response.status_code not in [200, 204, 205]:
         flash(f'Let op: "{filename}" is gekopieerd maar het origineel kon niet verwijderd worden', 'error')
@@ -430,13 +508,10 @@ def search_pod(container_url, query, path='', depth=0, max_depth=5):
     items = parse_container_contents(response.text, container_url)
     for item in items:
         if item['is_folder']:
-            # Build the subfolder path
             sub_path = path + '/' + item['name'] if path else item['name']
             sub_url = item['url']
-            # Recurse into subfolder
             results.extend(search_pod(sub_url, query, sub_path, depth + 1, max_depth))
         else:
-            # Check if filename matches query (case-insensitive)
             if query.lower() in item['name'].lower():
                 file_path = path + '/' + item['name'] if path else item['name']
                 results.append({
@@ -483,8 +558,6 @@ def view_file(file_path):
     filename = file_path.split('/')[-1]
     ext = os.path.splitext(filename)[1].lower()
 
-    # For media types that need an HTML wrapper (audio/video), render a template
-    # Unless ?raw=1 is passed (used by <source> tags to get the actual media data)
     if ext in ('.mp3', '.wav', '.mp4', '.webm') and not request.args.get('raw'):
         folder_path = '/'.join(file_path.split('/')[:-1])
         return render_template('view.html',
@@ -495,7 +568,6 @@ def view_file(file_path):
             content_type=VIEWABLE_TYPES.get(ext, content_type),
         )
 
-    # For viewable types, serve inline
     if ext in VIEWABLE_TYPES:
         return Response(
             response.content,
@@ -503,7 +575,6 @@ def view_file(file_path):
             headers={'Content-Disposition': f'inline; filename="{filename}"'}
         )
 
-    # For everything else, trigger download
     return Response(
         response.content,
         content_type=content_type,
@@ -536,7 +607,6 @@ def build_acl_content(resource_url):
     is_container = resource_url.endswith('/')
     shares = get_shares_for_resource(resource_url)
 
-    # Owner entry (always present)
     acl = '@prefix acl: <http://www.w3.org/ns/auth/acl#>.\n'
     acl += '@prefix foaf: <http://xmlns.com/foaf/0.1/>.\n\n'
     acl += '<#owner>\n'
@@ -547,7 +617,6 @@ def build_acl_content(resource_url):
         acl += f'    acl:default <{resource_url}>;\n'
     acl += '    acl:mode acl:Read, acl:Write, acl:Control.\n'
 
-    # Add one entry per active share
     for i, share in enumerate(shares, 1):
         acl += f'\n<#shared{i}>\n'
         acl += '    a acl:Authorization;\n'
@@ -569,7 +638,6 @@ def write_acl(resource_url):
     shares = get_shares_for_resource(resource_url)
 
     if not shares:
-        # No shares left, remove the ACL so it falls back to parent
         pod_request('DELETE', acl_url)
         return
 
@@ -594,12 +662,13 @@ def share():
         flash('Geen resource opgegeven', 'error')
         return redirect_to_folder(folder_path)
 
-    # Determine modes based on access level
     if access_level == 'public':
         webid = 'public'
         modes = ['acl:Read']
     elif access_level == 'readwrite':
         modes = ['acl:Read', 'acl:Write']
+    elif access_level == 'append':
+        modes = ['acl:Append']
     else:
         modes = ['acl:Read']
 
@@ -607,10 +676,7 @@ def share():
         flash('Vul een WebID in of kies openbaar', 'error')
         return redirect_to_folder(folder_path)
 
-    # Add to shares.json
     add_share(resource_url, resource_path, webid, modes, expires)
-
-    # Write ACL with ALL active shares for this resource
     write_acl(resource_url)
 
     resource_name = resource_url.rstrip('/').split('/')[-1]
@@ -639,10 +705,7 @@ def revoke():
         flash('Ongeldige verzoek', 'error')
         return redirect(url_for('shares_overview'))
 
-    # Remove from shares.json
     remove_share(resource_url, webid)
-
-    # Rewrite ACL with remaining shares (or delete if none left)
     write_acl(resource_url)
 
     resource_name = resource_url.rstrip('/').split('/')[-1]
@@ -659,6 +722,194 @@ def audit():
     action_filter = request.args.get('filter', '')
     log = get_audit_log(action_filter if action_filter else None, limit=100)
     return render_template('audit.html', log=log, current_filter=action_filter)
+
+
+# === TRASH ROUTES ===
+
+@app.route('/trash')
+def trash_overview():
+    """Show trash contents"""
+    # Auto-cleanup expired items
+    expired = cleanup_expired()
+    for item in expired:
+        pod_request('DELETE', item['trash_url'])
+        add_notification('trash_auto_deleted', f'"{item["filename"]}" is definitief verwijderd uit prullenbak')
+        log_action('trash_auto_deleted', {'file': item['filename']})
+
+    trash_items = get_all_trash()
+    return render_template('trash.html', trash_items=trash_items)
+
+
+@app.route('/trash/restore', methods=['POST'])
+def trash_restore():
+    """Restore a file from trash to its original location"""
+    trash_id = request.form.get('trash_id', '')
+
+    entry = restore_from_trash(trash_id)
+    if not entry:
+        flash('Item niet gevonden in prullenbak', 'error')
+        return redirect(url_for('trash_overview'))
+
+    # Download from _trash/
+    get_response = pod_request('GET', entry['trash_url'])
+    if not get_response or get_response.status_code != 200:
+        flash('Herstellen mislukt: kon bestand niet ophalen uit prullenbak', 'error')
+        return redirect(url_for('trash_overview'))
+
+    content_type = get_response.headers.get('Content-Type', 'application/octet-stream')
+
+    # Upload to original location
+    put_response = pod_request('PUT', entry['resource_url'],
+        data=get_response.content,
+        headers={'Content-Type': content_type}
+    )
+    if not put_response or put_response.status_code not in [200, 201, 205]:
+        flash('Herstellen mislukt: kon bestand niet terugplaatsen', 'error')
+        return redirect(url_for('trash_overview'))
+
+    # Delete from _trash/
+    pod_request('DELETE', entry['trash_url'])
+
+    flash(f'"{entry["filename"]}" hersteld naar {entry.get("original_folder", "originele locatie")}', 'success')
+    log_action('restore', {'file': entry['filename'], 'to': entry.get('original_folder', '')})
+    return redirect(url_for('trash_overview'))
+
+
+@app.route('/trash/delete', methods=['POST'])
+def trash_permanent_delete():
+    """Permanently delete a file from trash"""
+    trash_id = request.form.get('trash_id', '')
+
+    entry = permanent_delete(trash_id)
+    if not entry:
+        flash('Item niet gevonden in prullenbak', 'error')
+        return redirect(url_for('trash_overview'))
+
+    # Delete from pod _trash/
+    pod_request('DELETE', entry['trash_url'])
+
+    flash(f'"{entry["filename"]}" definitief verwijderd', 'success')
+    log_action('permanent_delete', {'file': entry['filename']})
+    return redirect(url_for('trash_overview'))
+
+
+# === NOTIFICATION ROUTES ===
+
+@app.route('/notifications')
+def notifications_page():
+    """Show all notifications"""
+    notifs = get_all_notifications()
+    return render_template('notifications.html', notifications=notifs)
+
+
+@app.route('/notifications/read', methods=['POST'])
+def notification_mark_read():
+    """Mark notification(s) as read"""
+    notification_id = request.form.get('notification_id', '')
+    if notification_id:
+        mark_as_read(notification_id)
+    else:
+        mark_all_read()
+    return redirect(url_for('notifications_page'))
+
+
+# === PROFILE & SETTINGS ROUTES ===
+
+def get_storage_stats():
+    """Calculate storage statistics by scanning the pod"""
+    stats = {'file_count': 0, 'folder_count': 0, 'total_size': 0}
+
+    def scan(container_url, depth=0, max_depth=5):
+        if depth >= max_depth:
+            return
+        response = pod_request('GET', container_url, headers={'Accept': 'text/turtle'})
+        if not response or response.status_code != 200:
+            return
+        items = parse_container_contents(response.text, container_url)
+        for item in items:
+            if item['is_folder']:
+                stats['folder_count'] += 1
+                scan(item['url'], depth + 1, max_depth)
+            else:
+                stats['file_count'] += 1
+                # Try to get file size
+                head_resp = pod_request('GET', item['url'])
+                if head_resp and head_resp.status_code == 200:
+                    stats['total_size'] += len(head_resp.content)
+
+    try:
+        scan(SOLID_POD_URL)
+    except Exception:
+        pass
+    return stats
+
+
+def format_size(size_bytes):
+    """Format bytes to human-readable size"""
+    if size_bytes < 1024:
+        return f'{size_bytes} B'
+    elif size_bytes < 1024 * 1024:
+        return f'{size_bytes / 1024:.1f} KB'
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f'{size_bytes / (1024 * 1024):.1f} MB'
+    else:
+        return f'{size_bytes / (1024 * 1024 * 1024):.1f} GB'
+
+
+@app.route('/profile')
+def profile():
+    """Show user profile with storage stats"""
+    stats = get_storage_stats()
+    stats['total_size_formatted'] = format_size(stats['total_size'])
+    return render_template('profile.html',
+        webid=OWNER_WEBID,
+        pod_url=SOLID_POD_URL,
+        stats=stats,
+    )
+
+
+@app.route('/settings')
+def settings():
+    """Show settings page"""
+    return render_template('settings.html')
+
+
+@app.route('/settings/export', methods=['POST'])
+def export_backup():
+    """Export entire pod as ZIP"""
+    buffer = io.BytesIO()
+
+    def add_to_zip(zf, container_url, path='', depth=0, max_depth=5):
+        if depth >= max_depth:
+            return
+        response = pod_request('GET', container_url, headers={'Accept': 'text/turtle'})
+        if not response or response.status_code != 200:
+            return
+        items = parse_container_contents(response.text, container_url)
+        for item in items:
+            if item['is_folder']:
+                sub_path = path + item['name'] + '/'
+                add_to_zip(zf, item['url'], sub_path, depth + 1, max_depth)
+            else:
+                file_path = path + item['name']
+                file_response = pod_request('GET', item['url'])
+                if file_response and file_response.status_code == 200:
+                    zf.writestr(file_path, file_response.content)
+
+    try:
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            add_to_zip(zf, SOLID_POD_URL)
+    except Exception as e:
+        flash(f'Backup mislukt: {e}', 'error')
+        return redirect(url_for('settings'))
+
+    buffer.seek(0)
+    log_action('export', {'type': 'zip_backup'})
+    return Response(
+        buffer.getvalue(),
+        content_type='application/zip',
+        headers={'Content-Disposition': 'attachment; filename="mysolido-backup.zip"'}
+    )
 
 
 @app.route('/debug')
@@ -678,7 +929,7 @@ def debug():
 
 @app.route('/init-folders')
 def init_folders():
-    """Maak de standaard 13 hoofdmappen aan in de pod"""
+    """Maak de standaard 14 hoofdmappen aan in de pod"""
     created = []
     skipped = []
 

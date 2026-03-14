@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MySolido{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+      (function(){ var t=localStorage.getItem('mysolido-theme'); if(t) document.documentElement.dataset.theme=t; })();
+    </script>
+</head>
+<body>
+    {% from "macros/icons.html" import icon_sun, icon_moon, icon_bell, icon_vault, icon_share, icon_trash, icon_search, icon_user, icon_folder, icon_file, icon_settings %}
+    <header class="header">
+        <div class="header-top">
+            <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
+            <div class="header-actions">
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Thema wisselen">
+                    <span class="icon-sun">{{ icon_sun() }}</span>
+                    <span class="icon-moon">{{ icon_moon() }}</span>
+                </button>
+                <a href="{{ url_for('notifications_page') }}" class="bell-link">
+                    {{ icon_bell() }}
+                    {% if unread_count %}<span class="badge">{{ unread_count }}</span>{% endif %}
+                </a>
+            </div>
+        </div>
+        <p class="header-subtitle">Jouw persoonlijke datakluis</p>
+        <nav class="header-nav">
+            <a href="{{ url_for('index') }}" class="{{ 'active' if active_nav == 'kluis' }}">{{ icon_vault() }} Kluis</a>
+            <a href="{{ url_for('shares_overview') }}" class="{{ 'active' if active_nav == 'gedeeld' }}">{{ icon_share() }} Gedeeld</a>
+            <a href="{{ url_for('trash_overview') }}" class="{{ 'active' if active_nav == 'prullenbak' }}">{{ icon_trash() }} Prullenbak</a>
+            <a href="{{ url_for('audit') }}" class="{{ 'active' if active_nav == 'logboek' }}">{{ icon_file() }} Logboek</a>
+            <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }} Profiel</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <nav class="bottom-nav">
+        <a href="{{ url_for('index') }}" class="{{ 'active' if active_nav == 'kluis' }}">{{ icon_vault() }}<span>Kluis</span></a>
+        <a href="{{ url_for('search') }}" class="{{ 'active' if active_nav == 'zoeken' }}">{{ icon_search() }}<span>Zoeken</span></a>
+        <a href="{{ url_for('trash_overview') }}" class="{{ 'active' if active_nav == 'prullenbak' }}">{{ icon_trash() }}<span>Prullen</span></a>
+        <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }}<span>Profiel</span></a>
+    </nav>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

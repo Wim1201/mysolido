@@ -1,116 +1,50 @@
-<!DOCTYPE html>
-<html lang="nl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zoeken - MySolido</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7f5; color: #333; }
-        .header { background: linear-gradient(135deg, #1a6b3c, #0f9b4f); color: white; padding: 20px 30px; }
-        .header h1 { font-size: 1.5rem; margin-bottom: 4px; }
-        .header h1 a { color: white; text-decoration: none; }
-        .header h1 a:hover { opacity: 0.9; }
-        .header p { font-size: 0.85rem; opacity: 0.8; }
-        .header-nav { margin-top: 8px; display: flex; gap: 16px; }
-        .header-nav a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem; }
-        .header-nav a:hover { color: white; }
-        .header-nav a.active { color: white; font-weight: 600; border-bottom: 2px solid white; padding-bottom: 2px; }
-        .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
-        .flash { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; }
-        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .btn { background: #1a6b3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
-        .btn:hover { background: #0f4d2a; }
-        .btn-download { background: #198754; font-size: 0.8rem; padding: 5px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
-        .btn-download:hover { background: #146c43; }
-        .btn-danger { background: #dc3545; }
-        .btn-danger:hover { background: #a71d2a; }
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left, icon_search, icon_download, icon_file, folder_icon %}
 
-        .search-bar { background: white; border-radius: 12px; padding: 12px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .search-bar form { display: flex; gap: 8px; }
-        .search-bar input[type="search"] { flex: 1; padding: 8px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
-        .search-bar input[type="search"]:focus { outline: none; border-color: #1a6b3c; box-shadow: 0 0 0 2px rgba(26,107,60,0.15); }
+{% block title %}Zoeken - MySolido{% endblock %}
 
-        .results { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .results h2 { font-size: 1rem; margin-bottom: 12px; color: #1a6b3c; }
-        .result-list { list-style: none; }
-        .result-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .result-item:last-child { border-bottom: none; }
-        .result-info { display: flex; flex-direction: column; gap: 2px; }
-        .result-name { display: flex; align-items: center; gap: 8px; }
-        .result-name .icon { font-size: 1.2rem; }
-        .result-name a { color: #333; text-decoration: none; font-weight: 500; }
-        .result-name a:hover { color: #1a6b3c; }
-        .result-path { font-size: 0.8rem; color: #999; margin-left: 28px; }
-        .result-path a { color: #1a6b3c; text-decoration: none; }
-        .result-path a:hover { text-decoration: underline; }
-        .result-actions { display: flex; gap: 6px; align-items: center; }
-        .empty { color: #999; font-style: italic; padding: 20px 0; }
-        .back-link { display: inline-block; margin-bottom: 16px; color: #1a6b3c; text-decoration: none; font-size: 0.9rem; }
-        .back-link:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
-        <p>Jouw persoonlijke datakluis op je eigen pc</p>
-        <div class="header-nav">
-            <a href="{{ url_for('index') }}">Kluis</a>
-            <a href="{{ url_for('shares_overview') }}">Gedeeld</a>
-            <a href="{{ url_for('audit') }}">Logboek</a>
-        </div>
+{% block content %}
+    <a href="{{ url_for('index') }}" class="back-link">{{ icon_arrow_left() }} Terug naar kluis</a>
+
+    <div class="search-bar">
+        <form action="{{ url_for('search') }}" method="get">
+            <input type="search" name="q" placeholder="Zoek in je kluis..." value="{{ query }}">
+            <button type="submit" class="btn">{{ icon_search() }} Zoeken</button>
+        </form>
     </div>
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endwith %}
 
-        <a href="{{ url_for('index') }}" class="back-link">&#x2190; Terug naar kluis</a>
-
-        <div class="search-bar">
-            <form action="{{ url_for('search') }}" method="get">
-                <input type="search" name="q" placeholder="Zoek in je kluis..." value="{{ query }}">
-                <button type="submit" class="btn">Zoeken</button>
-            </form>
-        </div>
-
-        <div class="results">
-            {% if query %}
-                <h2>{{ results|length }} resultaat{% if results|length != 1 %}en{% endif %} voor "{{ query }}"</h2>
-                {% if results %}
-                    <ul class="result-list">
-                        {% for item in results %}
-                        <li class="result-item">
-                            <div class="result-info">
-                                <div class="result-name">
-                                    <span class="icon">{{ item.icon }}</span>
-                                    <a href="{{ url_for('view_file', file_path=item.path) }}">{{ item.name }}</a>
-                                </div>
-                                <div class="result-path">
-                                    {% if item.folder_path %}
-                                        <a href="{{ url_for('browse', folder_path=item.folder_path) }}">{{ item.folder_path.replace('/', ' / ') }}</a>
-                                    {% else %}
-                                        Pod root
-                                    {% endif %}
-                                </div>
+    <div class="results">
+        {% if query %}
+            <h2>{{ results|length }} resultaat{% if results|length != 1 %}en{% endif %} voor "{{ query }}"</h2>
+            {% if results %}
+                <ul class="result-list">
+                    {% for item in results %}
+                    <li class="result-item">
+                        <div class="result-info">
+                            <div class="result-name">
+                                <span class="icon">{{ icon_file() }}</span>
+                                <a href="{{ url_for('view_file', file_path=item.path) }}">{{ item.name }}</a>
                             </div>
-                            <div class="result-actions">
-                                <a href="{{ url_for('download_file', file_path=item.path) }}" class="btn btn-download">&#x2B07; Download</a>
+                            <div class="result-path">
+                                {% if item.folder_path %}
+                                    <a href="{{ url_for('browse', folder_path=item.folder_path) }}">{{ item.folder_path.replace('/', ' / ') }}</a>
+                                {% else %}
+                                    Pod root
+                                {% endif %}
                             </div>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="empty">Geen resultaten gevonden voor "{{ query }}".</p>
-                {% endif %}
+                        </div>
+                        <div class="result-actions">
+                            <a href="{{ url_for('download_file', file_path=item.path) }}" class="btn btn-download">{{ icon_download() }} Download</a>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
             {% else %}
-                <h2>Zoeken</h2>
-                <p class="empty">Typ een zoekterm om bestanden te vinden in je kluis.</p>
+                <p class="empty">Geen resultaten gevonden voor "{{ query }}".</p>
             {% endif %}
-        </div>
+        {% else %}
+            <h2>Zoeken</h2>
+            <p class="empty">Typ een zoekterm om bestanden te vinden in je kluis.</p>
+        {% endif %}
     </div>
-</body>
-</html>
+{% endblock %}

@@ -1,106 +1,82 @@
-<!DOCTYPE html>
-<html lang="nl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logboek - MySolido</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7f5; color: #333; }
-        .header { background: linear-gradient(135deg, #1a6b3c, #0f9b4f); color: white; padding: 20px 30px; }
-        .header h1 { font-size: 1.5rem; margin-bottom: 4px; }
-        .header h1 a { color: white; text-decoration: none; }
-        .header h1 a:hover { opacity: 0.9; }
-        .header p { font-size: 0.85rem; opacity: 0.8; }
-        .header-nav { margin-top: 8px; display: flex; gap: 16px; }
-        .header-nav a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.85rem; }
-        .header-nav a:hover { color: white; }
-        .header-nav a.active { color: white; font-weight: 600; border-bottom: 2px solid white; padding-bottom: 2px; }
-        .container { max-width: 800px; margin: 20px auto; padding: 0 20px; }
-        .btn { background: #1a6b3c; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; text-decoration: none; }
-        .btn:hover { background: #0f4d2a; }
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_upload, icon_delete, icon_folder, icon_share, icon_lock, icon_hourglass, icon_refresh, icon_search, icon_trash, icon_restore, icon_info, icon_zip %}
 
-        .filter-bar { background: white; border-radius: 12px; padding: 12px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 8px; }
-        .filter-bar label { font-size: 0.9rem; font-weight: 500; }
-        .filter-bar select { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.85rem; }
+{% block title %}Logboek - MySolido{% endblock %}
 
-        .audit-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .audit-card h2 { font-size: 1rem; margin-bottom: 16px; color: #1a6b3c; }
-        .log-list { list-style: none; }
-        .log-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .log-item:last-child { border-bottom: none; }
-        .log-icon { font-size: 1.1rem; min-width: 24px; text-align: center; }
-        .log-content { flex: 1; }
-        .log-action { font-weight: 500; font-size: 0.9rem; }
-        .log-details { font-size: 0.8rem; color: #666; margin-top: 2px; }
-        .log-time { font-size: 0.75rem; color: #999; white-space: nowrap; }
-        .empty { color: #999; font-style: italic; padding: 20px 0; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1><a href="{{ url_for('index') }}">MySolido</a></h1>
-        <p>Jouw persoonlijke datakluis op je eigen pc</p>
-        <div class="header-nav">
-            <a href="{{ url_for('index') }}">Kluis</a>
-            <a href="{{ url_for('shares_overview') }}">Gedeeld</a>
-            <a href="{{ url_for('audit') }}" class="active">Logboek</a>
-        </div>
+{% block content %}
+    <div class="filter-bar">
+        <label>Filter:</label>
+        <select onchange="window.location.href='{{ url_for('audit') }}?filter=' + this.value">
+            <option value="" {% if not current_filter %}selected{% endif %}>Alle acties</option>
+            <option value="upload" {% if current_filter == 'upload' %}selected{% endif %}>Upload</option>
+            <option value="trash" {% if current_filter == 'trash' %}selected{% endif %}>Prullenbak</option>
+            <option value="delete" {% if current_filter == 'delete' %}selected{% endif %}>Verwijderd</option>
+            <option value="create_folder" {% if current_filter == 'create_folder' %}selected{% endif %}>Map aangemaakt</option>
+            <option value="share" {% if current_filter == 'share' %}selected{% endif %}>Gedeeld</option>
+            <option value="revoke" {% if current_filter == 'revoke' %}selected{% endif %}>Ingetrokken</option>
+            <option value="revoke_expired" {% if current_filter == 'revoke_expired' %}selected{% endif %}>Verlopen</option>
+            <option value="move" {% if current_filter == 'move' %}selected{% endif %}>Verplaatst</option>
+            <option value="search" {% if current_filter == 'search' %}selected{% endif %}>Gezocht</option>
+            <option value="restore" {% if current_filter == 'restore' %}selected{% endif %}>Hersteld</option>
+            <option value="permanent_delete" {% if current_filter == 'permanent_delete' %}selected{% endif %}>Definitief verwijderd</option>
+            <option value="export" {% if current_filter == 'export' %}selected{% endif %}>Backup</option>
+        </select>
     </div>
-    <div class="container">
-        <div class="filter-bar">
-            <label>Filter:</label>
-            <select onchange="window.location.href='{{ url_for('audit') }}?filter=' + this.value">
-                <option value="" {% if not current_filter %}selected{% endif %}>Alle acties</option>
-                <option value="upload" {% if current_filter == 'upload' %}selected{% endif %}>&#x1F4E4; Upload</option>
-                <option value="delete" {% if current_filter == 'delete' %}selected{% endif %}>&#x1F5D1;&#xFE0F; Verwijderd</option>
-                <option value="create_folder" {% if current_filter == 'create_folder' %}selected{% endif %}>&#x1F4C1; Map aangemaakt</option>
-                <option value="share" {% if current_filter == 'share' %}selected{% endif %}>&#x1F517; Gedeeld</option>
-                <option value="revoke" {% if current_filter == 'revoke' %}selected{% endif %}>&#x1F512; Ingetrokken</option>
-                <option value="revoke_expired" {% if current_filter == 'revoke_expired' %}selected{% endif %}>&#x23F3; Verlopen</option>
-                <option value="move" {% if current_filter == 'move' %}selected{% endif %}>&#x1F504; Verplaatst</option>
-                <option value="search" {% if current_filter == 'search' %}selected{% endif %}>&#x1F50D; Gezocht</option>
-            </select>
-        </div>
 
-        <div class="audit-card">
-            <h2>Logboek{% if current_filter %} ({{ current_filter }}){% endif %}</h2>
-            {% if log %}
-                <ul class="log-list">
-                    {% for entry in log %}
-                    <li class="log-item">
-                        <span class="log-icon">
-                            {% if entry.action == 'upload' %}&#x1F4E4;{% elif entry.action == 'delete' %}&#x1F5D1;&#xFE0F;{% elif entry.action == 'create_folder' %}&#x1F4C1;{% elif entry.action == 'share' %}&#x1F517;{% elif entry.action == 'revoke' or entry.action == 'revoke_expired' %}&#x1F512;{% elif entry.action == 'move' %}&#x1F504;{% elif entry.action == 'search' %}&#x1F50D;{% else %}&#x2139;&#xFE0F;{% endif %}
-                        </span>
-                        <div class="log-content">
-                            <div class="log-action">
-                                {% if entry.action == 'upload' %}Geupload
-                                {% elif entry.action == 'delete' %}Verwijderd
-                                {% elif entry.action == 'create_folder' %}Map aangemaakt
-                                {% elif entry.action == 'share' %}Gedeeld
-                                {% elif entry.action == 'revoke' %}Toegang ingetrokken
-                                {% elif entry.action == 'revoke_expired' %}Toegang verlopen
-                                {% elif entry.action == 'move' %}Verplaatst
-                                {% elif entry.action == 'search' %}Gezocht
-                                {% else %}{{ entry.action }}
-                                {% endif %}
-                            </div>
-                            <div class="log-details">
-                                {% if entry.details %}
-                                    {% for key, value in entry.details.items() %}
-                                        {{ key }}: {{ value }}{% if not loop.last %} &middot; {% endif %}
-                                    {% endfor %}
-                                {% endif %}
-                            </div>
+    <div class="audit-card">
+        <h2>Logboek{% if current_filter %} ({{ current_filter }}){% endif %}</h2>
+        {% if log %}
+            <ul class="log-list">
+                {% for entry in log %}
+                <li class="log-item">
+                    <span class="log-icon">
+                        {% if entry.action == 'upload' %}{{ icon_upload() }}
+                        {% elif entry.action == 'trash' %}{{ icon_trash() }}
+                        {% elif entry.action == 'delete' %}{{ icon_delete() }}
+                        {% elif entry.action == 'create_folder' %}{{ icon_folder() }}
+                        {% elif entry.action == 'share' %}{{ icon_share() }}
+                        {% elif entry.action == 'revoke' or entry.action == 'revoke_expired' %}{{ icon_lock() }}
+                        {% elif entry.action == 'move' %}{{ icon_refresh() }}
+                        {% elif entry.action == 'search' %}{{ icon_search() }}
+                        {% elif entry.action == 'restore' %}{{ icon_restore() }}
+                        {% elif entry.action == 'permanent_delete' %}{{ icon_delete() }}
+                        {% elif entry.action == 'trash_auto_deleted' %}{{ icon_hourglass() }}
+                        {% elif entry.action == 'export' %}{{ icon_zip() }}
+                        {% else %}{{ icon_info() }}
+                        {% endif %}
+                    </span>
+                    <div class="log-content">
+                        <div class="log-action">
+                            {% if entry.action == 'upload' %}Geupload
+                            {% elif entry.action == 'trash' %}Naar prullenbak
+                            {% elif entry.action == 'delete' %}Verwijderd
+                            {% elif entry.action == 'create_folder' %}Map aangemaakt
+                            {% elif entry.action == 'share' %}Gedeeld
+                            {% elif entry.action == 'revoke' %}Toegang ingetrokken
+                            {% elif entry.action == 'revoke_expired' %}Toegang verlopen
+                            {% elif entry.action == 'move' %}Verplaatst
+                            {% elif entry.action == 'search' %}Gezocht
+                            {% elif entry.action == 'restore' %}Hersteld uit prullenbak
+                            {% elif entry.action == 'permanent_delete' %}Definitief verwijderd
+                            {% elif entry.action == 'trash_auto_deleted' %}Auto-verwijderd (30 dagen)
+                            {% elif entry.action == 'export' %}Backup geexporteerd
+                            {% else %}{{ entry.action }}
+                            {% endif %}
                         </div>
-                        <span class="log-time">{{ entry.timestamp[:16].replace('T', ' ') }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="empty">Geen logboek entries{% if current_filter %} voor dit filter{% endif %}.</p>
-            {% endif %}
-        </div>
+                        <div class="log-details">
+                            {% if entry.details %}
+                                {% for key, value in entry.details.items() %}
+                                    {{ key }}: {{ value }}{% if not loop.last %} &middot; {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="log-time">{{ entry.timestamp[:16].replace('T', ' ') }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="empty">Geen logboek entries{% if current_filter %} voor dit filter{% endif %}.</p>
+        {% endif %}
     </div>
-</body>
-</html>
+{% endblock %}
