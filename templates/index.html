@@ -84,11 +84,21 @@
     </div>
     {% endif %}
 
-    <!-- Other items in root (files) -->
+    <!-- Other items in root (files only) -->
     {% set root_files = items|selectattr('is_folder', 'equalto', false)|list %}
     {% if root_files %}
     <div class="files" style="margin-top: 16px;">
-        <h2>Bestanden in root</h2>
+        <div class="files-header">
+            <h2>Bestanden in root</h2>
+            <form action="{{ url_for('index') }}" method="get" class="sort-form">
+                <select name="sort" onchange="this.form.submit()">
+                    <option value="name-asc" {{ 'selected' if current_sort == 'name-asc' }}>Naam (A-Z)</option>
+                    <option value="name-desc" {{ 'selected' if current_sort == 'name-desc' }}>Naam (Z-A)</option>
+                    <option value="date-desc" {{ 'selected' if current_sort == 'date-desc' }}>Nieuwste eerst</option>
+                    <option value="date-asc" {{ 'selected' if current_sort == 'date-asc' }}>Oudste eerst</option>
+                </select>
+            </form>
+        </div>
         <ul class="file-list">
             {% for item in root_files %}
             <li class="file-item">
@@ -185,27 +195,39 @@
 
     <!-- File/folder listing -->
     <div class="files">
-        <h2>Inhoud van {{ folder_path.split('/')[-1] }}</h2>
+        <div class="files-header">
+            <h2>Inhoud van {{ folder_path.split('/')[-1] }}</h2>
+            <form action="{{ url_for('browse', folder_path=folder_path) }}" method="get" class="sort-form">
+                <select name="sort" onchange="this.form.submit()">
+                    <option value="name-asc" {{ 'selected' if current_sort == 'name-asc' }}>Naam (A-Z)</option>
+                    <option value="name-desc" {{ 'selected' if current_sort == 'name-desc' }}>Naam (Z-A)</option>
+                    <option value="date-desc" {{ 'selected' if current_sort == 'date-desc' }}>Nieuwste eerst</option>
+                    <option value="date-asc" {{ 'selected' if current_sort == 'date-asc' }}>Oudste eerst</option>
+                </select>
+            </form>
+        </div>
         {% if items %}
             <ul class="file-list">
                 {% for item in items %}
+                {# Use item.url ending with / as authoritative folder check #}
+                {% set is_dir = item.url.endswith('/') %}
                 <li class="file-item">
                     <div class="file-name">
                         <span class="icon">
-                            {% if item.is_folder %}
+                            {% if is_dir %}
                                 {{ folder_icon(item.name) }}
                             {% else %}
                                 {{ icon_file() }}
                             {% endif %}
                         </span>
-                        {% if item.is_folder %}
+                        {% if is_dir %}
                             <a href="{{ url_for('browse', folder_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="folder-link">{{ item.name }}</a>
                         {% else %}
                             <a href="{{ url_for('view_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}">{{ item.name }}</a>
                         {% endif %}
                     </div>
                     <div class="file-actions">
-                        {% if not item.is_folder %}
+                        {% if not is_dir %}
                         <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-download">{{ icon_download() }} Download</a>
                         <div class="move-wrapper">
                             <button type="button" class="btn btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaatsen</button>

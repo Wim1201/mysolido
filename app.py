@@ -251,6 +251,21 @@ def get_recent_files(limit=5):
     return log
 
 
+def sort_items(items, sort_by):
+    """Sort items: folders always first, then files by chosen criterion"""
+    folders = [i for i in items if i['is_folder']]
+    files = [i for i in items if not i['is_folder']]
+    if sort_by == 'name-desc':
+        files.sort(key=lambda x: x['name'].lower(), reverse=True)
+    elif sort_by == 'date-desc':
+        files.reverse()
+    elif sort_by == 'date-asc':
+        pass  # server order is already oldest first
+    else:  # name-asc (default)
+        files.sort(key=lambda x: x['name'].lower())
+    return folders + files
+
+
 def browse_folder(folder_path):
     """Shared logic for browsing a folder"""
     # Check for expired shares and auto-revoke
@@ -264,6 +279,7 @@ def browse_folder(folder_path):
         add_notification('share_expired', f'Toegang van {display_webid} tot "{resource_name}" is verlopen')
 
     folder_path = folder_path.strip('/')
+    sort_by = request.args.get('sort', 'name-asc')
     if folder_path:
         container_url = SOLID_POD_URL + folder_path + '/'
     else:
@@ -273,6 +289,7 @@ def browse_folder(folder_path):
         response = pod_request('GET', container_url, headers={'Accept': 'text/turtle'})
         if response and response.status_code == 200:
             items = parse_container_contents(response.text, container_url)
+            items = sort_items(items, sort_by)
             breadcrumbs = build_breadcrumbs(folder_path)
             parts = [p for p in folder_path.split('/') if p]
             parent_path = '/'.join(parts[:-1]) if parts else None
@@ -293,6 +310,7 @@ def browse_folder(folder_path):
                 folder_count=folder_count,
                 recent_files=recent_files,
                 default_folders=DEFAULT_FOLDERS,
+                current_sort=sort_by,
             )
         elif response:
             flash(f'Kon map niet laden: {response.status_code}', 'error')
@@ -316,6 +334,7 @@ def browse_folder(folder_path):
         folder_count=0,
         recent_files=[],
         default_folders=DEFAULT_FOLDERS,
+        current_sort=sort_by,
     )
 
 
@@ -566,7 +585,6 @@ def view_file(file_path):
         flash('Bestand kon niet worden geopend', 'error')
         return redirect(url_for('index'))
 
-    content_type = response.headers.get('Content-Type', 'application/octet-stream')
     filename = file_path.split('/')[-1]
     ext = os.path.splitext(filename)[1].lower()
 
@@ -577,21 +595,22 @@ def view_file(file_path):
             file_path=file_path,
             folder_path=folder_path,
             media_type='audio' if ext in ('.mp3', '.wav') else 'video',
-            content_type=VIEWABLE_TYPES.get(ext, content_type),
+            content_type=VIEWABLE_TYPES.get(ext, 'application/octet-stream'),
         )
 
     if ext in VIEWABLE_TYPES:
-        return Response(
-            response.content,
-            content_type=content_type,
-            headers={'Content-Disposition': f'inline; filename="{filename}"'}
-        )
+        mime = VIEWABLE_TYPES[ext]
+        print(f"[view] {filename} → inline, Content-Type: {mime}")
+        resp = Response(response.content)
+        resp.headers['Content-Type'] = mime
+        resp.headers['Content-Disposition'] = f'inline; filename="{filename}"'
+        return resp
 
-    return Response(
-        response.content,
-        content_type=content_type,
-        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-    )
+    print(f"[view] {filename} → attachment")
+    resp = Response(response.content)
+    resp.headers['Content-Type'] = response.headers.get('Content-Type', 'application/octet-stream')
+    resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return resp
 
 
 @app.route('/download/<path:file_path>')
