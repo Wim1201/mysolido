@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Welkom - MySolido{% endblock %}
+
+{% block content %}
+<div class="welcome">
+    <div class="welcome-header">
+        <svg class="welcome-logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="12" fill="var(--color-primary)"/>
+            <path d="M14 20a10 10 0 0 1 20 0v4a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2v-4z" fill="rgba(255,255,255,0.3)"/>
+            <rect x="12" y="24" width="24" height="14" rx="3" fill="white"/>
+            <circle cx="24" cy="31" r="3" fill="var(--color-primary)"/>
+            <path d="M24 31v3" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <h1>MySolido</h1>
+        <p class="welcome-subtitle">Welkom bij je persoonlijke datakluis</p>
+    </div>
+
+    <div class="welcome-steps">
+        <div class="welcome-step">
+            <div class="step-number">1</div>
+            <div class="step-text">
+                <strong>Kluis inrichten</strong>
+                <span>We maken 20 beveiligde mappen voor je aan</span>
+            </div>
+        </div>
+        <div class="welcome-step">
+            <div class="step-number">2</div>
+            <div class="step-text">
+                <strong>Documenten uploaden</strong>
+                <span>Upload je eerste document</span>
+            </div>
+        </div>
+        <div class="welcome-step">
+            <div class="step-number">3</div>
+            <div class="step-text">
+                <strong>Toegang beheren</strong>
+                <span>Jij bepaalt wie erbij mag</span>
+            </div>
+        </div>
+    </div>
+
+    <a href="{{ url_for('init_folders_welcome') }}" class="btn btn-welcome" onclick="showSpinner()">Kluis inrichten</a>
+</div>
+{% endblock %}
