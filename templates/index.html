@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/icons.html" import icon_arrow_left, icon_chevron_right, icon_download, icon_upload, icon_delete, icon_share, icon_move, icon_search, icon_plus, icon_folder, icon_file, icon_package, icon_eye, icon_edit, icon_globe, icon_lock, icon_hourglass, icon_append, folder_icon %}
+{% from "macros/icons.html" import icon_arrow_left, icon_chevron_right, icon_download, icon_upload, icon_delete, icon_share, icon_move, icon_search, icon_plus, icon_folder, icon_file, icon_package, icon_eye, icon_edit, icon_globe, icon_lock, icon_hourglass, icon_append %}
 
 {% block title %}{% if folder_path %}{{ folder_path.split('/')[-1] }} - {% endif %}MySolido{% endblock %}
 
@@ -59,8 +59,8 @@
     <h2 style="font-size: 1rem; color: var(--color-primary); margin-bottom: 12px;">Mappen</h2>
     <div class="folder-grid">
         {% for name in default_folders %}
-        <a href="{{ url_for('browse', folder_path=name) }}" class="folder-card" style="--folder-color: {{ folder_styles[name].color }}">
-            {{ folder_icon(name) }}
+        <a href="{{ url_for('browse', folder_path=name) }}" class="folder-card" style="--folder-color: {{ folder_icons[name].color }}">
+            {{ folder_icons[name].svg | safe }}
             <div class="folder-card-name">{{ name.capitalize() }}</div>
         </a>
         {% endfor %}
@@ -218,8 +218,10 @@
                 <li class="file-item">
                     <div class="file-name">
                         <span class="icon">
-                            {% if is_dir %}
-                                {{ folder_icon(item.name) }}
+                            {% if is_dir and item.svg %}
+                                {{ item.svg | safe }}
+                            {% elif is_dir %}
+                                {{ icon_folder() }}
                             {% else %}
                                 {{ icon_file() }}
                             {% endif %}

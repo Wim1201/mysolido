@@ -1,12 +1,32 @@
-node_modules/
+# Solid pod data (lokaal, persoonlijk)
 .data/
+
+# Python
 __pycache__/
 *.pyc
-~
-files.zip
-~$*
-shares.json
-audit_log.json
+*.pyo
+.env
+venv/
+.venv/
+
+# App state (persoonlijk)
 trash.json
 notifications.json
-.env
+audit.json
+shares.json
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+audit_log.json
+~$*
