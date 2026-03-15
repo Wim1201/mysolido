@@ -59,6 +59,36 @@ document.addEventListener('click', function(e) {
     }
 });
 
+/* --- Loading Spinner --- */
+function showSpinner() {
+    document.getElementById('spinner-overlay').classList.add('active');
+}
+
+(function() {
+    // Show spinner on form submits (upload, search, create folder)
+    document.querySelectorAll('form').forEach(function(form) {
+        // Skip delete forms (they have confirm dialogs)
+        if (form.action && form.action.includes('/delete')) return;
+        // Skip move/share dropdown forms
+        if (form.closest('.move-dropdown') || form.closest('.share-dropdown')) return;
+
+        form.addEventListener('submit', function() {
+            showSpinner();
+            // Disable submit buttons to prevent double-click
+            form.querySelectorAll('button[type="submit"]').forEach(function(btn) {
+                btn.disabled = true;
+            });
+        });
+    });
+
+    // Show spinner on folder card clicks (dashboard)
+    document.querySelectorAll('.folder-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            showSpinner();
+        });
+    });
+})();
+
 /* --- Drag and Drop Upload --- */
 (function() {
     var zone = document.querySelector('.upload-zone');
