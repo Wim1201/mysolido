@@ -302,6 +302,13 @@ def sort_items(items, sort_by):
     return folders + files
 
 
+def is_pod_empty(items):
+    """Check if the pod is essentially empty (only system files like profile/, README)"""
+    SYSTEM_NAMES = {'profile', 'README', '.acl', '_trash'}
+    user_items = [i for i in items if i['name'] not in SYSTEM_NAMES]
+    return len(user_items) == 0
+
+
 def browse_folder(folder_path):
     """Shared logic for browsing a folder"""
     # Check for expired shares and auto-revoke
@@ -325,6 +332,11 @@ def browse_folder(folder_path):
         response = pod_request('GET', container_url, headers={'Accept': 'text/turtle'})
         if response and response.status_code == 200:
             items = parse_container_contents(response.text, container_url)
+
+            # Show welcome page if pod root is empty
+            if not folder_path and is_pod_empty(items):
+                return render_template('welcome.html', pod_url=SOLID_POD_URL)
+
             items = sort_items(items, sort_by)
             breadcrumbs = build_breadcrumbs(folder_path)
             parts = [p for p in folder_path.split('/') if p]
@@ -1008,7 +1020,18 @@ def debug():
 
 @app.route('/init-folders')
 def init_folders():
-    """Maak de standaard 14 hoofdmappen aan in de pod"""
+    """Maak de standaardmappen aan in de pod"""
+    return _do_init_folders()
+
+
+@app.route('/init-folders-welcome')
+def init_folders_welcome():
+    """Maak de standaardmappen aan vanuit het welkomstscherm"""
+    return _do_init_folders(welcome=True)
+
+
+def _do_init_folders(welcome=False):
+    """Shared logic for creating default folders"""
     created = []
     skipped = []
 
@@ -1025,12 +1048,15 @@ def init_folders():
             status = response.status_code if response else 'geen response'
             flash(f'Map "{folder}" aanmaken mislukt: {status}', 'error')
 
-    if created:
-        flash(f'{len(created)} mappen aangemaakt: {", ".join(created)}', 'success')
-    if skipped:
-        flash(f'{len(skipped)} mappen bestonden al: {", ".join(skipped)}', 'success')
-    if not created and not skipped:
-        flash('Geen mappen aangemaakt', 'error')
+    if welcome and created:
+        flash('Je kluis is ingericht! Upload je eerste document.', 'success')
+    else:
+        if created:
+            flash(f'{len(created)} mappen aangemaakt: {", ".join(created)}', 'success')
+        if skipped:
+            flash(f'{len(skipped)} mappen bestonden al: {", ".join(skipped)}', 'success')
+        if not created and not skipped:
+            flash('Geen mappen aangemaakt', 'error')
 
     return redirect(url_for('index'))
 
