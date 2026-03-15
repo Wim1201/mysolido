@@ -3,7 +3,8 @@
     "allow": [
       "Bash(curl -s http://localhost:5000/debug)",
       "Bash(grep -E \"\\\\.\\(css|js\\)$\")",
-      "Bash(python -c \"from app import app; print\\(''App imports OK''\\)\")"
+      "Bash(python -c \"from app import app; print\\(''App imports OK''\\)\")",
+      "Bash(pip install:*)"
     ]
   }
 }

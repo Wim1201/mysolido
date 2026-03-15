@@ -2,23 +2,27 @@ import re
 import os
 import io
 import zipfile
+from urllib.parse import unquote
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
 import requests
 import base64
+from dotenv import load_dotenv
 from audit import log_action, get_audit_log
 from shares import add_share, remove_share, get_all_shares, get_shares_for_resource, check_expired_shares
 from trash import move_to_trash, restore_from_trash, permanent_delete, get_all_trash, cleanup_expired
 from notifications import add_notification, get_all_notifications, get_unread_count, mark_as_read, mark_all_read
 
+load_dotenv()
+
 app = Flask(__name__)
 app.secret_key = '***REMOVED***'
 
 # === CONFIGURATIE ===
-CSS_BASE_URL = 'http://localhost:3000'
-SOLID_POD_URL = 'http://localhost:3000/wim/'
-OWNER_WEBID = 'http://localhost:3000/wim/profile/card#me'
-CLIENT_ID = '***REMOVED***'
-CLIENT_SECRET = '***REMOVED***'
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://localhost:3000')
+SOLID_POD_URL = os.getenv('SOLID_POD_URL', 'http://localhost:3000/wim/')
+OWNER_WEBID = CSS_BASE_URL.rstrip('/') + '/wim/profile/card#me'
 
 # Viewable file types for inline display
 VIEWABLE_TYPES = {
@@ -173,7 +177,7 @@ def parse_container_contents(turtle_text, base_url):
             full_url = base_url.rstrip('/') + '/' + resource.lstrip('/')
         else:
             full_url = resource
-        name = resource.rstrip('/').split('/')[-1]
+        name = unquote(resource.rstrip('/').split('/')[-1])
         is_folder = resource.endswith('/')
         icon = get_folder_icon(name) if is_folder else 'file'
         items.append({

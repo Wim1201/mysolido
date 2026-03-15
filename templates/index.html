@@ -98,6 +98,25 @@
                 </div>
                 <div class="file-actions">
                     <a href="{{ url_for('download_file', file_path=item.name) }}" class="btn btn-download">{{ icon_download() }} Download</a>
+                    <div class="move-wrapper">
+                        <button type="button" class="btn btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaatsen</button>
+                        <div class="move-dropdown">
+                            <form action="{{ url_for('move') }}" method="post">
+                                <input type="hidden" name="resource_url" value="{{ item.url }}">
+                                <input type="hidden" name="folder_path" value="">
+                                <select name="target_folder">
+                                    <option value="">Pod root</option>
+                                    {% for folder in all_folders %}
+                                    <option value="{{ folder.name }}">{{ folder.label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="move-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">Annuleren</button>
+                                    <button type="submit" class="btn btn-sm">Verplaats</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                     <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
                         <input type="hidden" name="resource_url" value="{{ item.url }}">
                         <input type="hidden" name="folder_path" value="">
