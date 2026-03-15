@@ -51,6 +51,14 @@
         <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }}<span>Profiel</span></a>
     </nav>
 
+    <!-- Loading Spinner Overlay -->
+    <div class="spinner-overlay" id="spinner-overlay">
+        <div class="spinner-content">
+            <div class="spinner"></div>
+            <p>Laden...</p>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
