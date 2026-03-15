@@ -9,3 +9,4 @@ shares.json
 audit_log.json
 trash.json
 notifications.json
+.env
