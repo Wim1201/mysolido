@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MySolido — Jouw persoonlijke datakluis op je eigen pc</title>
+<meta name="description" content="Persoonlijke datakluis die op je eigen computer draait. Gebouwd op het Solid protocol. Geen cloud, geen abonnement, geen derde partij.">
+<meta property="og:title" content="MySolido — Jouw persoonlijke datakluis op je eigen pc">
+<meta property="og:description" content="Persoonlijke datakluis die op je eigen computer draait. Gebouwd op het Solid protocol. Geen cloud, geen abonnement.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mysolido.com">
+<meta property="og:locale" content="nl_NL">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a6b3c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3C/svg%3E">
+<style>
+/* ═══════════════════════════════════════
+   MySolido Landing Page
+   Geen externe dependencies. Geen tracking.
+   ═══════════════════════════════════════ */
+
+:root {
+  --green-900: #062B14;
+  --green-800: #0A3D1E;
+  --green-700: #0f4d2a;
+  --green-600: #1a6b3c;
+  --green-500: #22864c;
+  --green-400: #34a864;
+  --green-300: #50c878;
+  --green-200: #8edca8;
+  --green-100: #c8f0d8;
+  --green-50: #ecfaf1;
+
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --slate-100: #f1f5f9;
+  --slate-50: #f8fafc;
+
+  --white: #ffffff;
+  --text: #1e293b;
+  --text-muted: #475569;
+  --text-light: #64748b;
+  --radius: 12px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.1);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  color: var(--text);
+  background: var(--white);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── Typography ── */
+h1, h2, h3, h4 { line-height: 1.2; font-weight: 700; }
+h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); letter-spacing: -0.03em; }
+h2 { font-size: clamp(1.6rem, 3.5vw, 2.4rem); letter-spacing: -0.02em; }
+h3 { font-size: 1.15rem; }
+p { line-height: 1.7; }
+
+/* ── Layout ── */
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+section {
+  padding: 80px 0;
+}
+
+@media (min-width: 768px) {
+  section { padding: 100px 0; }
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--green-600);
+  color: var(--white);
+  box-shadow: 0 2px 8px rgba(26, 107, 60, 0.3);
+}
+.btn-primary:hover {
+  background: var(--green-700);
+  box-shadow: 0 4px 16px rgba(26, 107, 60, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--white);
+  color: var(--green-700);
+  border: 2px solid var(--green-200);
+}
+.btn-secondary:hover {
+  background: var(--green-50);
+  border-color: var(--green-400);
+}
+
+.btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+/* ════════════════════════════════════
+   HERO
+   ════════════════════════════════════ */
+.hero {
+  position: relative;
+  padding: 60px 0 80px;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 50%, rgba(80,200,120,0.06) 0%, transparent 100%),
+    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(26,107,60,0.04) 0%, transparent 100%),
+    var(--white);
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px; right: -200px;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(80,200,120,0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-inner {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .hero-inner { grid-template-columns: 1fr 1fr; }
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: 100px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--green-700);
+  margin-bottom: 20px;
+}
+
+.hero-badge svg { width: 14px; height: 14px; }
+
+.hero h1 {
+  color: var(--slate-900);
+  margin-bottom: 20px;
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: var(--green-600);
+}
+
+.hero-sub {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  max-width: 500px;
+  margin-bottom: 32px;
+}
+
+.hero-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.hero-visual {
+  position: relative;
+}
+
+.hero-mockup {
+  width: 100%;
+  max-width: 540px;
+  background: var(--slate-900);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--slate-700);
+}
+
+.mockup-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--slate-800);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.mockup-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.mockup-dot:nth-child(1) { background: #ff5f57; }
+.mockup-dot:nth-child(2) { background: #febc2e; }
+.mockup-dot:nth-child(3) { background: #28c840; }
+
+.mockup-url {
+  margin-left: 12px;
+  font-size: 0.75rem;
+  color: var(--slate-400);
+  background: var(--slate-700);
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+.mockup-content {
+  padding: 24px;
+}
+
+.mockup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.mockup-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--green-300);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.mockup-logo svg { width: 22px; height: 22px; }
+
+.mockup-nav {
+  display: flex;
+  gap: 16px;
+  font-size: 0.72rem;
+  color: var(--slate-400);
+}
+
+.mockup-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.mockup-card {
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 8px 4px;
+  text-align: center;
+  transition: background 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.mockup-card:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.mockup-card svg {
+  width: 20px; height: 20px;
+  margin-bottom: 3px;
+  display: block;
+  margin-left: auto; margin-right: auto;
+}
+
+.mockup-label {
+  font-size: 0.52rem;
+  color: var(--slate-300);
+  font-weight: 500;
+  display: block;
+}
+
+/* ════════════════════════════════════
+   PROBLEEM
+   ════════════════════════════════════ */
+.problem {
+  background: var(--slate-50);
+  border-top: 1px solid var(--slate-200);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--green-600);
+  margin-bottom: 16px;
+}
+
+.section-label svg { width: 16px; height: 16px; }
+
+.problem-text {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  max-width: 680px;
+  margin-bottom: 48px;
+}
+
+.problem-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 640px) {
+  .problem-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.problem-card {
+  padding: 28px;
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-sm);
+}
+
+.problem-card-icon {
+  width: 48px; height: 48px;
+  background: #fef2f2;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.problem-card-icon svg {
+  width: 24px; height: 24px;
+  color: #dc2626;
+}
+
+.problem-card h3 {
+  margin-bottom: 8px;
+  color: var(--slate-800);
+}
+
+.problem-card p {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+/* ════════════════════════════════════
+   OPLOSSING
+   ════════════════════════════════════ */
+.solution-inner {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .solution-inner { grid-template-columns: 1fr 1fr; }
+}
+
+.solution-text p {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+.solution-points {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.solution-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.solution-check {
+  width: 22px; height: 22px;
+  background: var(--green-100);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.solution-check svg { width: 12px; height: 12px; color: var(--green-600); }
+
+.solution-visual {
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  text-align: center;
+}
+
+.solution-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.diagram-you {
+  padding: 14px 32px;
+  background: var(--green-600);
+  color: var(--white);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 4px 12px rgba(26,107,60,0.3);
+}
+
+.diagram-arrow {
+  color: var(--green-400);
+}
+
+.diagram-arrow svg { width: 24px; height: 24px; }
+
+.diagram-pod {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  background: var(--white);
+  border: 2px solid var(--green-300);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.diagram-pod svg { width: 28px; height: 28px; color: var(--green-600); }
+
+.diagram-pod-text { text-align: left; }
+.diagram-pod-text strong { display: block; color: var(--green-800); font-size: 0.95rem; }
+.diagram-pod-text span { font-size: 0.78rem; color: var(--text-muted); }
+
+.diagram-items {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.diagram-item {
+  padding: 6px 14px;
+  background: var(--white);
+  border: 1px solid var(--green-200);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--green-700);
+  font-weight: 500;
+}
+
+/* ════════════════════════════════════
+   FEATURES
+   ════════════════════════════════════ */
+.features {
+  background: var(--slate-50);
+  border-top: 1px solid var(--slate-200);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.features h2 {
+  margin-bottom: 12px;
+}
+
+.features-sub {
+  color: var(--text-muted);
+  max-width: 560px;
+  margin-bottom: 48px;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 640px) {
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .features-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.feature-card {
+  padding: 24px;
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.feature-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  width: 44px; height: 44px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.feature-icon svg { width: 22px; height: 22px; color: var(--green-600); }
+
+.feature-card h3 {
+  margin-bottom: 6px;
+  font-size: 0.95rem;
+  color: var(--slate-800);
+}
+
+.feature-card p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.feature-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: var(--green-100);
+  color: var(--green-700);
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+/* ════════════════════════════════════
+   TECHNOLOGIE
+   ════════════════════════════════════ */
+.tech-inner {
+  text-align: center;
+}
+
+.tech-inner h2 { margin-bottom: 12px; }
+
+.tech-sub {
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto 40px;
+}
+
+.tech-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.tech-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  background: var(--white);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.tech-badge-icon {
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.tech-badge strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--slate-800);
+}
+
+.tech-badge span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.tech-context {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  color: var(--green-800);
+}
+
+/* ════════════════════════════════════
+   VERGELIJKING
+   ════════════════════════════════════ */
+.compare {
+  background: var(--slate-900);
+  color: var(--white);
+}
+
+.compare h2 { margin-bottom: 12px; color: var(--white); }
+
+.compare-sub {
+  color: var(--slate-400);
+  margin-bottom: 40px;
+  max-width: 500px;
+}
+
+.compare-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-700);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 580px;
+}
+
+thead th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--slate-800);
+  border-bottom: 1px solid var(--slate-700);
+  color: var(--slate-300);
+}
+
+thead th:last-child {
+  color: var(--green-300);
+  background: rgba(26,107,60,0.15);
+}
+
+tbody td {
+  padding: 14px 20px;
+  font-size: 0.88rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--slate-300);
+}
+
+tbody tr:last-child td { border-bottom: none; }
+
+tbody td:first-child {
+  font-weight: 600;
+  color: var(--slate-200);
+}
+
+tbody td:last-child {
+  color: var(--green-200);
+  font-weight: 600;
+  background: rgba(26,107,60,0.06);
+}
+
+.check-green { color: var(--green-400); }
+.cross-red { color: #f87171; }
+
+/* ════════════════════════════════════
+   DOELGROEPEN
+   ════════════════════════════════════ */
+.audiences h2 { margin-bottom: 12px; }
+.audiences-sub { color: var(--text-muted); margin-bottom: 40px; }
+
+.audiences-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 768px) {
+  .audiences-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.audience-card {
+  padding: 32px 28px;
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-sm);
+  background: var(--white);
+}
+
+.audience-card-icon {
+  font-size: 2rem;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.audience-card h3 {
+  margin-bottom: 10px;
+  color: var(--slate-800);
+}
+
+.audience-card p {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+/* ════════════════════════════════════
+   CTA / DOWNLOAD
+   ════════════════════════════════════ */
+.cta {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 100%, rgba(80,200,120,0.08) 0%, transparent 60%),
+    var(--white);
+  text-align: center;
+  border-top: 1px solid var(--slate-200);
+}
+
+.cta h2 { margin-bottom: 12px; }
+
+.cta-sub {
+  color: var(--text-muted);
+  margin-bottom: 32px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cta-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.cta-note {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  margin-bottom: 24px;
+}
+
+.cta-reqs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--slate-500);
+  padding: 12px 20px;
+  background: var(--slate-50);
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+}
+
+.cta-reqs span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ════════════════════════════════════
+   FOOTER
+   ════════════════════════════════════ */
+footer {
+  padding: 40px 0;
+  background: var(--slate-900);
+  color: var(--slate-400);
+  font-size: 0.85rem;
+}
+
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--slate-200);
+  font-weight: 600;
+}
+
+.footer-brand svg { width: 20px; height: 20px; color: var(--green-400); }
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.footer-links a {
+  color: var(--slate-400);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover { color: var(--green-300); }
+
+.footer-note {
+  width: 100%;
+  text-align: center;
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--slate-800);
+  color: var(--slate-500);
+  font-size: 0.78rem;
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════ HERO ════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-inner">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Open source · Solid protocol
+        </div>
+        <h1>Jouw data.<br>Op jouw pc.<br><em>Jouw voorwaarden.</em></h1>
+        <p class="hero-sub">MySolido is een persoonlijke datakluis die op je eigen computer draait. Geen cloud. Geen abonnement. Geen derde partij.</p>
+        <div class="hero-buttons">
+          <a href="https://github.com/Wim1201/mysolido/releases" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download voor Windows
+          </a>
+          <a href="https://github.com/Wim1201/mysolido" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            Bekijk op GitHub
+          </a>
+        </div>
+      </div>
+
+      <!-- App mockup -->
+      <div class="hero-visual">
+        <div class="hero-mockup">
+          <div class="mockup-bar">
+            <span class="mockup-dot"></span>
+            <span class="mockup-dot"></span>
+            <span class="mockup-dot"></span>
+            <span class="mockup-url">localhost:5000</span>
+          </div>
+          <div class="mockup-content">
+            <div class="mockup-header">
+              <div class="mockup-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#50c878" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                MySolido
+              </div>
+              <div class="mockup-nav">
+                <span>Dashboard</span>
+                <span>Zoeken</span>
+                <span>Profiel</span>
+              </div>
+            </div>
+            <div style="font-size:0.72rem;font-weight:700;color:#1a6b3c;margin-bottom:8px;">Mappen</div>
+            <div class="mockup-grid">
+              <!-- Row 1 -->
+              <div class="mockup-card" style="border-left-color:#5b6abf"><svg viewBox="0 0 24 24" fill="none" stroke="#5b6abf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="mockup-label">Identiteit</span></div>
+              <div class="mockup-card" style="border-left-color:#e05555"><svg viewBox="0 0 24 24" fill="none" stroke="#e05555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg><span class="mockup-label">Medisch</span></div>
+              <div class="mockup-card" style="border-left-color:#e8913a"><svg viewBox="0 0 24 24" fill="none" stroke="#e8913a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><path d="M2 7l4-4h12l4 4"/></svg><span class="mockup-label">Financieel</span></div>
+              <div class="mockup-card" style="border-left-color:#d4a030"><svg viewBox="0 0 24 24" fill="none" stroke="#d4a030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg><span class="mockup-label">Wonen</span></div>
+              <div class="mockup-card" style="border-left-color:#2ea8a0"><svg viewBox="0 0 24 24" fill="none" stroke="#2ea8a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V3H8v4"/><path d="M12 12v3"/></svg><span class="mockup-label">Zakelijk</span></div>
+              <!-- Row 2 -->
+              <div class="mockup-card" style="border-left-color:#4a8c5c"><svg viewBox="0 0 24 24" fill="none" stroke="#4a8c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M6.34 6.34l2.83 2.83M2 12h4M6.34 17.66l2.83-2.83"/><circle cx="12" cy="12" r="4"/></svg><span class="mockup-label">Werk</span></div>
+              <div class="mockup-card" style="border-left-color:#e07830"><svg viewBox="0 0 24 24" fill="none" stroke="#e07830" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17h-2V6h14l3 5v6h-3"/><path d="M9 17h6"/></svg><span class="mockup-label">Voertuigen</span></div>
+              <div class="mockup-card" style="border-left-color:#8868b0"><svg viewBox="0 0 24 24" fill="none" stroke="#8868b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg><span class="mockup-label">Juridisch</span></div>
+              <div class="mockup-card" style="border-left-color:#d06090"><svg viewBox="0 0 24 24" fill="none" stroke="#d06090" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><circle cx="18" cy="6" r="1"/></svg><span class="mockup-label">Media</span></div>
+              <div class="mockup-card" style="border-left-color:#c8a050"><svg viewBox="0 0 24 24" fill="none" stroke="#c8a050" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg><span class="mockup-label">Wachtwoorden</span></div>
+              <!-- Row 3 -->
+              <div class="mockup-card" style="border-left-color:#4a9060"><svg viewBox="0 0 24 24" fill="none" stroke="#4a9060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><span class="mockup-label">Gezin</span></div>
+              <div class="mockup-card" style="border-left-color:#6088c0"><svg viewBox="0 0 24 24" fill="none" stroke="#6088c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7h8M8 12h8M8 17h5"/></svg><span class="mockup-label">Abonnementen</span></div>
+              <div class="mockup-card" style="border-left-color:#5090b0"><svg viewBox="0 0 24 24" fill="none" stroke="#5090b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 9 8 12 2 12"/></svg><span class="mockup-label">Inbox</span></div>
+              <div class="mockup-card" style="border-left-color:#40a070"><svg viewBox="0 0 24 24" fill="none" stroke="#40a070" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><span class="mockup-label">Verzekeringen</span></div>
+              <div class="mockup-card" style="border-left-color:#d06050"><svg viewBox="0 0 24 24" fill="none" stroke="#d06050" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M6.17 17.34A7 7 0 0112 14a7 7 0 015.83 3.34"/><path d="M4.93 4.93a10 10 0 1014.14 0"/></svg><span class="mockup-label">Huisdieren</span></div>
+              <!-- Row 4 -->
+              <div class="mockup-card" style="border-left-color:#5080a8"><svg viewBox="0 0 24 24" fill="none" stroke="#5080a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/></svg><span class="mockup-label">Opleiding</span></div>
+              <div class="mockup-card" style="border-left-color:#c87840"><svg viewBox="0 0 24 24" fill="none" stroke="#c87840" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><span class="mockup-label">Reizen</span></div>
+              <div class="mockup-card" style="border-left-color:#6878a8"><svg viewBox="0 0 24 24" fill="none" stroke="#6878a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 8l3 3-3 3"/></svg><span class="mockup-label">Digitaal-testament</span></div>
+              <div class="mockup-card" style="border-left-color:#b8a040"><svg viewBox="0 0 24 24" fill="none" stroke="#b8a040" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span class="mockup-label">Persoonlijk</span></div>
+              <div class="mockup-card" style="border-left-color:#9068a0"><svg viewBox="0 0 24 24" fill="none" stroke="#9068a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg><span class="mockup-label">Projecten</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ PROBLEEM ════════════════ -->
+<section class="problem">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Het probleem
+    </div>
+    <h2>Je data staat niet bij jou</h2>
+    <p class="problem-text">Persoonlijke documenten, medische dossiers, foto's en wachtwoorden staan verspreid over servers van Amerikaanse techbedrijven. Je hebt geen controle over wie erbij kan.</p>
+
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="problem-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </div>
+        <h3>Geen eigenaarschap</h3>
+        <p>Google, Microsoft en Apple bepalen de voorwaarden. Zij bezitten de servers waarop jouw leven staat.</p>
+      </div>
+
+      <div class="problem-card">
+        <div class="problem-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </div>
+        <h3>Geen inzicht</h3>
+        <p>Je weet niet wie jouw data bekijkt, hoe lang het bewaard wordt, of waarvoor het gebruikt wordt.</p>
+      </div>
+
+      <div class="problem-card">
+        <div class="problem-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
+        </div>
+        <h3>Geen controle</h3>
+        <p>De CLOUD Act geeft de Amerikaanse overheid toegang tot data op Amerikaanse servers — ongeacht waar jij woont.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ OPLOSSING ════════════════ -->
+<section class="solution">
+  <div class="container">
+    <div class="solution-inner">
+      <div class="solution-text">
+        <div class="section-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          De oplossing
+        </div>
+        <h2>Installeer je eigen datakluis</h2>
+        <p>MySolido draait op jouw pc. Je documenten verlaten nooit je computer, tenzij jij dat wilt. Jij bepaalt wie erbij mag en hoe lang.</p>
+
+        <ul class="solution-points">
+          <li>
+            <span class="solution-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span><strong>Lokale opslag</strong> — Alles staat op je eigen harde schijf</span>
+          </li>
+          <li>
+            <span class="solution-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span><strong>Jij bepaalt toegang</strong> — Deel specifieke bestanden met specifieke mensen</span>
+          </li>
+          <li>
+            <span class="solution-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span><strong>Open standaard</strong> — Gebouwd op W3C Solid, geen vendor lock-in</span>
+          </li>
+          <li>
+            <span class="solution-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span><strong>Geen abonnement</strong> — Eenmalig downloaden, voor altijd van jou</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="solution-visual">
+        <div class="solution-diagram">
+          <div class="diagram-you">👤 Jij</div>
+          <div class="diagram-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </div>
+          <div class="diagram-pod">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <div class="diagram-pod-text">
+              <strong>MySolido Pod</strong>
+              <span>Op jouw pc · jouw controle</span>
+            </div>
+          </div>
+          <div class="diagram-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </div>
+          <div class="diagram-items">
+            <span class="diagram-item">🪪 Identiteit</span>
+            <span class="diagram-item">🏥 Medisch</span>
+            <span class="diagram-item">💰 Financieel</span>
+            <span class="diagram-item">📸 Media</span>
+            <span class="diagram-item">🔑 Wachtwoorden</span>
+            <span class="diagram-item">⚖️ Juridisch</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FEATURES ════════════════ -->
+<section class="features">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Mogelijkheden
+    </div>
+    <h2>Wat MySolido kan</h2>
+    <p class="features-sub">Alles wat je nodig hebt om je persoonlijke data veilig te bewaren en te delen.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        </div>
+        <h3>20 categorieën</h3>
+        <p>Identiteit, medisch, financieel, juridisch en meer — overzichtelijk geordend.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </div>
+        <h3>Delen met rechten</h3>
+        <p>Alleen lezen, tijdelijk, intrekbaar. Jij bepaalt wie wat mag zien.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <h3>Zoeken</h3>
+        <p>Doorzoek al je mappen tegelijk. Vind elk document in seconden.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </div>
+        <h3>Prullenbak</h3>
+        <p>Verwijderd is niet weg. Herstel bestanden binnen 30 dagen.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </div>
+        <h3>Dark mode</h3>
+        <p>Werk in de modus die bij je past — licht of donker.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <h3>Backup export</h3>
+        <p>Exporteer alles als ZIP. Jouw data is altijd overdraagbaar.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <h3>Encryptie per map</h3>
+        <p>Extra beveiliging voor je meest gevoelige documenten.</p>
+        <span class="feature-badge">Binnenkort</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 014 4v2H8V6a4 4 0 014-4z"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-9-9"/><line x1="12" y1="15" x2="12" y2="18"/></svg>
+        </div>
+        <h3>AI-assistent</h3>
+        <p>Je eigen AI die jóuw data doorzoekt — lokaal, zonder cloud.</p>
+        <span class="feature-badge">Binnenkort</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ TECHNOLOGIE ════════════════ -->
+<section class="tech">
+  <div class="container">
+    <div class="tech-inner">
+      <div class="section-label" style="justify-content: center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Technologie
+      </div>
+      <h2>Gebouwd op open standaarden</h2>
+      <p class="tech-sub">Geen propriëtaire technologie. MySolido gebruikt het Solid protocol — een open W3C-standaard ontwikkeld door Tim Berners-Lee, de uitvinder van het wereldwijde web.</p>
+
+      <div class="tech-badges">
+        <div class="tech-badge">
+          <div class="tech-badge-icon">🔷</div>
+          <div>
+            <strong>Solid Protocol</strong>
+            <span>W3C-standaard voor data-soevereiniteit</span>
+          </div>
+        </div>
+        <div class="tech-badge">
+          <div class="tech-badge-icon">🌐</div>
+          <div>
+            <strong>W3C</strong>
+            <span>Open webstandaarden</span>
+          </div>
+        </div>
+        <div class="tech-badge">
+          <div class="tech-badge-icon">⚙️</div>
+          <div>
+            <strong>Community Solid Server</strong>
+            <span>Open source pod-opslag</span>
+          </div>
+        </div>
+        <div class="tech-badge">
+          <div class="tech-badge-icon">🐍</div>
+          <div>
+            <strong>Flask / Python</strong>
+            <span>Gebruikersinterface</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tech-context">
+        <strong>Dezelfde standaard als de groten.</strong> Athumi (Vlaamse overheid), de Nederlandse Datakluis (Jouw.id) en de EU Digital Identity Wallet bouwen allemaal op Solid. MySolido is volledig interoperabel.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ VERGELIJKING ════════════════ -->
+<section class="compare">
+  <div class="container">
+    <div class="section-label" style="color: var(--green-300);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--green-300);"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Vergelijking
+    </div>
+    <h2>MySolido vs. de cloud</h2>
+    <p class="compare-sub">Hoe verhoudt MySolido zich tot de diensten die je nu gebruikt?</p>
+
+    <div class="compare-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Google Drive</th>
+            <th>iCloud</th>
+            <th>MySolido ✦</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Data locatie</td>
+            <td>VS servers</td>
+            <td>VS servers</td>
+            <td>Jouw pc</td>
+          </tr>
+          <tr>
+            <td>Eigenaar data</td>
+            <td>Google</td>
+            <td>Apple</td>
+            <td>Jij</td>
+          </tr>
+          <tr>
+            <td>Toegang derden</td>
+            <td><span class="cross-red">Ja (CLOUD Act)</span></td>
+            <td><span class="cross-red">Ja (CLOUD Act)</span></td>
+            <td><span class="check-green">Nee</span></td>
+          </tr>
+          <tr>
+            <td>Kosten</td>
+            <td>Abonnement</td>
+            <td>Abonnement</td>
+            <td>Eenmalig / gratis</td>
+          </tr>
+          <tr>
+            <td>Open standaard</td>
+            <td><span class="cross-red">Nee</span></td>
+            <td><span class="cross-red">Nee</span></td>
+            <td><span class="check-green">Ja (W3C Solid)</span></td>
+          </tr>
+          <tr>
+            <td>Vendor lock-in</td>
+            <td><span class="cross-red">Ja</span></td>
+            <td><span class="cross-red">Ja</span></td>
+            <td><span class="check-green">Nee</span></td>
+          </tr>
+          <tr>
+            <td>Open source</td>
+            <td><span class="cross-red">Nee</span></td>
+            <td><span class="cross-red">Nee</span></td>
+            <td><span class="check-green">Ja</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ DOELGROEPEN ════════════════ -->
+<section class="audiences">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      Voor wie?
+    </div>
+    <h2>Gebouwd voor mensen die controle willen</h2>
+    <p class="audiences-sub">Of je nu technisch bent of niet — als je vindt dat jouw data van jou is, is MySolido voor jou.</p>
+
+    <div class="audiences-grid">
+      <div class="audience-card">
+        <span class="audience-card-icon">👨‍💻</span>
+        <h3>Tech enthousiasteling</h3>
+        <p>Self-hosted Solid pod, open source, volledig onder controle. Download, installeer en draai je eigen datakluis.</p>
+      </div>
+
+      <div class="audience-card">
+        <span class="audience-card-icon">👨‍👩‍👧‍👦</span>
+        <h3>Privacy-bewust gezin</h3>
+        <p>Sla kinderfoto's, medische dossiers, het testament en verzekeringen veilig op — op je eigen computer.</p>
+      </div>
+
+      <div class="audience-card">
+        <span class="audience-card-icon">💼</span>
+        <h3>ZZP / MKB</h3>
+        <p>Klantdata, contracten en administratie AVG-compliant opslaan — zonder cloudrisico van buitenlandse servers.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ CTA / DOWNLOAD ════════════════ -->
+<section class="cta" id="download">
+  <div class="container">
+    <div class="section-label" style="justify-content: center;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download
+    </div>
+    <h2>Begin vandaag</h2>
+    <p class="cta-sub">Download MySolido en neem controle over je persoonlijke data. Geen registratie nodig.</p>
+
+    <div class="cta-buttons">
+      <a href="https://github.com/Wim1201/mysolido/releases" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download voor Windows
+      </a>
+      <a href="https://github.com/Wim1201/mysolido" class="btn btn-secondary">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        Broncode op GitHub
+      </a>
+    </div>
+
+    <p class="cta-note">Geen registratie. Geen e-mail. Geen tracking.</p>
+
+    <div class="cta-reqs">
+      <span>⊞ Windows 10+</span>
+      <span>🍎 macOS</span>
+      <span>Node.js 18+</span>
+      <span>Python 3.8+</span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FOOTER ════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        MySolido
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/Wim1201/mysolido">GitHub</a>
+        <a href="https://solidproject.org">Solid Protocol</a>
+        <a href="https://www.w3.org/community/solid/">W3C Solid</a>
+      </div>
+    </div>
+    <div class="footer-note">
+      Gebouwd in Nederland · Geen cookies · Geen tracking · Geen advertenties
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
