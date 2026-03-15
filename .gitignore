@@ -30,3 +30,16 @@ Desktop.ini
 *.swo
 audit_log.json
 ~$*
+
+# Persoonlijke / vertrouwelijke documenten
+Aantekeningen MySolido.docx
+MySolido_Businessplan.pdf
+MySolido_Projectplan_v1.1.docx
+MySolido_Projectplan_v1.1.pdf
+MySolido_Ecosysteem_Diagram.html
+
+# App state
+shares.json
+
+# Claude Code
+.claude/
