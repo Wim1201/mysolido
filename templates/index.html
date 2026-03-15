@@ -106,6 +106,10 @@
                     <span class="icon">{{ icon_file() }}</span>
                     <a href="{{ url_for('view_file', file_path=item.name) }}">{{ item.name }}</a>
                 </div>
+                <div class="file-meta">
+                    <span class="file-size">{{ item.size }}</span>
+                    <span class="file-date">{{ item.modified }}</span>
+                </div>
                 <div class="file-actions">
                     <a href="{{ url_for('download_file', file_path=item.name) }}" class="btn btn-download">{{ icon_download() }} Download</a>
                     <div class="move-wrapper">
@@ -226,6 +230,12 @@
                             <a href="{{ url_for('view_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}">{{ item.name }}</a>
                         {% endif %}
                     </div>
+                    {% if not is_dir %}
+                    <div class="file-meta">
+                        <span class="file-size">{{ item.size }}</span>
+                        <span class="file-date">{{ item.modified }}</span>
+                    </div>
+                    {% endif %}
                     <div class="file-actions">
                         {% if not is_dir %}
                         <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-download">{{ icon_download() }} Download</a>

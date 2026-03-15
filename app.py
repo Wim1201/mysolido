@@ -2,6 +2,8 @@ import re
 import os
 import io
 import zipfile
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
 import requests
@@ -129,6 +131,8 @@ def pod_request(method, url, **kwargs):
 
     if method == 'GET':
         return requests.get(url, headers=headers, **kwargs)
+    elif method == 'HEAD':
+        return requests.head(url, headers=headers, **kwargs)
     elif method == 'PUT':
         return requests.put(url, headers=headers, **kwargs)
     elif method == 'DELETE':
@@ -187,6 +191,38 @@ def parse_container_contents(turtle_text, base_url):
             'icon': icon,
         })
     items.sort(key=lambda x: (not x['is_folder'], x['name'].lower()))
+
+    # Fetch metadata (size, modified) for files via HEAD requests (max 20)
+    file_count = 0
+    for item in items:
+        if item['is_folder']:
+            item['size'] = ''
+            item['modified'] = ''
+            continue
+        file_count += 1
+        if file_count <= 20:
+            try:
+                head = pod_request('HEAD', item['url'])
+                if head and head.status_code == 200:
+                    # Size
+                    cl = head.headers.get('Content-Length')
+                    item['size'] = format_size(int(cl)) if cl else '—'
+                    # Date
+                    lm = head.headers.get('Last-Modified')
+                    if lm:
+                        item['modified'] = format_date_nl(lm)
+                    else:
+                        item['modified'] = '—'
+                else:
+                    item['size'] = '—'
+                    item['modified'] = '—'
+            except Exception:
+                item['size'] = '—'
+                item['modified'] = '—'
+        else:
+            item['size'] = '—'
+            item['modified'] = '—'
+
     return items
 
 
@@ -885,6 +921,18 @@ def format_size(size_bytes):
         return f'{size_bytes / (1024 * 1024):.1f} MB'
     else:
         return f'{size_bytes / (1024 * 1024 * 1024):.1f} GB'
+
+
+NL_MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+
+
+def format_date_nl(http_date):
+    """Format HTTP Last-Modified header to Dutch date like '15 mrt 2026'"""
+    try:
+        dt = parsedate_to_datetime(http_date)
+        return f'{dt.day} {NL_MONTHS[dt.month - 1]} {dt.year}'
+    except Exception:
+        return '—'
 
 
 @app.route('/profile')
