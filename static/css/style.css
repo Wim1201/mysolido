@@ -80,6 +80,7 @@
     --shadow-card: 0 2px 8px rgba(0,0,0,0.3);
     --shadow-dropdown: 0 4px 12px rgba(0,0,0,0.4);
 }
+[data-theme="dark"] .welcome-logo { stroke: #50c878; }
 
 /* --- Reset & Base --- */
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -104,8 +105,9 @@ a:hover { text-decoration: underline; }
     align-items: center;
 }
 .header h1 { font-size: 1.4rem; margin-bottom: 2px; }
-.header h1 a { color: white; text-decoration: none; }
+.header h1 a { color: white; text-decoration: none; display: flex; align-items: center; gap: 8px; }
 .header h1 a:hover { opacity: 0.9; }
+.logo-shield { width: 28px; height: 28px; stroke: white; flex-shrink: 0; }
 .header-subtitle { font-size: 0.82rem; opacity: var(--header-subtitle-opacity); }
 .header-actions {
     display: flex;
@@ -411,10 +413,10 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
     color: var(--color-text);
 }
 .folder-card svg {
-    width: 32px;
-    height: 32px;
-    color: var(--folder-color, var(--color-primary));
-    margin-bottom: 8px;
+    width: 40px;
+    height: 40px;
+    display: block;
+    margin: 0 auto 8px;
 }
 .folder-card-name {
     font-size: 0.85rem;

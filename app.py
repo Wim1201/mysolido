@@ -53,28 +53,88 @@ DEFAULT_FOLDERS = [
     'persoonlijk', 'projecten',
 ]
 
-# Folder styles with icon name and colors for light/dark themes
-FOLDER_STYLES = {
-    'identiteit':         {'icon': 'shield',       'color': '#6366f1', 'color_dark': '#818cf8'},
-    'medisch':            {'icon': 'heart',        'color': '#ef4444', 'color_dark': '#f87171'},
-    'financieel':         {'icon': 'banknotes',    'color': '#f59e0b', 'color_dark': '#fbbf24'},
-    'wonen':              {'icon': 'house',        'color': '#10b981', 'color_dark': '#34d399'},
-    'zakelijk':           {'icon': 'briefcase',    'color': '#3b82f6', 'color_dark': '#60a5fa'},
-    'werk':               {'icon': 'tie',          'color': '#8b5cf6', 'color_dark': '#a78bfa'},
-    'voertuigen':         {'icon': 'car',          'color': '#f97316', 'color_dark': '#fb923c'},
-    'juridisch':          {'icon': 'gavel',        'color': '#64748b', 'color_dark': '#94a3b8'},
-    'media':              {'icon': 'camera',       'color': '#ec4899', 'color_dark': '#f472b6'},
-    'wachtwoorden':       {'icon': 'key',          'color': '#eab308', 'color_dark': '#facc15'},
-    'gezin':              {'icon': 'family',       'color': '#14b8a6', 'color_dark': '#2dd4bf'},
-    'abonnementen':       {'icon': 'clipboard',    'color': '#a855f7', 'color_dark': '#c084fc'},
-    'inbox':              {'icon': 'inbox',        'color': '#0ea5e9', 'color_dark': '#38bdf8'},
-    'verzekeringen':      {'icon': 'shield_check', 'color': '#22c55e', 'color_dark': '#4ade80'},
-    'huisdieren':         {'icon': 'paw',          'color': '#c2410c', 'color_dark': '#fdba74'},
-    'opleiding':          {'icon': 'graduation',   'color': '#3730a3', 'color_dark': '#a5b4fc'},
-    'reizen':             {'icon': 'plane',        'color': '#0f766e', 'color_dark': '#5eead4'},
-    'digitaal-testament': {'icon': 'testament',    'color': '#6b21a8', 'color_dark': '#c084fc'},
-    'persoonlijk':        {'icon': 'star',         'color': '#57534e', 'color_dark': '#d6d3d1'},
-    'projecten':          {'icon': 'wrench',       'color': '#4d7c0f', 'color_dark': '#bef264'},
+# Folder icons with SVG and colors (matching mysolido.com landing page)
+FOLDER_ICONS = {
+    'identiteit': {
+        'color': '#5b6abf',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#5b6abf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
+    },
+    'medisch': {
+        'color': '#e05555',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#e05555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg>'
+    },
+    'financieel': {
+        'color': '#e8913a',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#e8913a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><path d="M2 7l4-4h12l4 4"/></svg>'
+    },
+    'wonen': {
+        'color': '#d4a030',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#d4a030" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>'
+    },
+    'zakelijk': {
+        'color': '#2ea8a0',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#2ea8a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V3H8v4"/><path d="M12 12v3"/></svg>'
+    },
+    'werk': {
+        'color': '#4a8c5c',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#4a8c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M6.34 6.34l2.83 2.83M2 12h4M6.34 17.66l2.83-2.83"/><circle cx="12" cy="12" r="4"/></svg>'
+    },
+    'voertuigen': {
+        'color': '#e07830',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#e07830" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17h-2V6h14l3 5v6h-3"/><path d="M9 17h6"/></svg>'
+    },
+    'juridisch': {
+        'color': '#8868b0',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#8868b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>'
+    },
+    'media': {
+        'color': '#d06090',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#d06090" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><circle cx="18" cy="6" r="1"/></svg>'
+    },
+    'wachtwoorden': {
+        'color': '#c8a050',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#c8a050" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>'
+    },
+    'gezin': {
+        'color': '#4a9060',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#4a9060" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>'
+    },
+    'abonnementen': {
+        'color': '#6088c0',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#6088c0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7h8M8 12h8M8 17h5"/></svg>'
+    },
+    'inbox': {
+        'color': '#5090b0',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#5090b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 9 8 12 2 12"/></svg>'
+    },
+    'verzekeringen': {
+        'color': '#40a070',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#40a070" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>'
+    },
+    'huisdieren': {
+        'color': '#d06050',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#d06050" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M6.17 17.34A7 7 0 0112 14a7 7 0 015.83 3.34"/><path d="M4.93 4.93a10 10 0 1014.14 0"/></svg>'
+    },
+    'opleiding': {
+        'color': '#5080a8',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#5080a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/></svg>'
+    },
+    'reizen': {
+        'color': '#c87840',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#c87840" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>'
+    },
+    'digitaal-testament': {
+        'color': '#6878a8',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#6878a8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 8l3 3-3 3"/></svg>'
+    },
+    'persoonlijk': {
+        'color': '#b8a040',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#b8a040" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+    },
+    'projecten': {
+        'color': '#9068a0',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#9068a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>'
+    },
 }
 
 
@@ -94,7 +154,7 @@ def inject_globals():
     }
     active = nav_map.get(request.endpoint, '')
     return {
-        'folder_styles': FOLDER_STYLES,
+        'folder_icons': FOLDER_ICONS,
         'unread_count': get_unread_count(),
         'active_nav': active,
     }
@@ -156,13 +216,14 @@ def create_container(url):
     )
 
 
-def get_folder_icon(folder_name):
-    """Get the icon name for a folder"""
+def get_folder_svg(folder_name):
+    """Get the SVG icon for a folder"""
     name_lower = folder_name.lower()
-    style = FOLDER_STYLES.get(name_lower)
-    if style:
-        return style['icon']
-    return 'folder'
+    info = FOLDER_ICONS.get(name_lower)
+    if info:
+        return info['svg']
+    # Generic folder icon for unknown folders
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
 
 
 def parse_container_contents(turtle_text, base_url):
@@ -183,12 +244,12 @@ def parse_container_contents(turtle_text, base_url):
             full_url = resource
         name = unquote(resource.rstrip('/').split('/')[-1])
         is_folder = resource.endswith('/')
-        icon = get_folder_icon(name) if is_folder else 'file'
+        svg = get_folder_svg(name) if is_folder else None
         items.append({
             'name': name,
             'url': full_url,
             'is_folder': is_folder,
-            'icon': icon,
+            'svg': svg,
         })
     items.sort(key=lambda x: (not x['is_folder'], x['name'].lower()))
 
@@ -261,7 +322,7 @@ def browse(folder_path):
 def get_all_folders():
     """Geeft lijst van alle hoofdmappen met icoon en label voor de upload-dropdown"""
     return [
-        {'name': name, 'icon': FOLDER_STYLES.get(name, {}).get('icon', 'folder'), 'label': name.capitalize()}
+        {'name': name, 'label': name.capitalize(), 'svg': FOLDER_ICONS.get(name, {}).get('svg', ''), 'color': FOLDER_ICONS.get(name, {}).get('color', '')}
         for name in DEFAULT_FOLDERS
     ]
 
@@ -272,7 +333,6 @@ def get_move_folders(folder_path, items):
     subfolders = [item for item in items if item['is_folder']]
 
     for name in DEFAULT_FOLDERS:
-        style = FOLDER_STYLES.get(name, {})
         folders.append({'value': name, 'label': name.capitalize(), 'indent': 0})
         if folder_path == name or folder_path.startswith(name + '/'):
             for sub in subfolders:
@@ -598,7 +658,7 @@ def search_pod(container_url, query, path='', depth=0, max_depth=5):
                     'path': file_path,
                     'folder_path': path,
                     'url': item['url'],
-                    'icon': item['icon'],
+                    'svg': item.get('svg'),
                 })
     return results
 
