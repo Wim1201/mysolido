@@ -299,7 +299,7 @@ echo.
 
 :: Start Community Solid Server op de achtergrond
 echo   Community Solid Server starten op poort 3000...
-start /min "MySolido - Solid Server" cmd /c "npx @solid/community-server -p 3000 -f .data/ -c @css:config/file.json"
+start /min "MySolido - Solid Server" cmd /c "npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json"
 
 :: Wacht op CSS
 powershell -command "Start-Sleep -Seconds 5"
