@@ -36,9 +36,12 @@ if %ERRORLEVEL% equ 0 (
 REM Ga naar de projectmap
 cd /d "%~dp0"
 
+REM Zorg dat npm global map bestaat
+if not exist "%APPDATA%\npm" mkdir "%APPDATA%\npm"
+
 REM Start CSS onzichtbaar op de achtergrond
 echo   Community Solid Server starten...
-start /b "" cmd /c "npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
+start /b "" cmd /c "npx --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
 
 REM Wacht tot CSS bereikbaar is (max 30 pogingen van 1 seconde)
 set /a attempts=0
