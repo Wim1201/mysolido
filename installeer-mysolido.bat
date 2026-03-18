@@ -293,50 +293,14 @@ if !errorlevel! equ 0 (
 )
 
 echo.
-echo   Let op: Windows Firewall kan om toestemming vragen.
-echo   Klik op 'Toegang toestaan' als dat verschijnt.
+echo   ================================
+echo   Installatie voltooid!
+echo   MySolido wordt gestart...
+echo   ================================
 echo.
 
-:: Start Community Solid Server op de achtergrond
-echo   Community Solid Server starten op poort 3000...
-start /min "MySolido - Solid Server" cmd /c "npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json"
-
-:: Wacht op CSS
-powershell -command "Start-Sleep -Seconds 5"
-
-:: Start Flask app
-echo   MySolido interface starten op poort 5000...
-start /min "MySolido - Flask" cmd /c "python app.py"
-
-:: Wacht op Flask
-powershell -command "Start-Sleep -Seconds 3"
-
-:: Open browser
-echo.
-echo   =============================================
-echo   *                                           *
-echo   *   MySolido is klaar! Je browser wordt     *
-echo   *   geopend.                                *
-echo   *                                           *
-echo   =============================================
-echo.
-start "" "http://localhost:5000"
-
-echo   +---------------------------------------------+
-echo   |  MySolido draait op http://localhost:5000     |
-echo   |  Sluit dit venster NIET -- dat stopt alles    |
-echo   |  Druk op een toets om MySolido te stoppen     |
-echo   +---------------------------------------------+
-echo.
-pause >nul
-
-:: Stop beide servers
-echo.
-echo   MySolido wordt gestopt...
-taskkill /fi "windowtitle eq MySolido - Solid Server" /f >nul 2>nul
-taskkill /fi "windowtitle eq MySolido - Flask" /f >nul 2>nul
-echo   Tot de volgende keer!
-powershell -command "Start-Sleep -Seconds 2"
+REM Start MySolido via start-mysolido.bat
+call "%INSTALL_DIR%\start-mysolido.bat"
 goto :end
 
 :: ==========================================================

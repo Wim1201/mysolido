@@ -1,6 +1,9 @@
 import re
 import os
 import io
+import time
+import secrets
+import string
 import zipfile
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -23,8 +26,159 @@ app.secret_key = '***REMOVED***'
 CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://localhost:3000')
-SOLID_POD_URL = os.getenv('SOLID_POD_URL', 'http://localhost:3000/wim/')
-OWNER_WEBID = CSS_BASE_URL.rstrip('/') + '/wim/profile/card#me'
+SOLID_POD_URL = os.getenv('SOLID_POD_URL', 'http://localhost:3000/mysolido/')
+WEBID = os.getenv('WEBID', 'http://localhost:3000/mysolido/profile/card#me')
+OWNER_WEBID = WEBID
+
+
+def generate_password(length=32):
+    """Genereer een veilig wachtwoord"""
+    chars = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(chars) for _ in range(length))
+
+
+def auto_setup():
+    """Automatische setup bij eerste start"""
+    global CLIENT_ID, CLIENT_SECRET, CSS_BASE_URL, SOLID_POD_URL, WEBID, OWNER_WEBID
+
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+
+    # Check of .env al bestaat met geldige credentials
+    if os.path.exists(env_path):
+        load_dotenv(env_path, override=True)
+        if os.getenv('CLIENT_ID') and os.getenv('CLIENT_SECRET'):
+            print("  [OK] Bestaande configuratie gevonden")
+            return True
+
+    print("  Eerste keer opstarten \u2014 account wordt aangemaakt...")
+
+    css_base = 'http://localhost:3000'
+
+    try:
+        # Stap 1: Check of CSS draait
+        css_ready = False
+        for attempt in range(10):
+            try:
+                r = requests.get(f'{css_base}/.account/', timeout=3)
+                if r.status_code == 200:
+                    css_ready = True
+                    break
+            except requests.ConnectionError:
+                pass
+            time.sleep(2)
+
+        if not css_ready:
+            print("  [FOUT] Community Solid Server is niet bereikbaar op poort 3000")
+            return False
+
+        controls = r.json().get('controls', {})
+
+        # Stap 2: Maak account aan
+        r = requests.post(
+            controls['account']['create'],
+            headers={'content-type': 'application/json'},
+            json={}
+        )
+        if r.status_code not in [200, 201]:
+            print(f"  [FOUT] Account aanmaken mislukt: {r.status_code}")
+            return False
+
+        data = r.json()
+        authorization = data.get('authorization')
+        new_controls = data.get('controls', {})
+
+        # Stap 3: Registreer email/wachtwoord
+        email = 'user@mysolido.local'
+        password = generate_password()
+
+        r = requests.post(
+            new_controls['password']['register'],
+            headers={
+                'content-type': 'application/json',
+                'Authorization': f'CSS-Account-Token {authorization}'
+            },
+            json={
+                'email': email,
+                'password': password
+            }
+        )
+        if r.status_code not in [200, 201]:
+            print(f"  [FOUT] Wachtwoord registreren mislukt: {r.status_code}")
+            return False
+
+        # Update controls na registratie
+        new_controls = r.json().get('controls', new_controls)
+
+        # Stap 4: Maak pod aan
+        pod_name = 'mysolido'
+        r = requests.post(
+            new_controls['account']['pod'],
+            headers={
+                'content-type': 'application/json',
+                'Authorization': f'CSS-Account-Token {authorization}'
+            },
+            json={'name': pod_name}
+        )
+        if r.status_code not in [200, 201]:
+            print(f"  [FOUT] Pod aanmaken mislukt: {r.status_code}")
+            return False
+
+        pod_url = f'{css_base}/{pod_name}/'
+        webid = f'{pod_url}profile/card#me'
+
+        # Stap 5: Genereer client credentials
+        r = requests.post(
+            new_controls['account']['clientCredentials'],
+            headers={
+                'content-type': 'application/json',
+                'Authorization': f'CSS-Account-Token {authorization}'
+            },
+            json={
+                'name': 'MySolido App',
+                'webId': webid
+            }
+        )
+        if r.status_code not in [200, 201]:
+            print(f"  [FOUT] Client credentials aanmaken mislukt: {r.status_code}")
+            return False
+
+        cred_data = r.json()
+        client_id = cred_data.get('id')
+        client_secret = cred_data.get('secret')
+
+        if not client_id or not client_secret:
+            print("  [FOUT] Geen client credentials ontvangen")
+            return False
+
+        # Stap 6: Schrijf .env
+        with open(env_path, 'w') as f:
+            f.write(f'CLIENT_ID={client_id}\n')
+            f.write(f'CLIENT_SECRET={client_secret}\n')
+            f.write(f'CSS_BASE_URL={css_base}\n')
+            f.write(f'SOLID_POD_URL={pod_url}\n')
+            f.write(f'WEBID={webid}\n')
+            f.write(f'CSS_EMAIL={email}\n')
+            f.write(f'CSS_PASSWORD={password}\n')
+
+        # Herlaad .env en update globale variabelen
+        load_dotenv(env_path, override=True)
+        CLIENT_ID = os.getenv('CLIENT_ID')
+        CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+        CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://localhost:3000')
+        SOLID_POD_URL = os.getenv('SOLID_POD_URL')
+        WEBID = os.getenv('WEBID')
+        OWNER_WEBID = WEBID
+
+        print(f"  [OK] Account aangemaakt")
+        print(f"  [OK] Pod: {pod_url}")
+        print(f"  [OK] WebID: {webid}")
+        print(f"  [OK] Credentials opgeslagen in .env")
+
+        return True
+
+    except Exception as e:
+        print(f"  [FOUT] Setup mislukt: {e}")
+        return False
 
 # Viewable file types for inline display
 VIEWABLE_TYPES = {
@@ -1129,13 +1283,20 @@ def redirect_to_folder(folder_path):
 
 
 if __name__ == '__main__':
-    print("=== MySolido ===")
-    print(f"Pod: {SOLID_POD_URL}")
-    token = get_access_token()
-    if token:
-        print(f"Authenticatie OK!")
-    else:
-        print("WAARSCHUWING: Authenticatie mislukt!")
-    print("Start op http://localhost:5000")
-    print("================")
+    print()
+    print("  === MySolido ===")
+
+    if not auto_setup():
+        print()
+        print("  Setup mislukt. Zorg dat Community Solid Server draait op poort 3000:")
+        print("  npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json")
+        print()
+        exit(1)
+
+    print()
+    print(f"  Pod: {os.getenv('SOLID_POD_URL')}")
+    print(f"  Start op http://localhost:5000")
+    print("  ================")
+    print()
+
     app.run(port=5000, debug=True)
