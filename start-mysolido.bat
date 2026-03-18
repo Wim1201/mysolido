@@ -43,41 +43,44 @@ REM Start CSS onzichtbaar op de achtergrond
 echo   Community Solid Server starten...
 start /b "" cmd /c "npx --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
 
-REM Wacht tot CSS bereikbaar is (max 30 pogingen van 1 seconde)
+REM Wacht tot CSS bereikbaar is (max 60 pogingen van 1 seconde)
 set /a attempts=0
 :wait_css
 set /a attempts+=1
-if %attempts% gtr 30 (
+if %attempts% gtr 60 (
     echo   [FOUT] CSS start niet op. Controleer css.log voor details.
     pause
     exit /b 1
 )
-curl -s -o nul http://localhost:3000 2>nul
-if %ERRORLEVEL% neq 0 (
-    echo   Wachten op Solid Server... (%attempts%/30)
-    timeout /t 1 /nobreak >nul
-    goto wait_css
-)
+powershell -command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>nul
+if %ERRORLEVEL% equ 0 goto :css_running
+echo   Wachten op Solid Server... (%attempts%/60)
+timeout /t 1 /nobreak >nul
+goto :wait_css
+
+:css_running
 echo   [OK] Solid Server draait
 
 REM Start Flask onzichtbaar op de achtergrond
 echo   MySolido starten...
 start /b "" cmd /c "python app.py > flask.log 2>&1"
 
-REM Wacht tot Flask bereikbaar is (max 15 pogingen)
+REM Wacht tot Flask bereikbaar is (max 30 pogingen)
 set /a attempts=0
 :wait_flask
 set /a attempts+=1
-if %attempts% gtr 15 (
+if %attempts% gtr 30 (
     echo   [FOUT] MySolido start niet op. Controleer flask.log voor details.
     pause
     exit /b 1
 )
-curl -s -o nul http://localhost:5000 2>nul
-if %ERRORLEVEL% neq 0 (
-    timeout /t 1 /nobreak >nul
-    goto wait_flask
-)
+powershell -command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:5000' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>nul
+if %ERRORLEVEL% equ 0 goto :flask_running
+echo   Wachten op MySolido... (%attempts%/30)
+timeout /t 1 /nobreak >nul
+goto :wait_flask
+
+:flask_running
 echo   [OK] MySolido draait
 
 echo.

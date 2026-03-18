@@ -25,9 +25,9 @@ app.secret_key = '***REMOVED***'
 # === CONFIGURATIE ===
 CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://localhost:3000')
-SOLID_POD_URL = os.getenv('SOLID_POD_URL', 'http://localhost:3000/mysolido/')
-WEBID = os.getenv('WEBID', 'http://localhost:3000/mysolido/profile/card#me')
+CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
+SOLID_POD_URL = os.getenv('SOLID_POD_URL', 'http://127.0.0.1:3000/mysolido/')
+WEBID = os.getenv('WEBID', 'http://127.0.0.1:3000/mysolido/profile/card#me')
 OWNER_WEBID = WEBID
 
 
@@ -52,7 +52,7 @@ def auto_setup():
 
     print("  Eerste keer opstarten \u2014 account wordt aangemaakt...")
 
-    css_base = 'http://localhost:3000'
+    css_base = 'http://127.0.0.1:3000'
 
     try:
         # Stap 1: Check of CSS draait
@@ -91,8 +91,19 @@ def auto_setup():
         email = 'user@mysolido.local'
         password = generate_password()
 
+        # Zoek register URL — check meerdere locaties (CSS v7.1.8)
+        register_url = None
+        if 'password' in new_controls and 'register' in new_controls.get('password', {}):
+            register_url = new_controls['password']['register']
+        elif 'html' in new_controls and 'password' in new_controls.get('html', {}) and 'register' in new_controls.get('html', {}).get('password', {}):
+            register_url = new_controls['html']['password']['register']
+
+        if not register_url:
+            print("  [FOUT] Geen registratie-URL gevonden in CSS API")
+            return False
+
         r = requests.post(
-            new_controls['password']['register'],
+            register_url,
             headers={
                 'content-type': 'application/json',
                 'Authorization': f'CSS-Account-Token {authorization}'
@@ -106,13 +117,32 @@ def auto_setup():
             print(f"  [FOUT] Wachtwoord registreren mislukt: {r.status_code}")
             return False
 
-        # Update controls na registratie
-        new_controls = r.json().get('controls', new_controls)
+        # Haal controls opnieuw op met auth header (meer endpoints beschikbaar na login)
+        r = requests.get(
+            f'{css_base}/.account/',
+            headers={
+                'Authorization': f'CSS-Account-Token {authorization}',
+                'Accept': 'application/json'
+            },
+            timeout=5
+        )
+        if r.status_code == 200:
+            new_controls = r.json().get('controls', new_controls)
 
         # Stap 4: Maak pod aan
         pod_name = 'mysolido'
+
+        # Zoek pod-URL in controls
+        pod_create_url = None
+        if 'account' in new_controls and 'pod' in new_controls.get('account', {}):
+            pod_create_url = new_controls['account']['pod']
+
+        if not pod_create_url:
+            print("  [FOUT] Geen pod-aanmaak-URL gevonden in CSS API")
+            return False
+
         r = requests.post(
-            new_controls['account']['pod'],
+            pod_create_url,
             headers={
                 'content-type': 'application/json',
                 'Authorization': f'CSS-Account-Token {authorization}'
@@ -126,9 +156,29 @@ def auto_setup():
         pod_url = f'{css_base}/{pod_name}/'
         webid = f'{pod_url}profile/card#me'
 
+        # Haal controls opnieuw op na pod-aanmaak
+        r = requests.get(
+            f'{css_base}/.account/',
+            headers={
+                'Authorization': f'CSS-Account-Token {authorization}',
+                'Accept': 'application/json'
+            },
+            timeout=5
+        )
+        if r.status_code == 200:
+            new_controls = r.json().get('controls', new_controls)
+
         # Stap 5: Genereer client credentials
+        cred_url = None
+        if 'account' in new_controls and 'clientCredentials' in new_controls.get('account', {}):
+            cred_url = new_controls['account']['clientCredentials']
+
+        if not cred_url:
+            print("  [FOUT] Geen clientCredentials-URL gevonden in CSS API")
+            return False
+
         r = requests.post(
-            new_controls['account']['clientCredentials'],
+            cred_url,
             headers={
                 'content-type': 'application/json',
                 'Authorization': f'CSS-Account-Token {authorization}'
@@ -164,7 +214,7 @@ def auto_setup():
         load_dotenv(env_path, override=True)
         CLIENT_ID = os.getenv('CLIENT_ID')
         CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-        CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://localhost:3000')
+        CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
         SOLID_POD_URL = os.getenv('SOLID_POD_URL')
         WEBID = os.getenv('WEBID')
         OWNER_WEBID = WEBID
