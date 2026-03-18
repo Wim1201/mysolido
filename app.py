@@ -5,6 +5,7 @@ import time
 import secrets
 import string
 import zipfile
+import shutil
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
@@ -29,6 +30,79 @@ CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
 SOLID_POD_URL = os.getenv('SOLID_POD_URL', 'http://127.0.0.1:3000/mysolido/')
 WEBID = os.getenv('WEBID', 'http://127.0.0.1:3000/mysolido/profile/card#me')
 OWNER_WEBID = WEBID
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def get_pod_data_path():
+    """Bepaal het lokale filesystem pad naar de pod data"""
+    pod_url = os.getenv('SOLID_POD_URL', SOLID_POD_URL or 'http://127.0.0.1:3000/mysolido/')
+    pod_name = pod_url.rstrip('/').split('/')[-1]
+    return os.path.join(PROJECT_DIR, '.data', pod_name)
+
+
+def safe_pod_path(relative_path):
+    """Geeft het veilige absolute pad terug, of None bij path traversal"""
+    pod_path = get_pod_data_path()
+    full_path = os.path.normpath(os.path.join(pod_path, relative_path))
+    if not full_path.startswith(os.path.normpath(pod_path)):
+        return None
+    return full_path
+
+
+def url_to_relative_path(url):
+    """Converteer een pod URL naar een relatief pad binnen de pod data-map"""
+    pod_url = os.getenv('SOLID_POD_URL', SOLID_POD_URL or 'http://127.0.0.1:3000/mysolido/')
+    if url.startswith(pod_url):
+        return url[len(pod_url):]
+    css_base = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
+    pod_name = pod_url.rstrip('/').split('/')[-1]
+    prefix = f'{css_base}/{pod_name}/'
+    if url.startswith(prefix):
+        return url[len(prefix):]
+    return None
+
+
+def pod_write(relative_path, content):
+    """Schrijf naar de pod via het filesystem"""
+    full_path = safe_pod_path(relative_path)
+    if not full_path:
+        return False
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    mode = 'wb' if isinstance(content, bytes) else 'w'
+    with open(full_path, mode) as f:
+        f.write(content)
+    return True
+
+
+def pod_delete(relative_path):
+    """Verwijder uit de pod via het filesystem"""
+    full_path = safe_pod_path(relative_path)
+    if not full_path:
+        return False
+    if os.path.isdir(full_path):
+        shutil.rmtree(full_path)
+        return True
+    elif os.path.isfile(full_path):
+        os.remove(full_path)
+        return True
+    return False
+
+
+def pod_mkdir(relative_path):
+    """Maak een map aan in de pod via het filesystem"""
+    full_path = safe_pod_path(relative_path)
+    if not full_path:
+        return False
+    os.makedirs(full_path, exist_ok=True)
+    return True
+
+
+def pod_exists(relative_path):
+    """Check of een pad bestaat in de pod"""
+    full_path = safe_pod_path(relative_path)
+    if not full_path:
+        return False
+    return os.path.exists(full_path)
 
 
 def generate_password(length=32):
@@ -662,24 +736,15 @@ def upload():
         return redirect_to_folder(folder_path)
 
     if folder_path:
-        upload_url = SOLID_POD_URL + folder_path + '/' + file.filename
+        relative_path = folder_path + '/' + file.filename
     else:
-        upload_url = SOLID_POD_URL + file.filename
+        relative_path = file.filename
 
-    content_type = file.content_type or 'application/octet-stream'
-
-    response = pod_request('PUT', upload_url,
-        data=file.read(),
-        headers={'Content-Type': content_type}
-    )
-
-    if response and response.status_code in [200, 201, 205]:
+    if pod_write(relative_path, file.read()):
         flash(f'"{file.filename}" succesvol geupload!', 'success')
         log_action('upload', {'file': file.filename, 'folder': folder_path or 'root'})
-    elif response:
-        flash(f'Upload mislukt: {response.status_code}', 'error')
     else:
-        flash('Upload mislukt: authenticatie error', 'error')
+        flash('Upload mislukt: kon bestand niet opslaan', 'error')
 
     return redirect_to_folder(folder_path)
 
@@ -699,50 +764,46 @@ def delete():
 
     if is_folder:
         # Folders: direct verwijderen (niet naar prullenbak)
-        response = pod_request('DELETE', resource_url)
-        if response and response.status_code in [200, 204, 205]:
+        rel_path = url_to_relative_path(resource_url)
+        if rel_path and pod_delete(rel_path):
             flash(f'Map "{name}" verwijderd', 'success')
             log_action('delete', {'resource': name, 'folder': folder_path or 'root'})
-        elif response:
-            flash(f'Verwijderen mislukt: {response.status_code}', 'error')
         else:
-            flash('Verwijderen mislukt: authenticatie error', 'error')
+            flash('Verwijderen mislukt', 'error')
         return redirect_to_folder(folder_path)
 
-    # Files: verplaats naar prullenbak
-    # Step 1: Ensure _trash/ container exists
-    trash_container = SOLID_POD_URL + '_trash/'
-    if not container_exists(trash_container):
-        create_container(trash_container)
+    # Files: verplaats naar prullenbak via filesystem
+    # Step 1: Ensure _trash/ directory exists
+    pod_mkdir('_trash')
 
-    # Step 2: Download the file
-    get_response = pod_request('GET', resource_url)
-    if not get_response or get_response.status_code != 200:
-        flash(f'Verwijderen mislukt: kon bestand niet ophalen', 'error')
+    # Step 2: Read the file from filesystem
+    rel_path = url_to_relative_path(resource_url)
+    if not rel_path:
+        flash('Verwijderen mislukt: ongeldig pad', 'error')
         return redirect_to_folder(folder_path)
 
-    content_type = get_response.headers.get('Content-Type', 'application/octet-stream')
+    src_path = safe_pod_path(rel_path)
+    if not src_path or not os.path.isfile(src_path):
+        flash('Verwijderen mislukt: bestand niet gevonden', 'error')
+        return redirect_to_folder(folder_path)
 
     # Step 3: Generate trash entry
     import uuid
     trash_id = uuid.uuid4().hex[:12]
     trash_filename = f'{trash_id}_{name}'
-    trash_url = trash_container + trash_filename
+    trash_rel_path = '_trash/' + trash_filename
+    trash_url = SOLID_POD_URL + trash_rel_path
 
-    # Step 4: Upload to _trash/
-    put_response = pod_request('PUT', trash_url,
-        data=get_response.content,
-        headers={'Content-Type': content_type}
-    )
-    if not put_response or put_response.status_code not in [200, 201, 205]:
-        flash(f'Verplaatsen naar prullenbak mislukt', 'error')
+    # Step 4: Copy to _trash/
+    dst_path = safe_pod_path(trash_rel_path)
+    if not dst_path:
+        flash('Verplaatsen naar prullenbak mislukt', 'error')
         return redirect_to_folder(folder_path)
+
+    shutil.copy2(src_path, dst_path)
 
     # Step 5: Delete original
-    del_response = pod_request('DELETE', resource_url)
-    if not del_response or del_response.status_code not in [200, 204, 205]:
-        flash(f'Let op: "{name}" is naar prullenbak gekopieerd maar het origineel kon niet verwijderd worden', 'error')
-        return redirect_to_folder(folder_path)
+    os.remove(src_path)
 
     # Step 6: Record in trash.json
     resource_path = folder_path + '/' + name if folder_path else name
@@ -765,23 +826,19 @@ def create_folder_route():
         return redirect_to_folder(folder_path)
 
     if folder_path:
-        new_folder_url = SOLID_POD_URL + folder_path + '/' + normalized + '/'
+        relative_path = folder_path + '/' + normalized
     else:
-        new_folder_url = SOLID_POD_URL + normalized + '/'
+        relative_path = normalized
 
-    if container_exists(new_folder_url):
+    if pod_exists(relative_path):
         flash(f'Map "{normalized}" bestaat al', 'error')
         return redirect_to_folder(folder_path)
 
-    response = create_container(new_folder_url)
-
-    if response and response.status_code in [200, 201, 205]:
+    if pod_mkdir(relative_path):
         flash(f'Map "{normalized}" aangemaakt!', 'success')
         log_action('create_folder', {'name': normalized, 'path': folder_path or 'root'})
-    elif response:
-        flash(f'Map aanmaken mislukt: {response.status_code}', 'error')
     else:
-        flash('Map aanmaken mislukt: authenticatie error', 'error')
+        flash('Map aanmaken mislukt', 'error')
 
     return redirect_to_folder(folder_path)
 
@@ -798,36 +855,29 @@ def move():
         flash('Geen bestand opgegeven', 'error')
         return redirect_to_folder(folder_path)
 
+    src_rel = url_to_relative_path(resource_url)
     if target_folder:
-        target_url = SOLID_POD_URL + target_folder + '/' + filename
+        dst_rel = target_folder + '/' + filename
     else:
-        target_url = SOLID_POD_URL + filename
+        dst_rel = filename
 
-    if target_url == resource_url:
+    if src_rel == dst_rel:
         flash('Bestand staat al in deze map', 'error')
         return redirect_to_folder(folder_path)
 
-    get_response = pod_request('GET', resource_url)
-    if not get_response or get_response.status_code != 200:
-        status = get_response.status_code if get_response else 'geen response'
-        flash(f'Verplaatsen mislukt: kon bestand niet ophalen ({status})', 'error')
+    src_path = safe_pod_path(src_rel) if src_rel else None
+    dst_path = safe_pod_path(dst_rel)
+
+    if not src_path or not os.path.isfile(src_path):
+        flash('Verplaatsen mislukt: bestand niet gevonden', 'error')
         return redirect_to_folder(folder_path)
 
-    content_type = get_response.headers.get('Content-Type', 'application/octet-stream')
-
-    put_response = pod_request('PUT', target_url,
-        data=get_response.content,
-        headers={'Content-Type': content_type}
-    )
-    if not put_response or put_response.status_code not in [200, 201, 205]:
-        status = put_response.status_code if put_response else 'geen response'
-        flash(f'Verplaatsen mislukt: kon bestand niet opslaan ({status})', 'error')
+    if not dst_path:
+        flash('Verplaatsen mislukt: ongeldig doelpad', 'error')
         return redirect_to_folder(folder_path)
 
-    del_response = pod_request('DELETE', resource_url)
-    if not del_response or del_response.status_code not in [200, 204, 205]:
-        flash(f'Let op: "{filename}" is gekopieerd maar het origineel kon niet verwijderd worden', 'error')
-        return redirect_to_folder(folder_path)
+    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+    shutil.move(src_path, dst_path)
 
     target_label = target_folder if target_folder else 'Pod root'
     flash(f'"{filename}" verplaatst naar {target_label}', 'success')
@@ -974,18 +1024,19 @@ def build_acl_content(resource_url):
 
 def write_acl(resource_url):
     """Write or delete ACL for a resource based on its active shares"""
-    acl_url = resource_url + '.acl'
+    rel_path = url_to_relative_path(resource_url)
+    if not rel_path:
+        return
+
+    acl_rel_path = rel_path + '.acl'
     shares = get_shares_for_resource(resource_url)
 
     if not shares:
-        pod_request('DELETE', acl_url)
+        pod_delete(acl_rel_path)
         return
 
     acl_content = build_acl_content(resource_url)
-    pod_request('PUT', acl_url,
-        data=acl_content,
-        headers={'Content-Type': 'text/turtle'}
-    )
+    pod_write(acl_rel_path, acl_content)
 
 
 @app.route('/share', methods=['POST'])
@@ -1072,7 +1123,9 @@ def trash_overview():
     # Auto-cleanup expired items
     expired = cleanup_expired()
     for item in expired:
-        pod_request('DELETE', item['trash_url'])
+        rel_path = url_to_relative_path(item['trash_url'])
+        if rel_path:
+            pod_delete(rel_path)
         add_notification('trash_auto_deleted', f'"{item["filename"]}" is definitief verwijderd uit prullenbak')
         log_action('trash_auto_deleted', {'file': item['filename']})
 
@@ -1090,25 +1143,27 @@ def trash_restore():
         flash('Item niet gevonden in prullenbak', 'error')
         return redirect(url_for('trash_overview'))
 
-    # Download from _trash/
-    get_response = pod_request('GET', entry['trash_url'])
-    if not get_response or get_response.status_code != 200:
-        flash('Herstellen mislukt: kon bestand niet ophalen uit prullenbak', 'error')
+    # Move from _trash/ back to original location via filesystem
+    trash_rel = url_to_relative_path(entry['trash_url'])
+    orig_rel = url_to_relative_path(entry['resource_url'])
+
+    if not trash_rel or not orig_rel:
+        flash('Herstellen mislukt: ongeldig pad', 'error')
         return redirect(url_for('trash_overview'))
 
-    content_type = get_response.headers.get('Content-Type', 'application/octet-stream')
+    trash_path = safe_pod_path(trash_rel)
+    orig_path = safe_pod_path(orig_rel)
 
-    # Upload to original location
-    put_response = pod_request('PUT', entry['resource_url'],
-        data=get_response.content,
-        headers={'Content-Type': content_type}
-    )
-    if not put_response or put_response.status_code not in [200, 201, 205]:
-        flash('Herstellen mislukt: kon bestand niet terugplaatsen', 'error')
+    if not trash_path or not os.path.isfile(trash_path):
+        flash('Herstellen mislukt: bestand niet gevonden in prullenbak', 'error')
         return redirect(url_for('trash_overview'))
 
-    # Delete from _trash/
-    pod_request('DELETE', entry['trash_url'])
+    if not orig_path:
+        flash('Herstellen mislukt: ongeldig doelpad', 'error')
+        return redirect(url_for('trash_overview'))
+
+    os.makedirs(os.path.dirname(orig_path), exist_ok=True)
+    shutil.move(trash_path, orig_path)
 
     flash(f'"{entry["filename"]}" hersteld naar {entry.get("original_folder", "originele locatie")}', 'success')
     log_action('restore', {'file': entry['filename'], 'to': entry.get('original_folder', '')})
@@ -1125,8 +1180,10 @@ def trash_permanent_delete():
         flash('Item niet gevonden in prullenbak', 'error')
         return redirect(url_for('trash_overview'))
 
-    # Delete from pod _trash/
-    pod_request('DELETE', entry['trash_url'])
+    # Delete from pod _trash/ via filesystem
+    rel_path = url_to_relative_path(entry['trash_url'])
+    if rel_path:
+        pod_delete(rel_path)
 
     flash(f'"{entry["filename"]}" definitief verwijderd', 'success')
     log_action('permanent_delete', {'file': entry['filename']})
@@ -1292,22 +1349,19 @@ def init_folders_welcome():
 
 
 def _do_init_folders(welcome=False):
-    """Shared logic for creating default folders"""
+    """Shared logic for creating default folders via filesystem"""
     created = []
     skipped = []
 
     for folder in DEFAULT_FOLDERS:
-        folder_url = SOLID_POD_URL + folder + '/'
-        if container_exists(folder_url):
+        if pod_exists(folder):
             skipped.append(folder)
             continue
 
-        response = create_container(folder_url)
-        if response and response.status_code in [200, 201, 205]:
+        if pod_mkdir(folder):
             created.append(folder)
         else:
-            status = response.status_code if response else 'geen response'
-            flash(f'Map "{folder}" aanmaken mislukt: {status}', 'error')
+            flash(f'Map "{folder}" aanmaken mislukt', 'error')
 
     if welcome and created:
         flash('Je kluis is ingericht! Upload je eerste document.', 'success')
