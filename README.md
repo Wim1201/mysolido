@@ -114,7 +114,9 @@ MySolido is gebouwd op het principe dat jouw data van jou is:
 
 ## Licentie
 
-[MIT](LICENSE)
+GPLv3 — zie [LICENSE](LICENSE) voor de volledige tekst.
+
+MySolido is open source software. Je mag het vrij gebruiken, aanpassen en verspreiden onder de voorwaarden van de GNU General Public License v3.
 
 ## Links
 
