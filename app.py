@@ -52,14 +52,16 @@ def auto_setup():
 
     print("  Eerste keer opstarten \u2014 account wordt aangemaakt...")
 
-    css_base = 'http://127.0.0.1:3000'
+    css_base = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
 
     try:
-        # Stap 1: Check of CSS draait
+        # Stap 1: Wacht tot CSS draait
         css_ready = False
-        for attempt in range(10):
+        for attempt in range(30):
             try:
-                r = requests.get(f'{css_base}/.account/', timeout=3)
+                r = requests.get(f'{css_base}/.account/',
+                    headers={'Accept': 'application/json'},
+                    timeout=3)
                 if r.status_code == 200:
                     css_ready = True
                     break
@@ -71,84 +73,81 @@ def auto_setup():
             print("  [FOUT] Community Solid Server is niet bereikbaar op poort 3000")
             return False
 
-        controls = r.json().get('controls', {})
+        initial_controls = r.json().get('controls', {})
 
         # Stap 2: Maak account aan
-        r = requests.post(
-            controls['account']['create'],
-            headers={'content-type': 'application/json'},
-            json={}
-        )
+        create_url = initial_controls.get('account', {}).get('create')
+        if not create_url:
+            print("  [FOUT] Geen account-create URL gevonden in CSS API")
+            return False
+
+        r = requests.post(create_url,
+            headers={'Content-Type': 'application/json'},
+            json={})
+
         if r.status_code not in [200, 201]:
             print(f"  [FOUT] Account aanmaken mislukt: {r.status_code}")
             return False
 
         data = r.json()
         authorization = data.get('authorization')
-        new_controls = data.get('controls', {})
+        if not authorization:
+            print("  [FOUT] Geen authorization token ontvangen")
+            return False
 
-        # Stap 3: Registreer email/wachtwoord
+        # Stap 3: Haal volledige controls op met authorization token
+        r = requests.get(f'{css_base}/.account/',
+            headers={
+                'Authorization': f'CSS-Account-Token {authorization}',
+                'Accept': 'application/json'
+            })
+
+        if r.status_code != 200:
+            print(f"  [FOUT] Account controls ophalen mislukt: {r.status_code}")
+            return False
+
+        full_controls = r.json().get('controls', {})
+
+        # Stap 4: Registreer email/wachtwoord
+        # In CSS v7.1.8 heet dit 'password.create', niet 'password.register'
+        password_create_url = full_controls.get('password', {}).get('create')
+        if not password_create_url:
+            print("  [FOUT] Geen password-create URL gevonden in CSS API")
+            print(f"  [DEBUG] Beschikbare password controls: {list(full_controls.get('password', {}).keys())}")
+            return False
+
         email = 'user@mysolido.local'
         password = generate_password()
 
-        # Zoek register URL — check meerdere locaties (CSS v7.1.8)
-        register_url = None
-        if 'password' in new_controls and 'register' in new_controls.get('password', {}):
-            register_url = new_controls['password']['register']
-        elif 'html' in new_controls and 'password' in new_controls.get('html', {}) and 'register' in new_controls.get('html', {}).get('password', {}):
-            register_url = new_controls['html']['password']['register']
-
-        if not register_url:
-            print("  [FOUT] Geen registratie-URL gevonden in CSS API")
-            return False
-
-        r = requests.post(
-            register_url,
+        r = requests.post(password_create_url,
             headers={
-                'content-type': 'application/json',
+                'Content-Type': 'application/json',
                 'Authorization': f'CSS-Account-Token {authorization}'
             },
             json={
                 'email': email,
                 'password': password
-            }
-        )
+            })
+
         if r.status_code not in [200, 201]:
             print(f"  [FOUT] Wachtwoord registreren mislukt: {r.status_code}")
             return False
 
-        # Haal controls opnieuw op met auth header (meer endpoints beschikbaar na login)
-        r = requests.get(
-            f'{css_base}/.account/',
-            headers={
-                'Authorization': f'CSS-Account-Token {authorization}',
-                'Accept': 'application/json'
-            },
-            timeout=5
-        )
-        if r.status_code == 200:
-            new_controls = r.json().get('controls', new_controls)
-
-        # Stap 4: Maak pod aan
-        pod_name = 'mysolido'
-
-        # Zoek pod-URL in controls
-        pod_create_url = None
-        if 'account' in new_controls and 'pod' in new_controls.get('account', {}):
-            pod_create_url = new_controls['account']['pod']
-
+        # Stap 5: Maak pod aan
+        pod_create_url = full_controls.get('account', {}).get('pod')
         if not pod_create_url:
-            print("  [FOUT] Geen pod-aanmaak-URL gevonden in CSS API")
+            print("  [FOUT] Geen pod-create URL gevonden in CSS API")
             return False
 
-        r = requests.post(
-            pod_create_url,
+        pod_name = 'mysolido'
+
+        r = requests.post(pod_create_url,
             headers={
-                'content-type': 'application/json',
+                'Content-Type': 'application/json',
                 'Authorization': f'CSS-Account-Token {authorization}'
             },
-            json={'name': pod_name}
-        )
+            json={'name': pod_name})
+
         if r.status_code not in [200, 201]:
             print(f"  [FOUT] Pod aanmaken mislukt: {r.status_code}")
             return False
@@ -156,38 +155,22 @@ def auto_setup():
         pod_url = f'{css_base}/{pod_name}/'
         webid = f'{pod_url}profile/card#me'
 
-        # Haal controls opnieuw op na pod-aanmaak
-        r = requests.get(
-            f'{css_base}/.account/',
-            headers={
-                'Authorization': f'CSS-Account-Token {authorization}',
-                'Accept': 'application/json'
-            },
-            timeout=5
-        )
-        if r.status_code == 200:
-            new_controls = r.json().get('controls', new_controls)
-
-        # Stap 5: Genereer client credentials
-        cred_url = None
-        if 'account' in new_controls and 'clientCredentials' in new_controls.get('account', {}):
-            cred_url = new_controls['account']['clientCredentials']
-
-        if not cred_url:
-            print("  [FOUT] Geen clientCredentials-URL gevonden in CSS API")
+        # Stap 6: Genereer client credentials
+        credentials_url = full_controls.get('account', {}).get('clientCredentials')
+        if not credentials_url:
+            print("  [FOUT] Geen clientCredentials URL gevonden in CSS API")
             return False
 
-        r = requests.post(
-            cred_url,
+        r = requests.post(credentials_url,
             headers={
-                'content-type': 'application/json',
+                'Content-Type': 'application/json',
                 'Authorization': f'CSS-Account-Token {authorization}'
             },
             json={
                 'name': 'MySolido App',
                 'webId': webid
-            }
-        )
+            })
+
         if r.status_code not in [200, 201]:
             print(f"  [FOUT] Client credentials aanmaken mislukt: {r.status_code}")
             return False
@@ -200,7 +183,7 @@ def auto_setup():
             print("  [FOUT] Geen client credentials ontvangen")
             return False
 
-        # Stap 6: Schrijf .env
+        # Stap 7: Schrijf .env
         with open(env_path, 'w') as f:
             f.write(f'CLIENT_ID={client_id}\n')
             f.write(f'CLIENT_SECRET={client_secret}\n')
