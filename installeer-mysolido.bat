@@ -108,6 +108,9 @@ echo   [OK] Node.js geinstalleerd
 
 :node_ok
 
+REM Zorg dat npm global map bestaat (nodig op verse installaties)
+if not exist "%APPDATA%\npm" mkdir "%APPDATA%\npm"
+
 :: ==========================================================
 :: STAP 2: Python controleren
 :: ==========================================================
@@ -236,14 +239,27 @@ echo   [OK] Python dependencies geinstalleerd
 :: ==========================================================
 echo   [5/6] Community Solid Server installeren...
 cd /d "%INSTALL_DIR%"
-call npm install @solid/community-server --quiet
-if !errorlevel! neq 0 (
-    echo.
-    echo   [FOUT] Community Solid Server kon niet worden geinstalleerd.
-    echo   Probeer handmatig: npm install @solid/community-server
-    echo.
-    goto :cleanup
+
+set /a npm_attempts=0
+:retry_npm
+set /a npm_attempts+=1
+call npm install @solid/community-server@7.1.8 --quiet 2>nul
+if !errorlevel! equ 0 goto :npm_ok
+
+if !npm_attempts! lss 3 (
+    echo   Poging !npm_attempts! mislukt, opnieuw proberen...
+    timeout /t 5 /nobreak >nul
+    goto :retry_npm
 )
+
+echo.
+echo   [FOUT] Community Solid Server kon niet worden geinstalleerd na 3 pogingen.
+echo   Controleer je internetverbinding en probeer het opnieuw.
+echo   Of probeer handmatig: npm install @solid/community-server@7.1.8
+echo.
+goto :cleanup
+
+:npm_ok
 echo   [OK] Community Solid Server geinstalleerd
 
 :: ==========================================================
