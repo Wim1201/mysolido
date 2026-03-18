@@ -198,9 +198,12 @@ def auto_setup():
         CLIENT_ID = os.getenv('CLIENT_ID')
         CLIENT_SECRET = os.getenv('CLIENT_SECRET')
         CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
-        SOLID_POD_URL = os.getenv('SOLID_POD_URL')
-        WEBID = os.getenv('WEBID')
+        SOLID_POD_URL = os.getenv('SOLID_POD_URL', f'{css_base}/{pod_name}/')
+        WEBID = os.getenv('WEBID', f'{css_base}/{pod_name}/profile/card#me')
         OWNER_WEBID = WEBID
+
+        print(f"  [DEBUG] CLIENT_ID geladen: {CLIENT_ID[:20]}..." if CLIENT_ID else "  [WARN] CLIENT_ID is None!")
+        print(f"  [DEBUG] SOLID_POD_URL: {SOLID_POD_URL}")
 
         print(f"  [OK] Account aangemaakt")
         print(f"  [OK] Pod: {pod_url}")
@@ -349,20 +352,31 @@ def inject_globals():
 
 def get_access_token():
     """Verkrijg een access token via client credentials"""
-    auth = base64.b64encode(f'{CLIENT_ID}:{CLIENT_SECRET}'.encode()).decode()
-    response = requests.post(
-        f'{CSS_BASE_URL}/.oidc/token',
-        data={'grant_type': 'client_credentials', 'scope': 'webid'},
-        headers={
-            'Authorization': f'Basic {auth}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-    )
+    client_id = os.getenv('CLIENT_ID') or CLIENT_ID
+    client_secret = os.getenv('CLIENT_SECRET') or CLIENT_SECRET
+    css_base = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
 
-    if response.status_code == 200:
-        return response.json().get('access_token')
-    else:
-        print(f"Token ophalen mislukt: {response.status_code} - {response.text}")
+    if not client_id or not client_secret:
+        return None
+
+    auth = base64.b64encode(f'{client_id}:{client_secret}'.encode()).decode()
+    try:
+        response = requests.post(
+            f'{css_base}/.oidc/token',
+            data={'grant_type': 'client_credentials', 'scope': 'webid'},
+            headers={
+                'Authorization': f'Basic {auth}',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return response.json().get('access_token')
+        else:
+            print(f"Token ophalen mislukt: {response.status_code} - {response.text}")
+            return None
+    except requests.ConnectionError:
         return None
 
 
