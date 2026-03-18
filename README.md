@@ -48,33 +48,51 @@ MySolido gebruikt dezelfde standaard als [Athumi](https://athumi.be) (Vlaamse ov
 
 ## Installatie
 
-### Vereisten
+### Automatisch (Windows)
 
-- Windows 10+ of macOS
+Download [installeer-mysolido.bat](https://raw.githubusercontent.com/Wim1201/mysolido/main/installeer-mysolido.bat), dubbelklik, en alles wordt automatisch geïnstalleerd en gestart.
+
+### Handmatig (Windows / macOS / Linux)
+
+#### Vereisten
+
 - [Node.js](https://nodejs.org) 18+
 - [Python](https://python.org) 3.8+
+- Git
 
-### Stappen
+#### Stappen
 
 ```bash
 # 1. Clone de repository
 git clone https://github.com/Wim1201/mysolido.git
 cd mysolido
 
-# 2. Installeer Python dependencies
-pip install -r requirements.txt
+# 2. Installeer dependencies
+npm install
+pip install -r requirements.txt        # Windows
+pip3 install -r requirements.txt       # macOS / Linux
 
-# 3. Start de Community Solid Server
-npx @solid/community-server -p 3000 -f .data/ -c @css:config/file.json
+# 3. Start de Community Solid Server (terminal 1)
+npx @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json
 
-# 4. Start de Flask app (in een tweede terminal)
-python app.py
+# Wacht tot je ziet: "Listening to server at http://localhost:3000/"
+
+# 4. Start MySolido (terminal 2)
+python app.py                          # Windows
+python3 app.py                         # macOS / Linux
 
 # 5. Open je browser
 # Ga naar http://localhost:5000
 ```
 
-Bij eerste gebruik verschijnt een welkomstscherm dat je door de setup leidt.
+Bij de eerste start wordt automatisch een account en pod aangemaakt. Geen handmatige configuratie nodig.
+
+#### Stoppen
+
+```bash
+# Sluit beide terminals, of op Windows:
+stop-mysolido.bat
+```
 
 ## Projectstructuur
 
