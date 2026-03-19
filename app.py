@@ -53,12 +53,12 @@ def url_to_relative_path(url):
     """Converteer een pod URL naar een relatief pad binnen de pod data-map"""
     pod_url = os.getenv('SOLID_POD_URL', SOLID_POD_URL or 'http://127.0.0.1:3000/mysolido/')
     if url.startswith(pod_url):
-        return url[len(pod_url):]
+        return unquote(url[len(pod_url):])
     css_base = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
     pod_name = pod_url.rstrip('/').split('/')[-1]
     prefix = f'{css_base}/{pod_name}/'
     if url.startswith(prefix):
-        return url[len(prefix):]
+        return unquote(url[len(prefix):])
     return None
 
 
