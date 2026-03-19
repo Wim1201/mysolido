@@ -9,7 +9,7 @@ import shutil
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
-from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_file
 import requests
 import base64
 from dotenv import load_dotenv
@@ -103,6 +103,126 @@ def pod_exists(relative_path):
     if not full_path:
         return False
     return os.path.exists(full_path)
+
+
+def list_folder_filesystem(relative_path=''):
+    """Lees de inhoud van een map van het filesystem"""
+    pod_path = get_pod_data_path()
+    folder_path = os.path.join(pod_path, relative_path) if relative_path else pod_path
+    folder_path = os.path.normpath(folder_path)
+
+    # Beveiligingscheck
+    if not folder_path.startswith(os.path.normpath(pod_path)):
+        return []
+
+    if not os.path.isdir(folder_path):
+        return []
+
+    items = []
+    pod_url = os.getenv('SOLID_POD_URL', SOLID_POD_URL or 'http://127.0.0.1:3000/mysolido/')
+
+    for entry in os.listdir(folder_path):
+        # Skip verborgen bestanden en metadata
+        if entry.startswith('.'):
+            continue
+
+        full_path = os.path.join(folder_path, entry)
+        entry_relative = os.path.join(relative_path, entry).replace('\\', '/') if relative_path else entry
+
+        if os.path.isdir(full_path):
+            svg = get_folder_svg(entry)
+            items.append({
+                'name': entry,
+                'url': pod_url + entry_relative + '/',
+                'is_folder': True,
+                'svg': svg,
+                'size': '',
+                'modified': datetime.fromtimestamp(os.path.getmtime(full_path)).strftime('%d %b %Y'),
+            })
+        else:
+            # Skip metadata bestanden
+            if entry.endswith('.acl') or entry.endswith('.meta'):
+                continue
+
+            stat = os.stat(full_path)
+            items.append({
+                'name': entry,
+                'url': pod_url + entry_relative,
+                'is_folder': False,
+                'svg': None,
+                'size': format_size(stat.st_size),
+                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%d %b %Y'),
+            })
+
+    # Sorteer: mappen eerst, dan bestanden op naam
+    items.sort(key=lambda x: (not x['is_folder'], x['name'].lower()))
+    return items
+
+
+def search_pod_filesystem(query, relative_path='', depth=0, max_depth=5):
+    """Zoek recursief in de pod via het filesystem"""
+    if depth >= max_depth:
+        return []
+
+    results = []
+    pod_path = get_pod_data_path()
+    search_path = os.path.join(pod_path, relative_path) if relative_path else pod_path
+
+    if not os.path.isdir(search_path):
+        return results
+
+    pod_url = os.getenv('SOLID_POD_URL', SOLID_POD_URL or 'http://127.0.0.1:3000/mysolido/')
+
+    for entry in os.listdir(search_path):
+        if entry.startswith('.') or entry.endswith('.acl') or entry.endswith('.meta'):
+            continue
+
+        full_path = os.path.join(search_path, entry)
+        entry_relative = os.path.join(relative_path, entry).replace('\\', '/') if relative_path else entry
+
+        if os.path.isdir(full_path):
+            results.extend(search_pod_filesystem(query, entry_relative, depth + 1, max_depth))
+        else:
+            if query.lower() in entry.lower():
+                stat = os.stat(full_path)
+                results.append({
+                    'name': entry,
+                    'url': pod_url + entry_relative,
+                    'path': entry_relative,
+                    'folder_path': relative_path,
+                    'is_folder': False,
+                    'svg': None,
+                    'size': format_size(stat.st_size),
+                    'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%d %b %Y'),
+                })
+
+    return results
+
+
+def get_pod_stats_filesystem():
+    """Bereken pod-statistieken via het filesystem"""
+    pod_path = get_pod_data_path()
+    total_files = 0
+    total_size = 0
+    total_folders = 0
+
+    if not os.path.isdir(pod_path):
+        return {'file_count': 0, 'folder_count': 0, 'total_size': 0}
+
+    for root, dirs, files in os.walk(pod_path):
+        # Skip verborgen mappen
+        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        total_folders += len(dirs)
+        for f in files:
+            if not f.startswith('.') and not f.endswith('.acl') and not f.endswith('.meta'):
+                total_files += 1
+                total_size += os.path.getsize(os.path.join(root, f))
+
+    return {
+        'file_count': total_files,
+        'folder_count': total_folders,
+        'total_size': total_size
+    }
 
 
 def generate_password(length=32):
@@ -424,6 +544,7 @@ def inject_globals():
     }
 
 
+# LEGACY: HTTP-gebaseerde functies — bewaard voor toekomstige remote pod-toegang
 def get_access_token():
     """Verkrijg een access token via client credentials"""
     client_id = os.getenv('CLIENT_ID') or CLIENT_ID
@@ -501,6 +622,7 @@ def get_folder_svg(folder_name):
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
 
 
+# LEGACY: HTTP-gebaseerde container listing — bewaard voor toekomstige remote pod-toegang
 def parse_container_contents(turtle_text, base_url):
     """Parse Turtle response to extract container contents"""
     items = []
@@ -658,64 +780,32 @@ def browse_folder(folder_path):
 
     folder_path = folder_path.strip('/')
     sort_by = request.args.get('sort', 'name-asc')
-    if folder_path:
-        container_url = SOLID_POD_URL + folder_path + '/'
-    else:
-        container_url = SOLID_POD_URL
 
-    try:
-        response = pod_request('GET', container_url, headers={'Accept': 'text/turtle'})
-        if response and response.status_code == 200:
-            items = parse_container_contents(response.text, container_url)
+    items = list_folder_filesystem(folder_path)
 
-            # Show welcome page if pod root is empty
-            if not folder_path and is_pod_empty(items):
-                return render_template('welcome.html', pod_url=SOLID_POD_URL)
+    # Show welcome page if pod root is empty
+    if not folder_path and is_pod_empty(items):
+        return render_template('welcome.html', pod_url=SOLID_POD_URL)
 
-            items = sort_items(items, sort_by)
-            breadcrumbs = build_breadcrumbs(folder_path)
-            parts = [p for p in folder_path.split('/') if p]
-            parent_path = '/'.join(parts[:-1]) if parts else None
-            move_folders = get_move_folders(folder_path, items)
-            # Count stats for dashboard
-            file_count = sum(1 for i in items if not i['is_folder'])
-            folder_count = sum(1 for i in items if i['is_folder'])
-            recent_files = get_recent_files() if not folder_path else []
-            return render_template('index.html',
-                items=items,
-                pod_url=SOLID_POD_URL,
-                folder_path=folder_path,
-                breadcrumbs=breadcrumbs,
-                parent_path=parent_path,
-                all_folders=get_all_folders(),
-                move_folders=move_folders,
-                file_count=file_count,
-                folder_count=folder_count,
-                recent_files=recent_files,
-                default_folders=DEFAULT_FOLDERS,
-                current_sort=sort_by,
-            )
-        elif response:
-            flash(f'Kon map niet laden: {response.status_code}', 'error')
-        else:
-            flash('Authenticatie mislukt. Controleer client credentials.', 'error')
-    except requests.ConnectionError:
-        flash('CSS server niet bereikbaar. Draait hij op poort 3000?', 'error')
-
+    items = sort_items(items, sort_by)
     breadcrumbs = build_breadcrumbs(folder_path)
     parts = [p for p in folder_path.split('/') if p]
     parent_path = '/'.join(parts[:-1]) if parts else None
+    move_folders = get_move_folders(folder_path, items)
+    file_count = sum(1 for i in items if not i['is_folder'])
+    folder_count = sum(1 for i in items if i['is_folder'])
+    recent_files = get_recent_files() if not folder_path else []
     return render_template('index.html',
-        items=[],
+        items=items,
         pod_url=SOLID_POD_URL,
         folder_path=folder_path,
         breadcrumbs=breadcrumbs,
         parent_path=parent_path,
         all_folders=get_all_folders(),
-        move_folders=get_move_folders(folder_path, []),
-        file_count=0,
-        folder_count=0,
-        recent_files=[],
+        move_folders=move_folders,
+        file_count=file_count,
+        folder_count=folder_count,
+        recent_files=recent_files,
         default_folders=DEFAULT_FOLDERS,
         current_sort=sort_by,
     )
@@ -885,6 +975,7 @@ def move():
     return redirect_to_folder(folder_path)
 
 
+# LEGACY: HTTP-gebaseerde zoekfunctie — bewaard voor toekomstige remote pod-toegang
 def search_pod(container_url, query, path='', depth=0, max_depth=5):
     """Recursively search the pod for files matching the query"""
     if depth >= max_depth:
@@ -920,11 +1011,8 @@ def search():
     query = request.args.get('q', '').strip()
     results = []
     if query:
-        try:
-            results = search_pod(SOLID_POD_URL, query)
-            log_action('search', {'query': query, 'results': len(results)})
-        except requests.ConnectionError:
-            flash('CSS server niet bereikbaar. Draait hij op poort 3000?', 'error')
+        results = search_pod_filesystem(query)
+        log_action('search', {'query': query, 'results': len(results)})
 
     return render_template('search.html',
         query=query,
@@ -936,11 +1024,9 @@ def search():
 
 @app.route('/view/<path:file_path>')
 def view_file(file_path):
-    """View a file inline in the browser"""
-    file_url = SOLID_POD_URL + file_path
-    response = pod_request('GET', file_url)
-
-    if not response or response.status_code != 200:
+    """View a file inline in the browser via filesystem"""
+    full_path = safe_pod_path(file_path)
+    if not full_path or not os.path.isfile(full_path):
         flash('Bestand kon niet worden geopend', 'error')
         return redirect(url_for('index'))
 
@@ -957,39 +1043,25 @@ def view_file(file_path):
             content_type=VIEWABLE_TYPES.get(ext, 'application/octet-stream'),
         )
 
-    if ext in VIEWABLE_TYPES:
-        mime = VIEWABLE_TYPES[ext]
-        print(f"[view] {filename} → inline, Content-Type: {mime}")
-        resp = Response(response.content)
-        resp.headers['Content-Type'] = mime
-        resp.headers['Content-Disposition'] = f'inline; filename="{filename}"'
-        return resp
+    import mimetypes
+    mime = VIEWABLE_TYPES.get(ext) or mimetypes.guess_type(filename)[0] or 'application/octet-stream'
 
-    print(f"[view] {filename} → attachment")
-    resp = Response(response.content)
-    resp.headers['Content-Type'] = response.headers.get('Content-Type', 'application/octet-stream')
-    resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return resp
+    if ext in VIEWABLE_TYPES:
+        return send_file(full_path, mimetype=mime, download_name=filename)
+
+    return send_file(full_path, as_attachment=True, download_name=filename)
 
 
 @app.route('/download/<path:file_path>')
 def download_file(file_path):
-    """Force download a file from the pod"""
-    file_url = SOLID_POD_URL + file_path
-    response = pod_request('GET', file_url)
-
-    if not response or response.status_code != 200:
+    """Force download a file from the pod via filesystem"""
+    full_path = safe_pod_path(file_path)
+    if not full_path or not os.path.isfile(full_path):
         flash('Bestand kon niet worden gedownload', 'error')
         return redirect(url_for('index'))
 
-    content_type = response.headers.get('Content-Type', 'application/octet-stream')
     filename = file_path.split('/')[-1]
-
-    return Response(
-        response.content,
-        content_type=content_type,
-        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-    )
+    return send_file(full_path, as_attachment=True, download_name=filename)
 
 
 def build_acl_content(resource_url):
@@ -1212,6 +1284,7 @@ def notification_mark_read():
 
 # === PROFILE & SETTINGS ROUTES ===
 
+# LEGACY: HTTP-gebaseerde statistieken — bewaard voor toekomstige remote pod-toegang
 def get_storage_stats():
     """Calculate storage statistics by scanning the pod"""
     stats = {'file_count': 0, 'folder_count': 0, 'total_size': 0}
@@ -1268,7 +1341,7 @@ def format_date_nl(http_date):
 @app.route('/profile')
 def profile():
     """Show user profile with storage stats"""
-    stats = get_storage_stats()
+    stats = get_pod_stats_filesystem()
     stats['total_size_formatted'] = format_size(stats['total_size'])
     return render_template('profile.html',
         webid=OWNER_WEBID,
@@ -1285,29 +1358,21 @@ def settings():
 
 @app.route('/settings/export', methods=['POST'])
 def export_backup():
-    """Export entire pod as ZIP"""
+    """Export entire pod as ZIP via filesystem"""
+    pod_path = get_pod_data_path()
     buffer = io.BytesIO()
-
-    def add_to_zip(zf, container_url, path='', depth=0, max_depth=5):
-        if depth >= max_depth:
-            return
-        response = pod_request('GET', container_url, headers={'Accept': 'text/turtle'})
-        if not response or response.status_code != 200:
-            return
-        items = parse_container_contents(response.text, container_url)
-        for item in items:
-            if item['is_folder']:
-                sub_path = path + item['name'] + '/'
-                add_to_zip(zf, item['url'], sub_path, depth + 1, max_depth)
-            else:
-                file_path = path + item['name']
-                file_response = pod_request('GET', item['url'])
-                if file_response and file_response.status_code == 200:
-                    zf.writestr(file_path, file_response.content)
 
     try:
         with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-            add_to_zip(zf, SOLID_POD_URL)
+            for root, dirs, files in os.walk(pod_path):
+                # Skip verborgen mappen
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                for f in files:
+                    if f.startswith('.') or f.endswith('.acl') or f.endswith('.meta'):
+                        continue
+                    full_path = os.path.join(root, f)
+                    arcname = os.path.relpath(full_path, pod_path).replace('\\', '/')
+                    zf.write(full_path, arcname)
     except Exception as e:
         flash(f'Backup mislukt: {e}', 'error')
         return redirect(url_for('settings'))
