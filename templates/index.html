@@ -1,9 +1,17 @@
 {% extends "base.html" %}
-{% from "macros/icons.html" import icon_arrow_left, icon_chevron_right, icon_download, icon_upload, icon_delete, icon_share, icon_move, icon_search, icon_plus, icon_folder, icon_file, icon_package, icon_eye, icon_edit, icon_globe, icon_lock, icon_hourglass, icon_append %}
+{% from "macros/icons.html" import icon_arrow_left, icon_chevron_right, icon_download, icon_upload, icon_delete, icon_share, icon_move, icon_search, icon_plus, icon_folder, icon_file, icon_package, icon_eye, icon_edit, icon_globe, icon_lock, icon_hourglass, icon_append, icon_link, icon_copy %}
 
 {% block title %}{% if folder_path %}{{ folder_path.split('/')[-1] }} - {% endif %}MySolido{% endblock %}
 
 {% block content %}
+    {% if share_link_url %}
+    <div class="share-link-banner">
+        <span>{{ icon_link() }} Deellink aangemaakt:</span>
+        <input type="text" value="{{ share_link_url }}" readonly id="share-link-url" class="share-link-input">
+        <button type="button" class="btn btn-sm btn-sharelink-copy" onclick="copyShareLink()">{{ icon_copy() }} Kopieer</button>
+    </div>
+    {% endif %}
+
     {% if not folder_path %}
     {# === DASHBOARD VIEW === #}
 
@@ -127,6 +135,28 @@
                                 <div class="move-actions">
                                     <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">Annuleren</button>
                                     <button type="submit" class="btn btn-sm">Verplaats</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="sharelink-wrapper">
+                        <button type="button" class="btn btn-link" onclick="toggleShareLink(this)">{{ icon_link() }} Deel via link</button>
+                        <div class="sharelink-dropdown">
+                            <form action="{{ url_for('create_share_link_route') }}" method="post">
+                                <input type="hidden" name="file_path" value="{{ item.name }}">
+                                <input type="hidden" name="file_name" value="{{ item.name }}">
+                                <label>Verloopdatum</label>
+                                <select name="expires_days">
+                                    <option value="1">1 dag</option>
+                                    <option value="7" selected>7 dagen</option>
+                                    <option value="30">30 dagen</option>
+                                    <option value="0">Geen verloopdatum</option>
+                                </select>
+                                <label>Wachtwoord (optioneel)</label>
+                                <input type="text" name="password" placeholder="Laat leeg voor geen wachtwoord">
+                                <div class="sharelink-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShareLink(this)">Annuleren</button>
+                                    <button type="submit" class="btn btn-sm btn-sharelink-create">Link aanmaken</button>
                                 </div>
                             </form>
                         </div>
@@ -286,6 +316,30 @@
                                 </form>
                             </div>
                         </div>
+                        {% if not is_dir %}
+                        <div class="sharelink-wrapper">
+                            <button type="button" class="btn btn-link" onclick="toggleShareLink(this)">{{ icon_link() }} Deel via link</button>
+                            <div class="sharelink-dropdown">
+                                <form action="{{ url_for('create_share_link_route') }}" method="post">
+                                    <input type="hidden" name="file_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
+                                    <input type="hidden" name="file_name" value="{{ item.name }}">
+                                    <label>Verloopdatum</label>
+                                    <select name="expires_days">
+                                        <option value="1">1 dag</option>
+                                        <option value="7" selected>7 dagen</option>
+                                        <option value="30">30 dagen</option>
+                                        <option value="0">Geen verloopdatum</option>
+                                    </select>
+                                    <label>Wachtwoord (optioneel)</label>
+                                    <input type="text" name="password" placeholder="Laat leeg voor geen wachtwoord">
+                                    <div class="sharelink-actions">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShareLink(this)">Annuleren</button>
+                                        <button type="submit" class="btn btn-sm btn-sharelink-create">Link aanmaken</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
                         <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
                             <input type="hidden" name="resource_url" value="{{ item.url }}">
                             <input type="hidden" name="folder_path" value="{{ folder_path }}">

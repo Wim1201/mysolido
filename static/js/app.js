@@ -46,18 +46,36 @@ function toggleWebidField(select) {
     }
 }
 
+function toggleShareLink(btn) {
+    var dropdown = btn.closest('.sharelink-wrapper').querySelector('.sharelink-dropdown');
+    closeAllDropdowns(dropdown);
+    dropdown.classList.toggle('show');
+}
+
 function closeAllDropdowns(except) {
-    document.querySelectorAll('.move-dropdown.show, .share-dropdown.show').forEach(function(d) {
+    document.querySelectorAll('.move-dropdown.show, .share-dropdown.show, .sharelink-dropdown.show').forEach(function(d) {
         if (d !== except) d.classList.remove('show');
     });
 }
 
 // Close dropdowns when clicking outside
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.move-wrapper') && !e.target.closest('.share-wrapper')) {
+    if (!e.target.closest('.move-wrapper') && !e.target.closest('.share-wrapper') && !e.target.closest('.sharelink-wrapper')) {
         closeAllDropdowns();
     }
 });
+
+/* --- Share Link Copy --- */
+function copyShareLink() {
+    var input = document.getElementById('share-link-url');
+    if (!input) return;
+    navigator.clipboard.writeText(input.value).then(function() {
+        var btn = input.nextElementSibling;
+        var orig = btn.innerHTML;
+        btn.textContent = 'Gekopieerd!';
+        setTimeout(function() { btn.innerHTML = orig; }, 2000);
+    });
+}
 
 /* --- Loading Spinner --- */
 function showSpinner() {

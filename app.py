@@ -17,6 +17,10 @@ from audit import log_action, get_audit_log
 from shares import add_share, remove_share, get_all_shares, get_shares_for_resource, check_expired_shares
 from trash import move_to_trash, restore_from_trash, permanent_delete, get_all_trash, cleanup_expired
 from notifications import add_notification, get_all_notifications, get_unread_count, mark_as_read, mark_all_read
+from share_links import (
+    create_share_link, get_share_link, deactivate_share_link,
+    get_active_share_links, increment_download_count, hash_password
+)
 
 load_dotenv()
 
@@ -795,6 +799,7 @@ def browse_folder(folder_path):
     file_count = sum(1 for i in items if not i['is_folder'])
     folder_count = sum(1 for i in items if i['is_folder'])
     recent_files = get_recent_files() if not folder_path else []
+    share_link_url = request.args.get('share_link', '')
     return render_template('index.html',
         items=items,
         pod_url=SOLID_POD_URL,
@@ -808,6 +813,7 @@ def browse_folder(folder_path):
         recent_files=recent_files,
         default_folders=DEFAULT_FOLDERS,
         current_sort=sort_by,
+        share_link_url=share_link_url,
     )
 
 
@@ -1154,7 +1160,79 @@ def share():
 def shares_overview():
     """Show overview of all shared resources"""
     all_shares = get_all_shares()
-    return render_template('shares.html', shares=all_shares)
+    active_links = get_active_share_links()
+    return render_template('shares.html', shares=all_shares, share_links=active_links)
+
+
+@app.route('/share-link/create', methods=['POST'])
+def create_share_link_route():
+    """Genereer een deellink voor een bestand"""
+    file_path = request.form.get('file_path', '')
+    file_name = request.form.get('file_name', '')
+    expires_days = int(request.form.get('expires_days', 7))
+    password = request.form.get('password', '').strip() or None
+
+    full_path = safe_pod_path(file_path)
+    if not full_path or not os.path.isfile(full_path):
+        flash('Bestand niet gevonden', 'error')
+        return redirect(request.referrer or url_for('index'))
+
+    link = create_share_link(file_path, file_name, expires_days, password)
+
+    share_url = url_for('view_shared_file', token=link['token'], _external=True)
+
+    log_action('share_link_created', {
+        'file': file_name,
+        'expires_days': expires_days,
+        'has_password': password is not None
+    })
+
+    folder_path = '/'.join(file_path.split('/')[:-1])
+    return redirect(url_for('browse', folder_path=folder_path) + '?share_link=' + share_url if folder_path else url_for('index') + '?share_link=' + share_url)
+
+
+@app.route('/share/<token>', methods=['GET', 'POST'])
+def view_shared_file(token):
+    """Toon een gedeeld bestand via deellink"""
+    link = get_share_link(token)
+
+    if not link:
+        return render_template('share_expired.html'), 404
+
+    if link['password_hash']:
+        if request.method == 'GET':
+            return render_template('share_password.html', token=token)
+
+        password = request.form.get('password', '')
+        if hash_password(password) != link['password_hash']:
+            flash('Onjuist wachtwoord', 'error')
+            return render_template('share_password.html', token=token)
+
+    full_path = safe_pod_path(link['file_path'])
+    if not full_path or not os.path.isfile(full_path):
+        return render_template('share_expired.html'), 404
+
+    increment_download_count(token)
+
+    import mimetypes
+    content_type, _ = mimetypes.guess_type(link['file_name'])
+
+    if content_type and (content_type.startswith('image/') or content_type == 'application/pdf'):
+        return send_file(full_path, mimetype=content_type)
+    else:
+        return send_file(full_path, as_attachment=True, download_name=link['file_name'])
+
+
+@app.route('/share-link/revoke', methods=['POST'])
+def revoke_share_link():
+    """Trek een deellink in"""
+    link_id = request.form.get('link_id', '')
+    if deactivate_share_link(link_id):
+        flash('Deellink ingetrokken', 'success')
+        log_action('share_link_revoked', {'link_id': link_id})
+    else:
+        flash('Deellink niet gevonden', 'error')
+    return redirect(url_for('shares_overview'))
 
 
 @app.route('/revoke', methods=['POST'])

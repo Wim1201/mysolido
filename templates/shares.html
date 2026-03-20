@@ -1,9 +1,45 @@
 {% extends "base.html" %}
-{% from "macros/icons.html" import icon_globe, icon_user, icon_eye, icon_edit, icon_hourglass, icon_append %}
+{% from "macros/icons.html" import icon_globe, icon_user, icon_eye, icon_edit, icon_hourglass, icon_append, icon_link, icon_copy, icon_lock, icon_download %}
 
 {% block title %}Gedeeld - MySolido{% endblock %}
 
 {% block content %}
+    {# === DEELLINKS SECTIE === #}
+    <div class="shares-card">
+        <h2>{{ icon_link() }} Deellinks</h2>
+        {% if share_links %}
+            <ul class="share-list">
+                {% for link in share_links %}
+                <li class="share-item">
+                    <div class="share-info">
+                        <div class="share-resource">{{ link.file_name }}</div>
+                        <div class="share-details">
+                            <span>{{ icon_link() }} <button type="button" class="btn-copy-inline" onclick="copyText('{{ url_for('view_shared_file', token=link.token, _external=True) }}', this)">Kopieer link</button></span>
+                            {% if link.password_hash %}
+                                <span>{{ icon_lock() }} Met wachtwoord</span>
+                            {% endif %}
+                            {% if link.expires_at %}
+                                <span>{{ icon_hourglass() }} Verloopt: {{ link.expires_at[:10] }}</span>
+                            {% else %}
+                                <span>{{ icon_hourglass() }} Geen verloopdatum</span>
+                            {% endif %}
+                            <span>{{ icon_download() }} {{ link.downloads }}x geopend</span>
+                            <span style="color: var(--color-text-muted);">{{ link.created_at[:10] }}</span>
+                        </div>
+                    </div>
+                    <form action="{{ url_for('revoke_share_link') }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze deellink wilt intrekken?')">
+                        <input type="hidden" name="link_id" value="{{ link.id }}">
+                        <button type="submit" class="btn btn-danger btn-sm">Intrekken</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="empty">Geen actieve deellinks.</p>
+        {% endif %}
+    </div>
+
+    {# === SOLID SHARES SECTIE === #}
     <div class="shares-card">
         <h2>Gedeelde bestanden en mappen</h2>
         {% if shares %}
@@ -45,7 +81,20 @@
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="empty">Je hebt nog niets gedeeld.</p>
+            <p class="empty">Je hebt nog niets gedeeld via Solid.</p>
         {% endif %}
     </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(function() {
+        var orig = btn.textContent;
+        btn.textContent = 'Gekopieerd!';
+        setTimeout(function() { btn.textContent = orig; }, 2000);
+    });
+}
+</script>
 {% endblock %}
