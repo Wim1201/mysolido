@@ -16,20 +16,26 @@
     {# === DASHBOARD VIEW === #}
 
     <!-- Stats -->
+    {% if stats %}
     <div class="stats-bar">
         <div class="stat-item">
-            <div class="stat-value">{{ folder_count }}</div>
-            <div class="stat-label">Mappen</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{{ file_count }}</div>
+            <div class="stat-value">{{ stats.total_files }}</div>
             <div class="stat-label">Bestanden</div>
         </div>
         <div class="stat-item">
-            <div class="stat-value">{{ items|length }}</div>
-            <div class="stat-label">Items in root</div>
+            <div class="stat-value">{{ stats.total_size_formatted }}</div>
+            <div class="stat-label">Opslag</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ stats.folder_count }}</div>
+            <div class="stat-label">Mappen</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ stats.active_share_links }}</div>
+            <div class="stat-label">Deellinks</div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Search bar -->
     <div class="search-bar">
@@ -78,17 +84,17 @@
     {% if recent_files %}
     <div class="files recent-section">
         <h2>Recente uploads</h2>
-        <ul class="file-list">
+        <div class="file-list">
             {% for entry in recent_files %}
-            <li class="file-item">
-                <div class="file-name">
-                    <span class="icon">{{ icon_file() }}</span>
-                    <span>{{ entry.details.file }} <small style="color: var(--color-text-muted);">({{ entry.details.folder }})</small></span>
+            <div class="file-item">
+                <div class="file-info-row">
+                    <span class="file-icon">{{ icon_file() }}</span>
+                    <span class="file-name" style="cursor: default;">{{ entry.details.file }} <small style="color: var(--color-text-muted);">({{ entry.details.folder }})</small></span>
+                    <span class="file-meta">{{ entry.timestamp[:10] }}</span>
                 </div>
-                <span style="font-size: 0.75rem; color: var(--color-text-muted);">{{ entry.timestamp[:10] }}</span>
-            </li>
+            </div>
             {% endfor %}
-        </ul>
+        </div>
     </div>
     {% endif %}
 
@@ -107,21 +113,18 @@
                 </select>
             </form>
         </div>
-        <ul class="file-list">
+        <div class="file-list">
             {% for item in root_files %}
-            <li class="file-item">
-                <div class="file-name">
-                    <span class="icon">{{ icon_file() }}</span>
-                    <a href="{{ url_for('view_file', file_path=item.name) }}">{{ item.name }}</a>
-                </div>
-                <div class="file-meta">
-                    <span class="file-size">{{ item.size }}</span>
-                    <span class="file-date">{{ item.modified }}</span>
+            <div class="file-item">
+                <div class="file-info-row">
+                    <span class="file-icon">{{ icon_file() }}</span>
+                    <a href="{{ url_for('view_file', file_path=item.name) }}" class="file-name">{{ item.name }}</a>
+                    <span class="file-meta">{{ item.size }}&nbsp;&nbsp;{{ item.modified }}</span>
                 </div>
                 <div class="file-actions">
-                    <a href="{{ url_for('download_file', file_path=item.name) }}" class="btn btn-download">{{ icon_download() }} Download</a>
+                    <a href="{{ url_for('download_file', file_path=item.name) }}" class="btn btn-compact btn-download">{{ icon_download() }} Download</a>
                     <div class="move-wrapper">
-                        <button type="button" class="btn btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaatsen</button>
+                        <button type="button" class="btn btn-compact btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaats</button>
                         <div class="move-dropdown">
                             <form action="{{ url_for('move') }}" method="post">
                                 <input type="hidden" name="resource_url" value="{{ item.url }}">
@@ -139,37 +142,56 @@
                             </form>
                         </div>
                     </div>
-                    <div class="sharelink-wrapper">
-                        <button type="button" class="btn btn-link" onclick="toggleShareLink(this)">{{ icon_link() }} Deel via link</button>
-                        <div class="sharelink-dropdown">
-                            <form action="{{ url_for('create_share_link_route') }}" method="post">
-                                <input type="hidden" name="file_path" value="{{ item.name }}">
-                                <input type="hidden" name="file_name" value="{{ item.name }}">
-                                <label>Verloopdatum</label>
-                                <select name="expires_days">
-                                    <option value="1">1 dag</option>
-                                    <option value="7" selected>7 dagen</option>
-                                    <option value="30">30 dagen</option>
-                                    <option value="0">Geen verloopdatum</option>
+                    <div class="share-wrapper">
+                        <button type="button" class="btn btn-compact btn-share" onclick="toggleShare(this)">{{ icon_share() }} Delen</button>
+                        <div class="share-dropdown">
+                            <form action="{{ url_for('share') }}" method="post">
+                                <input type="hidden" name="resource_url" value="{{ item.url }}">
+                                <input type="hidden" name="resource_path" value="{{ item.name }}">
+                                <input type="hidden" name="folder_path" value="">
+                                <label>Rechtenniveau</label>
+                                <select name="access_level" onchange="toggleWebidField(this)">
+                                    <option value="read">{{ icon_eye() }} Alleen lezen</option>
+                                    <option value="readwrite">{{ icon_edit() }} Lezen en schrijven</option>
+                                    <option value="append">{{ icon_append() }} Alleen toevoegen</option>
+                                    <option value="public">{{ icon_globe() }} Openbaar (iedereen)</option>
                                 </select>
-                                <label>Wachtwoord (optioneel)</label>
-                                <input type="text" name="password" placeholder="Laat leeg voor geen wachtwoord">
-                                <div class="sharelink-actions">
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShareLink(this)">Annuleren</button>
-                                    <button type="submit" class="btn btn-sm btn-sharelink-create">Link aanmaken</button>
+                                <label class="webid-label">WebID</label>
+                                <input type="url" name="webid" class="webid-input" placeholder="http://example.com/jan/profile/card#me">
+                                <label>Verloopt op (optioneel)</label>
+                                <input type="date" name="expires">
+                                <div class="share-actions">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">Annuleren</button>
+                                    <button type="submit" class="btn btn-sm" style="background: var(--color-purple);">Delen</button>
                                 </div>
                             </form>
                         </div>
                     </div>
+                    <button type="button" class="btn btn-compact btn-link" onclick="toggleShareLinkForm(this)">{{ icon_link() }} Link</button>
                     <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
                         <input type="hidden" name="resource_url" value="{{ item.url }}">
                         <input type="hidden" name="folder_path" value="">
-                        <button type="submit" class="btn btn-danger btn-sm">{{ icon_delete() }}</button>
+                        <button type="submit" class="btn btn-compact btn-danger">{{ icon_delete() }}</button>
                     </form>
                 </div>
-            </li>
+                <div class="share-link-form" style="display:none;">
+                    <form action="{{ url_for('create_share_link_route') }}" method="post" class="share-link-inline">
+                        <input type="hidden" name="file_path" value="{{ item.name }}">
+                        <input type="hidden" name="file_name" value="{{ item.name }}">
+                        <select name="expires_days">
+                            <option value="1">1 dag</option>
+                            <option value="7" selected>7 dagen</option>
+                            <option value="30">30 dagen</option>
+                            <option value="0">Geen verloopdatum</option>
+                        </select>
+                        <input type="text" name="password" placeholder="Wachtwoord (optioneel)">
+                        <button type="submit" class="btn btn-compact btn-sharelink-create">Link aanmaken</button>
+                        <button type="button" class="btn btn-compact btn-secondary" onclick="toggleShareLinkForm(this)">Annuleren</button>
+                    </form>
+                </div>
+            </div>
             {% endfor %}
-        </ul>
+        </div>
     </div>
     {% endif %}
     {% endif %}
@@ -241,13 +263,12 @@
             </form>
         </div>
         {% if items %}
-            <ul class="file-list">
+            <div class="file-list">
                 {% for item in items %}
-                {# Use item.url ending with / as authoritative folder check #}
                 {% set is_dir = item.url.endswith('/') %}
-                <li class="file-item">
-                    <div class="file-name">
-                        <span class="icon">
+                <div class="file-item">
+                    <div class="file-info-row">
+                        <span class="file-icon">
                             {% if is_dir and item.svg %}
                                 {{ item.svg | safe }}
                             {% elif is_dir %}
@@ -257,22 +278,19 @@
                             {% endif %}
                         </span>
                         {% if is_dir %}
-                            <a href="{{ url_for('browse', folder_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="folder-link">{{ item.name }}</a>
+                            <a href="{{ url_for('browse', folder_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="file-name folder-link">{{ item.name }}</a>
                         {% else %}
-                            <a href="{{ url_for('view_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}">{{ item.name }}</a>
+                            <a href="{{ url_for('view_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="file-name">{{ item.name }}</a>
+                        {% endif %}
+                        {% if not is_dir %}
+                        <span class="file-meta">{{ item.size }}&nbsp;&nbsp;{{ item.modified }}</span>
                         {% endif %}
                     </div>
-                    {% if not is_dir %}
-                    <div class="file-meta">
-                        <span class="file-size">{{ item.size }}</span>
-                        <span class="file-date">{{ item.modified }}</span>
-                    </div>
-                    {% endif %}
                     <div class="file-actions">
                         {% if not is_dir %}
-                        <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-download">{{ icon_download() }} Download</a>
+                        <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-compact btn-download">{{ icon_download() }} Download</a>
                         <div class="move-wrapper">
-                            <button type="button" class="btn btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaatsen</button>
+                            <button type="button" class="btn btn-compact btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaats</button>
                             <div class="move-dropdown">
                                 <form action="{{ url_for('move') }}" method="post">
                                     <input type="hidden" name="resource_url" value="{{ item.url }}">
@@ -292,7 +310,7 @@
                         </div>
                         {% endif %}
                         <div class="share-wrapper">
-                            <button type="button" class="btn btn-share" onclick="toggleShare(this)">{{ icon_share() }} Delen</button>
+                            <button type="button" class="btn btn-compact btn-share" onclick="toggleShare(this)">{{ icon_share() }} Delen</button>
                             <div class="share-dropdown">
                                 <form action="{{ url_for('share') }}" method="post">
                                     <input type="hidden" name="resource_url" value="{{ item.url }}">
@@ -317,38 +335,34 @@
                             </div>
                         </div>
                         {% if not is_dir %}
-                        <div class="sharelink-wrapper">
-                            <button type="button" class="btn btn-link" onclick="toggleShareLink(this)">{{ icon_link() }} Deel via link</button>
-                            <div class="sharelink-dropdown">
-                                <form action="{{ url_for('create_share_link_route') }}" method="post">
-                                    <input type="hidden" name="file_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
-                                    <input type="hidden" name="file_name" value="{{ item.name }}">
-                                    <label>Verloopdatum</label>
-                                    <select name="expires_days">
-                                        <option value="1">1 dag</option>
-                                        <option value="7" selected>7 dagen</option>
-                                        <option value="30">30 dagen</option>
-                                        <option value="0">Geen verloopdatum</option>
-                                    </select>
-                                    <label>Wachtwoord (optioneel)</label>
-                                    <input type="text" name="password" placeholder="Laat leeg voor geen wachtwoord">
-                                    <div class="sharelink-actions">
-                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShareLink(this)">Annuleren</button>
-                                        <button type="submit" class="btn btn-sm btn-sharelink-create">Link aanmaken</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
+                        <button type="button" class="btn btn-compact btn-link" onclick="toggleShareLinkForm(this)">{{ icon_link() }} Link</button>
                         {% endif %}
                         <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
                             <input type="hidden" name="resource_url" value="{{ item.url }}">
                             <input type="hidden" name="folder_path" value="{{ folder_path }}">
-                            <button type="submit" class="btn btn-danger btn-sm">{{ icon_delete() }}</button>
+                            <button type="submit" class="btn btn-compact btn-danger">{{ icon_delete() }}</button>
                         </form>
                     </div>
-                </li>
+                    {% if not is_dir %}
+                    <div class="share-link-form" style="display:none;">
+                        <form action="{{ url_for('create_share_link_route') }}" method="post" class="share-link-inline">
+                            <input type="hidden" name="file_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
+                            <input type="hidden" name="file_name" value="{{ item.name }}">
+                            <select name="expires_days">
+                                <option value="1">1 dag</option>
+                                <option value="7" selected>7 dagen</option>
+                                <option value="30">30 dagen</option>
+                                <option value="0">Geen verloopdatum</option>
+                            </select>
+                            <input type="text" name="password" placeholder="Wachtwoord (optioneel)">
+                            <button type="submit" class="btn btn-compact btn-sharelink-create">Link aanmaken</button>
+                            <button type="button" class="btn btn-compact btn-secondary" onclick="toggleShareLinkForm(this)">Annuleren</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
                 {% endfor %}
-            </ul>
+            </div>
         {% else %}
             <div class="empty-state">
                 <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
