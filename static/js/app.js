@@ -46,21 +46,23 @@ function toggleWebidField(select) {
     }
 }
 
-function toggleShareLink(btn) {
-    var dropdown = btn.closest('.sharelink-wrapper').querySelector('.sharelink-dropdown');
-    closeAllDropdowns(dropdown);
-    dropdown.classList.toggle('show');
+function toggleShareLinkForm(btn) {
+    var fileItem = btn.closest('.file-item');
+    var form = fileItem.querySelector('.share-link-form');
+    if (form) {
+        form.style.display = form.style.display === 'none' ? '' : 'none';
+    }
 }
 
 function closeAllDropdowns(except) {
-    document.querySelectorAll('.move-dropdown.show, .share-dropdown.show, .sharelink-dropdown.show').forEach(function(d) {
+    document.querySelectorAll('.move-dropdown.show, .share-dropdown.show').forEach(function(d) {
         if (d !== except) d.classList.remove('show');
     });
 }
 
 // Close dropdowns when clicking outside
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.move-wrapper') && !e.target.closest('.share-wrapper') && !e.target.closest('.sharelink-wrapper')) {
+    if (!e.target.closest('.move-wrapper') && !e.target.closest('.share-wrapper')) {
         closeAllDropdowns();
     }
 });
