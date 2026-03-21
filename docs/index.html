@@ -845,6 +845,145 @@ footer {
   color: var(--slate-500);
   font-size: 0.78rem;
 }
+
+/* ════════════════════════════════════
+   BRIDGE
+   ════════════════════════════════════ */
+.bridge {
+  background: var(--white);
+}
+
+.bridge-card {
+  position: relative;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 48px 40px;
+  background: var(--green-50);
+  border: 2px solid var(--green-200);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.bridge-badge {
+  position: absolute;
+  top: -12px;
+  right: 24px;
+  padding: 4px 16px;
+  background: var(--green-600);
+  color: var(--white);
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 100px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.bridge-sub {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.bridge-desc {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto 36px;
+}
+
+.bridge-diagram {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.bridge-node {
+  flex: 0 1 200px;
+  padding: 24px 20px;
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+
+.bridge-node-icon {
+  width: 44px; height: 44px;
+  margin: 0 auto 12px;
+  background: var(--green-100);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bridge-node-icon svg { width: 22px; height: 22px; color: var(--green-600); }
+
+.bridge-node strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--slate-800);
+  margin-bottom: 2px;
+}
+
+.bridge-node > span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.bridge-node ul {
+  list-style: none;
+  text-align: left;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.bridge-node ul li {
+  padding: 3px 0;
+}
+
+.bridge-master { border-left: 3px solid var(--green-500); }
+.bridge-remote { border-left: 3px solid var(--green-300); }
+
+.bridge-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 40px;
+  color: var(--green-400);
+}
+
+.bridge-arrow svg { width: 48px; height: 24px; }
+
+.bridge-arrow span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--green-600);
+  margin-top: 4px;
+}
+
+.bridge-price {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  padding: 12px 20px;
+  background: var(--white);
+  border: 1px solid var(--green-200);
+  border-radius: 8px;
+  display: inline-block;
+}
+
+@media (max-width: 639px) {
+  .bridge-card { padding: 32px 20px; }
+  .bridge-diagram { flex-direction: column; align-items: center; }
+  .bridge-arrow { transform: rotate(90deg); padding-top: 0; }
+  .bridge-node { flex: 0 1 auto; width: 100%; max-width: 260px; }
+}
 </style>
 </head>
 <body>
@@ -891,6 +1030,24 @@ footer {
                 <span>Dashboard</span>
                 <span>Zoeken</span>
                 <span>Profiel</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:10px;">
+              <div style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 8px;text-align:center;">
+                <div style="font-size:0.85rem;font-weight:700;color:var(--green-300);">14</div>
+                <div style="font-size:0.48rem;color:var(--slate-400);">Bestanden</div>
+              </div>
+              <div style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 8px;text-align:center;">
+                <div style="font-size:0.85rem;font-weight:700;color:var(--green-300);">2.3 MB</div>
+                <div style="font-size:0.48rem;color:var(--slate-400);">Opslag</div>
+              </div>
+              <div style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 8px;text-align:center;">
+                <div style="font-size:0.85rem;font-weight:700;color:var(--green-300);">20</div>
+                <div style="font-size:0.48rem;color:var(--slate-400);">Mappen</div>
+              </div>
+              <div style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 8px;text-align:center;">
+                <div style="font-size:0.85rem;font-weight:700;color:var(--green-300);">2</div>
+                <div style="font-size:0.48rem;color:var(--slate-400);">Deellinks</div>
               </div>
             </div>
             <div style="font-size:0.72rem;font-weight:700;color:#1a6b3c;margin-bottom:8px;">Mappen</div>
@@ -1072,6 +1229,22 @@ footer {
 
       <div class="feature-card">
         <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <h3>Deellinks</h3>
+        <p>Deel bestanden via een beveiligde link. Ontvangers hoeven geen Solid te hebben — alleen een browser. Optioneel wachtwoord en verloopdatum.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h3>Dashboard</h3>
+        <p>Overzicht van je kluis: aantal bestanden, opslaggrootte, mappen en actieve deellinks in één oogopslag.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
         </div>
         <h3>Dark mode</h3>
@@ -1102,6 +1275,58 @@ footer {
         <h3>AI-assistent</h3>
         <p>Je eigen AI die jóuw data doorzoekt — lokaal, zonder cloud.</p>
         <span class="feature-badge">Binnenkort</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ BRIDGE ════════════════ -->
+<section class="bridge" id="bridge">
+  <div class="container">
+    <div class="bridge-card">
+      <span class="bridge-badge">Binnenkort</span>
+      <div class="section-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        Optionele dienst
+      </div>
+      <h2>MySolido Bridge</h2>
+      <p class="bridge-sub">Je kluis, altijd bereikbaar — ook als je pc uit staat.</p>
+
+      <p class="bridge-desc">De Bridge is een optionele dienst die je kluis spiegelt naar een Nederlandse server. Je lokale pc blijft de master. De Bridge is een read-only kopie — jij houdt de controle.</p>
+
+      <div class="bridge-diagram">
+        <div class="bridge-node bridge-master">
+          <div class="bridge-node-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+          </div>
+          <strong>Jouw PC</strong>
+          <span>(master)</span>
+          <ul>
+            <li>Uploaden</li>
+            <li>Ordenen</li>
+            <li>Delen</li>
+          </ul>
+        </div>
+        <div class="bridge-arrow">
+          <svg viewBox="0 0 48 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="12" x2="40" y2="12"/><polyline points="34 6 40 12 34 18"/></svg>
+          <span>sync</span>
+        </div>
+        <div class="bridge-node bridge-remote">
+          <div class="bridge-node-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          </div>
+          <strong>Bridge</strong>
+          <span>(altijd bereikbaar)</span>
+          <ul>
+            <li>&#128241; Telefoon toegang</li>
+            <li>&#128279; Deellinks via internet</li>
+            <li>&#128190; Automatische backup</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="bridge-price">
+        Verwachte prijs: <strong>&euro;3-5 per maand</strong> &middot; Nederlandse server &middot; Geen Big Tech
       </div>
     </div>
   </div>
@@ -1218,6 +1443,12 @@ footer {
             <td><span class="cross-red">Nee</span></td>
             <td><span class="cross-red">Nee</span></td>
             <td><span class="check-green">Ja</span></td>
+          </tr>
+          <tr>
+            <td>Delen zonder account</td>
+            <td><span class="cross-red">Nee</span></td>
+            <td><span class="cross-red">Nee</span></td>
+            <td><span class="check-green">Ja (deellinks)</span></td>
           </tr>
         </tbody>
       </table>
