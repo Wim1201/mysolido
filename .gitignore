@@ -46,3 +46,8 @@ shares.json
 MySolido_Begrippenlijst.pdf
 claude-code-prompt-*.md
 tweakers-post-final.txt
+
+# Installer
+installer-output/
+mysolido.ico
+generate_ico.py
