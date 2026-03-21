@@ -14,7 +14,7 @@
                     <div class="share-info">
                         <div class="share-resource">{{ link.file_name }}</div>
                         <div class="share-details">
-                            <span>{{ icon_link() }} <button type="button" class="btn-copy-inline" onclick="copyText('{{ url_for('view_shared_file', token=link.token, _external=True) }}', this)">Kopieer link</button></span>
+                            <span>{{ icon_link() }} <button type="button" class="btn-copy-inline" onclick="copyText('{% if share_base_url %}{{ share_base_url }}/share/{{ link.token }}{% else %}{{ url_for('view_shared_file', token=link.token, _external=True) }}{% endif %}', this)">Kopieer link</button></span>
                             {% if link.password_hash %}
                                 <span>{{ icon_lock() }} Met wachtwoord</span>
                             {% endif %}
@@ -27,10 +27,12 @@
                             <span style="color: var(--color-text-muted);">{{ link.created_at[:10] }}</span>
                         </div>
                     </div>
+                    {% if not bridge_mode %}
                     <form action="{{ url_for('revoke_share_link') }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze deellink wilt intrekken?')">
                         <input type="hidden" name="link_id" value="{{ link.id }}">
                         <button type="submit" class="btn btn-danger btn-sm">Intrekken</button>
                     </form>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>
@@ -71,12 +73,14 @@
                             <span style="color: var(--color-text-muted);">{{ share.created[:10] }}</span>
                         </div>
                     </div>
+                    {% if not bridge_mode %}
                     <form action="{{ url_for('revoke') }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze toegang wilt intrekken?')">
                         <input type="hidden" name="resource_url" value="{{ share.resource_url }}">
                         <input type="hidden" name="resource_path" value="{{ share.resource_path }}">
                         <input type="hidden" name="webid" value="{{ share.webid }}">
                         <button type="submit" class="btn btn-danger btn-sm">Intrekken</button>
                     </form>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>

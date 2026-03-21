@@ -26,7 +26,7 @@
                 </a>
             </div>
         </div>
-        <p class="header-subtitle">Jouw persoonlijke datakluis</p>
+        <p class="header-subtitle">{% if bridge_mode %}Bridge (alleen-lezen){% else %}Jouw persoonlijke datakluis{% endif %}</p>
         <nav class="header-nav">
             <a href="{{ url_for('index') }}" class="{{ 'active' if active_nav == 'kluis' }}">{{ icon_vault() }} Kluis</a>
             <a href="{{ url_for('shares_overview') }}" class="{{ 'active' if active_nav == 'gedeeld' }}">{{ icon_share() }} Gedeeld</a>
@@ -35,6 +35,12 @@
             <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }} Profiel</a>
         </nav>
     </header>
+
+    {% if bridge_mode %}
+    <div class="bridge-banner">
+        &#127760; Je bekijkt deze kluis via de Bridge (alleen-lezen). Uploaden en bewerken doe je op je lokale MySolido.
+    </div>
+    {% endif %}
 
     <main class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}

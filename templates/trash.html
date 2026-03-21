@@ -22,6 +22,7 @@
                             &middot; Verwijderd: {{ item.deleted_at[:10] }}
                         </div>
                     </div>
+                    {% if not bridge_mode %}
                     <div class="trash-actions">
                         <form action="{{ url_for('trash_restore') }}" method="post">
                             <input type="hidden" name="trash_id" value="{{ item.trash_id }}">
@@ -32,6 +33,7 @@
                             <button type="submit" class="btn btn-danger btn-sm" title="Definitief verwijderen">{{ icon_delete() }}</button>
                         </form>
                     </div>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>

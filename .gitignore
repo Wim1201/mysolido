@@ -43,3 +43,6 @@ shares.json
 
 # Claude Code
 .claude/
+MySolido_Begrippenlijst.pdf
+claude-code-prompt-*.md
+tweakers-post-final.txt
