@@ -245,7 +245,7 @@ def get_pod_stats_filesystem():
     }
 
 
-def generate_password(length=32):
+def generate_password(length=16):
     """Genereer een veilig wachtwoord"""
     chars = string.ascii_letters + string.digits
     return ''.join(secrets.choice(chars) for _ in range(length))
@@ -254,19 +254,20 @@ def generate_password(length=32):
 def auto_setup():
     """Automatische setup bij eerste start"""
     global CLIENT_ID, CLIENT_SECRET, CSS_BASE_URL, SOLID_POD_URL, WEBID, OWNER_WEBID
+    import json
 
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 
-    # Check of .env al bestaat met geldige credentials
+    # Stap 0: Check of setup nodig is
     if os.path.exists(env_path):
         load_dotenv(env_path, override=True)
         if os.getenv('CLIENT_ID') and os.getenv('CLIENT_SECRET'):
             print("  [OK] Bestaande configuratie gevonden")
             return True
 
-    print("  Eerste keer opstarten \u2014 account wordt aangemaakt...")
+    print("  Eerste keer opstarten — account wordt aangemaakt...")
 
-    css_base = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
+    css_base = 'http://127.0.0.1:3000'
 
     try:
         # Stap 1: Wacht tot CSS draait
@@ -281,10 +282,11 @@ def auto_setup():
                     break
             except requests.ConnectionError:
                 pass
-            time.sleep(2)
+            if attempt < 29:
+                time.sleep(2)
 
         if not css_ready:
-            print("  [FOUT] Community Solid Server is niet bereikbaar op poort 3000")
+            print("  [FOUT] Community Solid Server is niet bereikbaar op http://127.0.0.1:3000")
             return False
 
         initial_controls = r.json().get('controls', {})
@@ -293,6 +295,7 @@ def auto_setup():
         create_url = initial_controls.get('account', {}).get('create')
         if not create_url:
             print("  [FOUT] Geen account-create URL gevonden in CSS API")
+            print(f"  [DEBUG] Controls: {json.dumps(initial_controls, indent=2)}")
             return False
 
         r = requests.post(create_url,
@@ -300,13 +303,17 @@ def auto_setup():
             json={})
 
         if r.status_code not in [200, 201]:
-            print(f"  [FOUT] Account aanmaken mislukt: {r.status_code}")
+            print(f"  [FOUT] Account aanmaken mislukt")
+            print(f"  [DEBUG] URL: {create_url}")
+            print(f"  [DEBUG] Status: {r.status_code}")
+            print(f"  [DEBUG] Response: {r.text[:500]}")
             return False
 
         data = r.json()
         authorization = data.get('authorization')
         if not authorization:
             print("  [FOUT] Geen authorization token ontvangen")
+            print(f"  [DEBUG] Response: {r.text[:500]}")
             return False
 
         # Stap 3: Haal volledige controls op met authorization token
@@ -317,17 +324,22 @@ def auto_setup():
             })
 
         if r.status_code != 200:
-            print(f"  [FOUT] Account controls ophalen mislukt: {r.status_code}")
+            print(f"  [FOUT] Account controls ophalen mislukt")
+            print(f"  [DEBUG] Status: {r.status_code}")
+            print(f"  [DEBUG] Response: {r.text[:500]}")
             return False
 
         full_controls = r.json().get('controls', {})
+        print(f"  [DEBUG] Controls: {json.dumps(full_controls, indent=2)}")
 
         # Stap 4: Registreer email/wachtwoord
-        # In CSS v7.1.8 heet dit 'password.create', niet 'password.register'
-        password_create_url = full_controls.get('password', {}).get('create')
+        password_create_url = (
+            full_controls.get('password', {}).get('create')
+            or full_controls.get('password', {}).get('register')
+            or full_controls.get('html', {}).get('password', {}).get('register')
+        )
         if not password_create_url:
             print("  [FOUT] Geen password-create URL gevonden in CSS API")
-            print(f"  [DEBUG] Beschikbare password controls: {list(full_controls.get('password', {}).keys())}")
             return False
 
         email = 'user@mysolido.local'
@@ -344,7 +356,10 @@ def auto_setup():
             })
 
         if r.status_code not in [200, 201]:
-            print(f"  [FOUT] Wachtwoord registreren mislukt: {r.status_code}")
+            print(f"  [FOUT] Wachtwoord registreren mislukt")
+            print(f"  [DEBUG] URL: {password_create_url}")
+            print(f"  [DEBUG] Status: {r.status_code}")
+            print(f"  [DEBUG] Response: {r.text[:500]}")
             return False
 
         # Stap 5: Maak pod aan
@@ -363,13 +378,16 @@ def auto_setup():
             json={'name': pod_name})
 
         if r.status_code not in [200, 201]:
-            print(f"  [FOUT] Pod aanmaken mislukt: {r.status_code}")
+            print(f"  [FOUT] Pod aanmaken mislukt")
+            print(f"  [DEBUG] URL: {pod_create_url}")
+            print(f"  [DEBUG] Status: {r.status_code}")
+            print(f"  [DEBUG] Response: {r.text[:500]}")
             return False
 
         pod_url = f'{css_base}/{pod_name}/'
         webid = f'{pod_url}profile/card#me'
 
-        # Stap 6: Genereer client credentials
+        # Stap 6: Maak client credentials aan
         credentials_url = full_controls.get('account', {}).get('clientCredentials')
         if not credentials_url:
             print("  [FOUT] Geen clientCredentials URL gevonden in CSS API")
@@ -381,12 +399,15 @@ def auto_setup():
                 'Authorization': f'CSS-Account-Token {authorization}'
             },
             json={
-                'name': 'MySolido App',
+                'name': 'mysolido-app',
                 'webId': webid
             })
 
         if r.status_code not in [200, 201]:
-            print(f"  [FOUT] Client credentials aanmaken mislukt: {r.status_code}")
+            print(f"  [FOUT] Client credentials aanmaken mislukt")
+            print(f"  [DEBUG] URL: {credentials_url}")
+            print(f"  [DEBUG] Status: {r.status_code}")
+            print(f"  [DEBUG] Response: {r.text[:500]}")
             return False
 
         cred_data = r.json()
@@ -395,39 +416,39 @@ def auto_setup():
 
         if not client_id or not client_secret:
             print("  [FOUT] Geen client credentials ontvangen")
+            print(f"  [DEBUG] Response: {json.dumps(cred_data, indent=2)}")
             return False
 
         # Stap 7: Schrijf .env
         with open(env_path, 'w') as f:
-            f.write(f'CLIENT_ID={client_id}\n')
-            f.write(f'CLIENT_SECRET={client_secret}\n')
             f.write(f'CSS_BASE_URL={css_base}\n')
             f.write(f'SOLID_POD_URL={pod_url}\n')
             f.write(f'WEBID={webid}\n')
             f.write(f'CSS_EMAIL={email}\n')
             f.write(f'CSS_PASSWORD={password}\n')
+            f.write(f'CLIENT_ID={client_id}\n')
+            f.write(f'CLIENT_SECRET={client_secret}\n')
+            f.write('SHARE_BASE_URL=http://localhost:5000\n')
 
-        # Herlaad .env en update globale variabelen
+        # Stap 8: Herlaad .env en update globale variabelen
         load_dotenv(env_path, override=True)
         CLIENT_ID = os.getenv('CLIENT_ID')
         CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-        CSS_BASE_URL = os.getenv('CSS_BASE_URL', 'http://127.0.0.1:3000')
-        SOLID_POD_URL = os.getenv('SOLID_POD_URL', f'{css_base}/{pod_name}/')
-        WEBID = os.getenv('WEBID', f'{css_base}/{pod_name}/profile/card#me')
+        CSS_BASE_URL = os.getenv('CSS_BASE_URL', css_base)
+        SOLID_POD_URL = os.getenv('SOLID_POD_URL', pod_url)
+        WEBID = os.getenv('WEBID', webid)
         OWNER_WEBID = WEBID
 
-        print(f"  [DEBUG] CLIENT_ID geladen: {CLIENT_ID[:20]}..." if CLIENT_ID else "  [WARN] CLIENT_ID is None!")
-        print(f"  [DEBUG] SOLID_POD_URL: {SOLID_POD_URL}")
-
-        print(f"  [OK] Account aangemaakt")
-        print(f"  [OK] Pod: {pod_url}")
-        print(f"  [OK] WebID: {webid}")
+        print(f"  [OK] Account aangemaakt: {email}")
+        print(f"  [OK] Pod aangemaakt: /{pod_name}/")
         print(f"  [OK] Credentials opgeslagen in .env")
 
         return True
 
     except Exception as e:
         print(f"  [FOUT] Setup mislukt: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 # Viewable file types for inline display
