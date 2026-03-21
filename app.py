@@ -1,6 +1,7 @@
 import re
 import os
 import io
+import sys
 import time
 import secrets
 import string
@@ -23,6 +24,8 @@ from share_links import (
 )
 
 load_dotenv()
+
+BRIDGE_MODE = '--bridge' in sys.argv
 
 app = Flask(__name__)
 app.secret_key = 'mysolido-dev-key-2026'
@@ -209,23 +212,36 @@ def get_pod_stats_filesystem():
     total_files = 0
     total_size = 0
     total_folders = 0
+    latest_modified = None
 
     if not os.path.isdir(pod_path):
-        return {'file_count': 0, 'folder_count': 0, 'total_size': 0}
+        return {'file_count': 0, 'folder_count': 0, 'total_size': 0,
+                'total_size_formatted': '0 B', 'latest_modified': None,
+                'active_share_links': 0}
 
     for root, dirs, files in os.walk(pod_path):
-        # Skip verborgen mappen
-        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        # Skip verborgen mappen en systeemmappen
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d != '_trash']
         total_folders += len(dirs)
         for f in files:
             if not f.startswith('.') and not f.endswith('.acl') and not f.endswith('.meta'):
                 total_files += 1
-                total_size += os.path.getsize(os.path.join(root, f))
+                filepath = os.path.join(root, f)
+                size = os.path.getsize(filepath)
+                total_size += size
+                mtime = os.path.getmtime(filepath)
+                if latest_modified is None or mtime > latest_modified:
+                    latest_modified = mtime
+
+    active_links = len(get_active_share_links())
 
     return {
         'file_count': total_files,
         'folder_count': total_folders,
-        'total_size': total_size
+        'total_size': total_size,
+        'total_size_formatted': format_size(total_size),
+        'latest_modified': datetime.fromtimestamp(latest_modified).strftime('%d %b %Y') if latest_modified else None,
+        'active_share_links': active_links
     }
 
 
@@ -526,6 +542,28 @@ FOLDER_ICONS = {
 }
 
 
+@app.before_request
+def check_bridge_mode():
+    if not BRIDGE_MODE:
+        return
+
+    blocked_endpoints = [
+        'upload',
+        'delete',
+        'move',
+        'create_folder_route',
+        'share',
+        'create_share_link_route',
+        'revoke_share_link',
+        'init_folders',
+        'init_folders_welcome',
+    ]
+
+    if request.endpoint in blocked_endpoints:
+        flash('Deze actie is niet beschikbaar via de Bridge. Gebruik je lokale MySolido.', 'error')
+        return redirect(request.referrer or url_for('index'))
+
+
 @app.context_processor
 def inject_globals():
     """Inject global template variables"""
@@ -545,6 +583,7 @@ def inject_globals():
         'folder_icons': FOLDER_ICONS,
         'unread_count': get_unread_count(),
         'active_nav': active,
+        'bridge_mode': BRIDGE_MODE,
     }
 
 
@@ -800,6 +839,7 @@ def browse_folder(folder_path):
     folder_count = sum(1 for i in items if i['is_folder'])
     recent_files = get_recent_files() if not folder_path else []
     share_link_url = request.args.get('share_link', '')
+    stats = get_pod_stats_filesystem() if not folder_path else None
     return render_template('index.html',
         items=items,
         pod_url=SOLID_POD_URL,
@@ -814,6 +854,7 @@ def browse_folder(folder_path):
         default_folders=DEFAULT_FOLDERS,
         current_sort=sort_by,
         share_link_url=share_link_url,
+        stats=stats,
     )
 
 
@@ -1161,7 +1202,8 @@ def shares_overview():
     """Show overview of all shared resources"""
     all_shares = get_all_shares()
     active_links = get_active_share_links()
-    return render_template('shares.html', shares=all_shares, share_links=active_links)
+    share_base_url = os.getenv('SHARE_BASE_URL', '').strip().rstrip('/')
+    return render_template('shares.html', shares=all_shares, share_links=active_links, share_base_url=share_base_url)
 
 
 @app.route('/share-link/create', methods=['POST'])
@@ -1179,7 +1221,11 @@ def create_share_link_route():
 
     link = create_share_link(file_path, file_name, expires_days, password)
 
-    share_url = url_for('view_shared_file', token=link['token'], _external=True)
+    base_url = os.getenv('SHARE_BASE_URL', '').strip().rstrip('/')
+    if base_url:
+        share_url = f"{base_url}/share/{link['token']}"
+    else:
+        share_url = url_for('view_shared_file', token=link['token'], _external=True)
 
     log_action('share_link_created', {
         'file': file_name,
@@ -1528,19 +1574,29 @@ def redirect_to_folder(folder_path):
 
 if __name__ == '__main__':
     print()
-    print("  === MySolido ===")
 
-    if not auto_setup():
+    if BRIDGE_MODE:
+        print("  === MySolido Bridge ===")
+        print("  [BRIDGE] Read-only modus")
+        print(f"  Pod: {SOLID_POD_URL}")
+        print(f"  Start op http://127.0.0.1:5000")
+        print("  ========================")
         print()
-        print("  Setup mislukt. Zorg dat Community Solid Server draait op poort 3000:")
-        print("  npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json")
+        app.run(port=5000, debug=True)
+    else:
+        print("  === MySolido ===")
+
+        if not auto_setup():
+            print()
+            print("  Setup mislukt. Zorg dat Community Solid Server draait op poort 3000:")
+            print("  npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json")
+            print()
+            exit(1)
+
         print()
-        exit(1)
+        print(f"  Pod: {os.getenv('SOLID_POD_URL')}")
+        print(f"  Start op http://localhost:5000")
+        print("  ================")
+        print()
 
-    print()
-    print(f"  Pod: {os.getenv('SOLID_POD_URL')}")
-    print(f"  Start op http://localhost:5000")
-    print("  ================")
-    print()
-
-    app.run(port=5000, debug=True)
+        app.run(port=5000, debug=True)

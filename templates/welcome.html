@@ -36,6 +36,10 @@
         </div>
     </div>
 
+    {% if not bridge_mode %}
     <a href="{{ url_for('init_folders_welcome') }}" class="btn btn-welcome" onclick="showSpinner()">Kluis inrichten</a>
+    {% else %}
+    <p style="text-align: center; color: var(--color-text-muted);">De kluis is nog niet ingericht. Doe dit op je lokale MySolido.</p>
+    {% endif %}
 </div>
 {% endblock %}
