@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-chcp 65001 >nul 2>nul
+title MySolido Stoppen
 echo.
 echo   MySolido wordt gestopt...
 echo.
@@ -32,4 +32,4 @@ if "!found_css!"=="1" (
 echo.
 echo   MySolido is gestopt.
 echo.
-timeout /t 3
+timeout /t 3 /nobreak >nul
