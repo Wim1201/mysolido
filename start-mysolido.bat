@@ -1,31 +1,37 @@
 @echo off
-chcp 65001 >nul
-title MySolido
+title MySolido — Jouw persoonlijke datakluis
+color 0A
+cd /d "%~dp0"
 
 echo.
-echo   === MySolido ===
-echo   Jouw persoonlijke datakluis
+echo   ============================================
+echo     MySolido — Jouw persoonlijke datakluis
+echo   ============================================
+echo.
+echo   Even geduld, MySolido wordt gestart...
 echo.
 
-REM Controleer of Node.js beschikbaar is
+:: Check of node beschikbaar is
 where node >nul 2>nul
-if %ERRORLEVEL% neq 0 (
+if errorlevel 1 (
     echo   [FOUT] Node.js is niet gevonden.
     echo   Installeer Node.js via https://nodejs.org
+    echo.
     pause
     exit /b 1
 )
 
-REM Controleer of Python beschikbaar is
+:: Check of python beschikbaar is
 where python >nul 2>nul
-if %ERRORLEVEL% neq 0 (
+if errorlevel 1 (
     echo   [FOUT] Python is niet gevonden.
     echo   Installeer Python via https://python.org
+    echo.
     pause
     exit /b 1
 )
 
-REM Controleer of MySolido al draait
+:: Check of MySolido al draait
 netstat -ano | findstr ":5000" >nul 2>nul
 if %ERRORLEVEL% equ 0 (
     echo   MySolido draait al. Browser wordt geopend...
@@ -33,17 +39,22 @@ if %ERRORLEVEL% equ 0 (
     exit /b 0
 )
 
-REM Ga naar de projectmap
-cd /d "%~dp0"
-
-REM Zorg dat npm global map bestaat
+:: Zorg dat npm global map bestaat
 if not exist "%APPDATA%\npm" mkdir "%APPDATA%\npm"
 
-REM Start CSS onzichtbaar op de achtergrond
-echo   Community Solid Server starten...
+:: Check of node_modules bestaat
+if not exist "node_modules" (
+    echo   [1/3] Community Solid Server installeren...
+    echo         Dit kan een paar minuten duren bij de eerste keer.
+    npm install @solid/community-server
+    echo.
+)
+
+:: Start CSS op de achtergrond
+echo   [1/2] Solid Server starten...
 start /b "" cmd /c "npx --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
 
-REM Wacht tot CSS bereikbaar is (max 60 pogingen van 1 seconde)
+:: Wacht tot CSS bereikbaar is (max 60 pogingen van 1 seconde)
 set /a attempts=0
 :wait_css
 set /a attempts+=1
@@ -61,11 +72,11 @@ goto :wait_css
 :css_running
 echo   [OK] Solid Server draait
 
-REM Start Flask onzichtbaar op de achtergrond
-echo   MySolido starten...
+:: Start Flask op de achtergrond
+echo   [2/2] MySolido starten...
 start /b "" cmd /c "python app.py > flask.log 2>&1"
 
-REM Wacht tot Flask bereikbaar is (max 30 pogingen)
+:: Wacht tot Flask bereikbaar is (max 30 pogingen)
 set /a attempts=0
 :wait_flask
 set /a attempts+=1
@@ -82,18 +93,21 @@ goto :wait_flask
 
 :flask_running
 echo   [OK] MySolido draait
-
 echo.
+
+:: Open browser
 echo   Browser wordt geopend...
 start http://localhost:5000
 
 echo.
-echo   ================================
-echo   MySolido is actief!
-echo   Sluit dit venster NIET.
+echo   ============================================
+echo     MySolido is bereikbaar op:
+echo     http://localhost:5000
+echo   ============================================
+echo.
+echo   Dit venster openlaten! Sluiten = MySolido stopt.
 echo   Gebruik stop-mysolido.bat om te stoppen.
-echo   ================================
 echo.
 
-REM Houd het venster open
+:: Houd het venster open
 pause >nul
