@@ -22,6 +22,12 @@ from share_links import (
     create_share_link, get_share_link, deactivate_share_link,
     get_active_share_links, increment_download_count, hash_password
 )
+from sync_bridge import (
+    is_configured as bridge_sync_configured,
+    get_status as get_bridge_sync_status,
+    sync_in_background,
+    auto_sync_after_change
+)
 
 load_dotenv()
 
@@ -626,6 +632,8 @@ def inject_globals():
         'unread_count': get_unread_count(),
         'active_nav': active,
         'bridge_mode': BRIDGE_MODE,
+        'bridge_sync_configured': bridge_sync_configured(),
+        'bridge_sync_status': get_bridge_sync_status(),
     }
 
 
@@ -652,6 +660,29 @@ def bridge_login():
 def bridge_logout():
     session.pop('bridge_authenticated', None)
     return redirect(url_for('bridge_login'))
+
+
+@app.route('/bridge-sync', methods=['POST'])
+def trigger_bridge_sync():
+    if BRIDGE_MODE:
+        abort(403)
+
+    if not bridge_sync_configured():
+        flash('Bridge sync is niet geconfigureerd. Stel BRIDGE_HOST in je .env in.', 'error')
+        return redirect(url_for('profile'))
+
+    sync_in_background()
+    flash('Synchronisatie gestart...', 'success')
+    log_action('bridge_sync_triggered', {})
+    return redirect(request.referrer or url_for('index'))
+
+
+@app.route('/bridge-sync/status')
+def bridge_sync_status():
+    if BRIDGE_MODE:
+        abort(403)
+    from flask import jsonify
+    return jsonify(get_bridge_sync_status())
 
 
 # LEGACY: HTTP-gebaseerde functies — bewaard voor toekomstige remote pod-toegang
@@ -947,6 +978,7 @@ def upload():
     if pod_write(relative_path, file.read()):
         flash(f'"{file.filename}" succesvol geupload!', 'success')
         log_action('upload', {'file': file.filename, 'folder': folder_path or 'root'})
+        auto_sync_after_change()
     else:
         flash('Upload mislukt: kon bestand niet opslaan', 'error')
 
@@ -972,6 +1004,7 @@ def delete():
         if rel_path and pod_delete(rel_path):
             flash(f'Map "{name}" verwijderd', 'success')
             log_action('delete', {'resource': name, 'folder': folder_path or 'root'})
+            auto_sync_after_change()
         else:
             flash('Verwijderen mislukt', 'error')
         return redirect_to_folder(folder_path)
@@ -1015,6 +1048,7 @@ def delete():
 
     flash(f'"{name}" naar prullenbak verplaatst', 'success')
     log_action('trash', {'resource': name, 'folder': folder_path or 'root'})
+    auto_sync_after_change()
     return redirect_to_folder(folder_path)
 
 
@@ -1041,6 +1075,7 @@ def create_folder_route():
     if pod_mkdir(relative_path):
         flash(f'Map "{normalized}" aangemaakt!', 'success')
         log_action('create_folder', {'name': normalized, 'path': folder_path or 'root'})
+        auto_sync_after_change()
     else:
         flash('Map aanmaken mislukt', 'error')
 
@@ -1086,6 +1121,7 @@ def move():
     target_label = target_folder if target_folder else 'Pod root'
     flash(f'"{filename}" verplaatst naar {target_label}', 'success')
     log_action('move', {'file': filename, 'from': folder_path or 'root', 'to': target_folder or 'root'})
+    auto_sync_after_change()
     return redirect_to_folder(folder_path)
 
 
@@ -1299,6 +1335,7 @@ def create_share_link_route():
         'expires_days': expires_days,
         'has_password': password is not None
     })
+    auto_sync_after_change()
 
     folder_path = '/'.join(file_path.split('/')[:-1])
     return redirect(url_for('browse', folder_path=folder_path) + '?share_link=' + share_url if folder_path else url_for('index') + '?share_link=' + share_url)
@@ -1343,6 +1380,7 @@ def revoke_share_link():
     if deactivate_share_link(link_id):
         flash('Deellink ingetrokken', 'success')
         log_action('share_link_revoked', {'link_id': link_id})
+        auto_sync_after_change()
     else:
         flash('Deellink niet gevonden', 'error')
     return redirect(url_for('shares_overview'))

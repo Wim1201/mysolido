@@ -78,6 +78,52 @@
             om de Bridge te activeren.
         </p>
         {% endif %}
+
+        {% if bridge_sync_configured %}
+        <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--color-border);">
+        <h4>Synchronisatie</h4>
+        <div class="bridge-info">
+            <div class="info-row">
+                <span class="info-label">Status</span>
+                <span class="info-value">
+                    {% if bridge_sync_status.running %}
+                        <span class="sync-badge sync-running">Bezig...</span>
+                    {% elif bridge_sync_status.last_result == 'success' %}
+                        <span class="sync-badge sync-success">Gesynchroniseerd</span>
+                    {% elif bridge_sync_status.last_result == 'error' %}
+                        <span class="sync-badge sync-error">Fout</span>
+                    {% else %}
+                        <span class="sync-badge">Nog niet gesynchroniseerd</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% if bridge_sync_status.last_sync %}
+            <div class="info-row">
+                <span class="info-label">Laatste sync</span>
+                <span class="info-value">{{ bridge_sync_status.last_sync[:19] }}</span>
+            </div>
+            {% endif %}
+            {% if bridge_sync_status.error %}
+            <div class="info-row">
+                <span class="info-label">Fout</span>
+                <span class="info-value" style="color: var(--color-danger);">{{ bridge_sync_status.error }}</span>
+            </div>
+            {% endif %}
+            <div class="info-row">
+                <span class="info-label">Auto-sync</span>
+                <span class="info-value">
+                    {% if bridge_sync_status.running is not none %}
+                        Aan — synchroniseert na elke wijziging
+                    {% else %}
+                        Uit — stel BRIDGE_AUTO_SYNC=true in je .env
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        <form action="{{ url_for('trigger_bridge_sync') }}" method="post" style="margin-top: 12px;">
+            <button type="submit" class="btn btn-primary">Nu synchroniseren</button>
+        </form>
+        {% endif %}
     </div>
     {% endif %}
 {% endblock %}
