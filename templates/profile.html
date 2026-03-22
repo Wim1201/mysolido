@@ -49,14 +49,8 @@
             <div class="info-row">
                 <span class="info-label">Wachtwoord</span>
                 <span class="info-value">
-                    <span id="bridge-pw-hidden">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span>
-                    <span id="bridge-pw-visible" style="display:none;">{{ bridge_password }}</span>
-                    <button type="button" class="btn btn-compact btn-secondary" onclick="toggleBridgePassword()">
-                        <span id="bridge-pw-toggle-text">Toon</span>
-                    </button>
-                    <button type="button" class="btn btn-compact btn-secondary" onclick="copyBridgePassword()">
-                        Kopieer
-                    </button>
+                    <span>&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span>
+                    <span class="text-secondary" style="font-size: 0.8rem;">(beveiligd met bcrypt)</span>
                 </span>
             </div>
         </div>

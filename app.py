@@ -13,6 +13,7 @@ from urllib.parse import unquote
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_file, session, abort
 import requests
 import base64
+import bcrypt
 from dotenv import load_dotenv
 from audit import log_action, get_audit_log
 from shares import add_share, remove_share, get_all_shares, get_shares_for_resource, check_expired_shares
@@ -20,7 +21,8 @@ from trash import move_to_trash, restore_from_trash, permanent_delete, get_all_t
 from notifications import add_notification, get_all_notifications, get_unread_count, mark_as_read, mark_all_read
 from share_links import (
     create_share_link, get_share_link, deactivate_share_link,
-    get_active_share_links, increment_download_count, hash_password
+    get_active_share_links, increment_download_count,
+    check_password as check_share_password
 )
 from sync_bridge import (
     is_configured as bridge_sync_configured,
@@ -258,6 +260,69 @@ def generate_password(length=16):
     return ''.join(secrets.choice(chars) for _ in range(length))
 
 
+def hash_password_bcrypt(password):
+    """Hash een wachtwoord met bcrypt"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def check_password_bcrypt(password, hashed):
+    """Controleer een wachtwoord tegen een bcrypt hash"""
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except (ValueError, AttributeError):
+        # Fallback voor migratie-periode: directe vergelijking met plain text
+        return password == hashed
+
+
+def is_bcrypt_hash(value):
+    """Check of een waarde een bcrypt hash is"""
+    return value and (value.startswith('$2b$') or value.startswith('$2a$'))
+
+
+def migrate_passwords_to_bcrypt():
+    """Migreer plain text wachtwoorden naar bcrypt hashes in .env"""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if not os.path.exists(env_path):
+        return
+
+    changed = False
+    lines = []
+
+    with open(env_path, 'r') as f:
+        lines = f.readlines()
+
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith('BRIDGE_PASSWORD='):
+            value = stripped.split('=', 1)[1]
+            if value and not is_bcrypt_hash(value):
+                hashed = hash_password_bcrypt(value)
+                new_lines.append(f'BRIDGE_PASSWORD={hashed}\n')
+                os.environ['BRIDGE_PASSWORD'] = hashed
+                changed = True
+                print("  [OK] BRIDGE_PASSWORD gehasht met bcrypt")
+                continue
+
+        if stripped.startswith('CSS_PASSWORD='):
+            value = stripped.split('=', 1)[1]
+            if value and not is_bcrypt_hash(value):
+                hashed = hash_password_bcrypt(value)
+                new_lines.append(f'CSS_PASSWORD={hashed}\n')
+                os.environ['CSS_PASSWORD'] = hashed
+                changed = True
+                print("  [OK] CSS_PASSWORD gehasht met bcrypt")
+                continue
+
+        new_lines.append(line)
+
+    if changed:
+        with open(env_path, 'w') as f:
+            f.writelines(new_lines)
+        print("  [OK] Wachtwoorden gemigreerd naar bcrypt")
+
+
 def auto_setup():
     """Automatische setup bij eerste start"""
     global CLIENT_ID, CLIENT_SECRET, CSS_BASE_URL, SOLID_POD_URL, WEBID, OWNER_WEBID
@@ -427,6 +492,9 @@ def auto_setup():
             return False
 
         # Stap 7: Schrijf .env
+        bridge_pw_plain = generate_password()
+        bridge_pw_hash = hash_password_bcrypt(bridge_pw_plain)
+
         with open(env_path, 'w') as f:
             f.write(f'CSS_BASE_URL={css_base}\n')
             f.write(f'SOLID_POD_URL={pod_url}\n')
@@ -436,8 +504,7 @@ def auto_setup():
             f.write(f'CLIENT_ID={client_id}\n')
             f.write(f'CLIENT_SECRET={client_secret}\n')
             f.write('SHARE_BASE_URL=http://localhost:5000\n')
-            bridge_pw = generate_password()
-            f.write(f'BRIDGE_PASSWORD={bridge_pw}\n')
+            f.write(f'BRIDGE_PASSWORD={bridge_pw_hash}\n')
             f.write(f'FLASK_SECRET_KEY={secrets.token_hex(32)}\n')
 
         # Stap 8: Herlaad .env en update globale variabelen
@@ -452,6 +519,8 @@ def auto_setup():
         print(f"  [OK] Account aangemaakt: {email}")
         print(f"  [OK] Pod aangemaakt: /{pod_name}/")
         print(f"  [OK] Credentials opgeslagen in .env")
+        print(f"  [OK] Bridge wachtwoord: {bridge_pw_plain}")
+        print(f"       (Bewaar dit wachtwoord! Het wordt gehasht opgeslagen)")
 
         return True
 
@@ -646,7 +715,7 @@ def bridge_login():
         password = request.form.get('password', '')
         bridge_password = os.getenv('BRIDGE_PASSWORD', os.getenv('CSS_PASSWORD', ''))
 
-        if password == bridge_password:
+        if check_password_bcrypt(password, bridge_password):
             session.permanent = True
             session['bridge_authenticated'] = True
             return redirect(url_for('index'))
@@ -1354,7 +1423,7 @@ def view_shared_file(token):
             return render_template('share_password.html', token=token)
 
         password = request.form.get('password', '')
-        if hash_password(password) != link['password_hash']:
+        if not check_share_password(password, link['password_hash']):
             flash('Onjuist wachtwoord', 'error')
             return render_template('share_password.html', token=token)
 
@@ -1578,7 +1647,6 @@ def profile():
         webid=OWNER_WEBID,
         pod_url=SOLID_POD_URL,
         stats=stats,
-        bridge_password=bridge_password,
         bridge_url=bridge_url,
         bridge_configured=bool(bridge_password),
     )
@@ -1597,6 +1665,8 @@ def change_bridge_password():
 
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 
+    hashed = hash_password_bcrypt(new_password)
+
     if os.path.exists(env_path):
         with open(env_path, 'r') as f:
             lines = f.readlines()
@@ -1605,15 +1675,15 @@ def change_bridge_password():
         with open(env_path, 'w') as f:
             for line in lines:
                 if line.startswith('BRIDGE_PASSWORD='):
-                    f.write(f'BRIDGE_PASSWORD={new_password}\n')
+                    f.write(f'BRIDGE_PASSWORD={hashed}\n')
                     found = True
                 else:
                     f.write(line)
             if not found:
-                f.write(f'BRIDGE_PASSWORD={new_password}\n')
+                f.write(f'BRIDGE_PASSWORD={hashed}\n')
 
         load_dotenv(env_path, override=True)
-        os.environ['BRIDGE_PASSWORD'] = new_password
+        os.environ['BRIDGE_PASSWORD'] = hashed
 
     flash('Bridge-wachtwoord gewijzigd', 'success')
     log_action('bridge_password_changed', {})
@@ -1721,13 +1791,16 @@ def redirect_to_folder(folder_path):
 if __name__ == '__main__':
     print()
 
+    # Migreer plain text wachtwoorden naar bcrypt
+    migrate_passwords_to_bcrypt()
+
     if BRIDGE_MODE:
         bridge_pw = os.getenv('BRIDGE_PASSWORD', os.getenv('CSS_PASSWORD', ''))
         print("  === MySolido Bridge ===")
         print("  [BRIDGE] Read-only modus")
         print(f"  Pod: {SOLID_POD_URL}")
         if bridge_pw:
-            print(f"  Wachtwoord: {bridge_pw}")
+            print(f"  Wachtwoord: beveiligd met bcrypt")
         else:
             print("  [WAARSCHUWING] Geen BRIDGE_PASSWORD of CSS_PASSWORD ingesteld!")
         print(f"  Start op http://127.0.0.1:5000")

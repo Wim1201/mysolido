@@ -2,6 +2,7 @@ import os
 import json
 import secrets
 import hashlib
+import bcrypt
 from datetime import datetime, timedelta
 
 SHARE_LINKS_FILE = '.mysolido/share_links.json'
@@ -38,8 +39,17 @@ def generate_token():
 
 
 def hash_password(password):
-    """Hash een wachtwoord met SHA-256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash een wachtwoord met bcrypt"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def check_password(password, hashed):
+    """Controleer een wachtwoord tegen een hash (bcrypt of legacy SHA-256)"""
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except (ValueError, AttributeError):
+        # Fallback voor oude SHA-256 hashes
+        return hashlib.sha256(password.encode()).hexdigest() == hashed
 
 
 def create_share_link(file_path, file_name, expires_days=7, password=None):
