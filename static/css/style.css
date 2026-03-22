@@ -1058,3 +1058,49 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
     color: #81c784;
     border-bottom-color: #2e5a2e;
 }
+
+/* --- Bridge Info (Profile) --- */
+.bridge-info {
+    margin: 12px 0;
+}
+
+.bridge-info .info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bridge-info .info-label {
+    font-weight: 600;
+    color: var(--color-text);
+    min-width: 120px;
+}
+
+.bridge-info .info-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bridge-password-form .form-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.bridge-password-form .form-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: var(--color-bg);
+    color: var(--color-text);
+}

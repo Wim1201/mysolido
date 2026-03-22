@@ -79,6 +79,30 @@ function copyShareLink() {
     });
 }
 
+/* --- Bridge Password Toggle --- */
+function toggleBridgePassword() {
+    var hidden = document.getElementById('bridge-pw-hidden');
+    var visible = document.getElementById('bridge-pw-visible');
+    var toggleText = document.getElementById('bridge-pw-toggle-text');
+
+    if (hidden.style.display !== 'none') {
+        hidden.style.display = 'none';
+        visible.style.display = 'inline';
+        toggleText.textContent = 'Verberg';
+    } else {
+        hidden.style.display = 'inline';
+        visible.style.display = 'none';
+        toggleText.textContent = 'Toon';
+    }
+}
+
+function copyBridgePassword() {
+    var pw = document.getElementById('bridge-pw-visible').textContent;
+    navigator.clipboard.writeText(pw).then(function() {
+        alert('Wachtwoord gekopieerd!');
+    });
+}
+
 /* --- Loading Spinner --- */
 function showSpinner() {
     document.getElementById('spinner-overlay').classList.add('active');

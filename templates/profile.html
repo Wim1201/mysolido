@@ -29,4 +29,55 @@
     <div style="text-align: center; margin-top: 16px;">
         <a href="{{ url_for('settings') }}" class="btn">{{ icon_settings() }} Instellingen</a>
     </div>
+
+    {% if not bridge_mode %}
+    <div class="card" style="margin-top: 20px;">
+        <h3>&#127760; Bridge</h3>
+        <p class="text-secondary">De Bridge maakt je kluis bereikbaar via internet — ook als je pc uit staat.</p>
+
+        {% if bridge_configured %}
+        <div class="bridge-info">
+            {% if bridge_url %}
+            <div class="info-row">
+                <span class="info-label">Bridge URL</span>
+                <span class="info-value">
+                    <a href="{{ bridge_url }}" target="_blank">{{ bridge_url }}</a>
+                </span>
+            </div>
+            {% endif %}
+
+            <div class="info-row">
+                <span class="info-label">Wachtwoord</span>
+                <span class="info-value">
+                    <span id="bridge-pw-hidden">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span>
+                    <span id="bridge-pw-visible" style="display:none;">{{ bridge_password }}</span>
+                    <button type="button" class="btn btn-compact btn-secondary" onclick="toggleBridgePassword()">
+                        <span id="bridge-pw-toggle-text">Toon</span>
+                    </button>
+                    <button type="button" class="btn btn-compact btn-secondary" onclick="copyBridgePassword()">
+                        Kopieer
+                    </button>
+                </span>
+            </div>
+        </div>
+
+        <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--color-border);">
+
+        <h4>Wachtwoord wijzigen</h4>
+        <form action="{{ url_for('change_bridge_password') }}" method="post" class="bridge-password-form">
+            <div class="form-row">
+                <input type="password" name="new_password" placeholder="Nieuw wachtwoord (min. 8 tekens)"
+                        minlength="8" required class="form-input">
+                <button type="submit" class="btn btn-compact btn-primary">Opslaan</button>
+            </div>
+        </form>
+
+        {% else %}
+        <p class="text-secondary">
+            De Bridge is nog niet geconfigureerd. Stel een <code>BRIDGE_PASSWORD</code> in je <code>.env</code> bestand in
+            om de Bridge te activeren.
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
 {% endblock %}

@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_file, session
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_file, session, abort
 import requests
 import base64
 from dotenv import load_dotenv
@@ -1534,11 +1534,52 @@ def profile():
     """Show user profile with storage stats"""
     stats = get_pod_stats_filesystem()
     stats['total_size_formatted'] = format_size(stats['total_size'])
+    bridge_password = os.getenv('BRIDGE_PASSWORD', '')
+    bridge_url = os.getenv('SHARE_BASE_URL', '')
     return render_template('profile.html',
         webid=OWNER_WEBID,
         pod_url=SOLID_POD_URL,
         stats=stats,
+        bridge_password=bridge_password,
+        bridge_url=bridge_url,
+        bridge_configured=bool(bridge_password),
     )
+
+
+@app.route('/profile/bridge-password', methods=['POST'])
+def change_bridge_password():
+    if BRIDGE_MODE:
+        abort(403)
+
+    new_password = request.form.get('new_password', '').strip()
+
+    if len(new_password) < 8:
+        flash('Wachtwoord moet minimaal 8 tekens zijn', 'error')
+        return redirect(url_for('profile'))
+
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            lines = f.readlines()
+
+        found = False
+        with open(env_path, 'w') as f:
+            for line in lines:
+                if line.startswith('BRIDGE_PASSWORD='):
+                    f.write(f'BRIDGE_PASSWORD={new_password}\n')
+                    found = True
+                else:
+                    f.write(line)
+            if not found:
+                f.write(f'BRIDGE_PASSWORD={new_password}\n')
+
+        load_dotenv(env_path, override=True)
+        os.environ['BRIDGE_PASSWORD'] = new_password
+
+    flash('Bridge-wachtwoord gewijzigd', 'success')
+    log_action('bridge_password_changed', {})
+    return redirect(url_for('profile'))
 
 
 @app.route('/settings')
