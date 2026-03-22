@@ -32,10 +32,10 @@ if errorlevel 1 (
 )
 
 :: Check of MySolido al draait
-netstat -ano | findstr ":5000" >nul 2>nul
+netstat -ano | findstr "127.0.0.1:5000" >nul 2>nul
 if %ERRORLEVEL% equ 0 (
     echo   MySolido draait al. Browser wordt geopend...
-    start http://localhost:5000
+    start netstat -ano | findstr "127.0.0.1:5000"
     exit /b 0
 )
 
