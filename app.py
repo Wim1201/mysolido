@@ -7,10 +7,10 @@ import secrets
 import string
 import zipfile
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_file, session
 import requests
 import base64
 from dotenv import load_dotenv
@@ -28,7 +28,8 @@ load_dotenv()
 BRIDGE_MODE = '--bridge' in sys.argv
 
 app = Flask(__name__)
-app.secret_key = '***REMOVED***'
+app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
+app.permanent_session_lifetime = timedelta(hours=24)
 
 # === CONFIGURATIE ===
 CLIENT_ID = os.getenv('CLIENT_ID')
@@ -429,6 +430,9 @@ def auto_setup():
             f.write(f'CLIENT_ID={client_id}\n')
             f.write(f'CLIENT_SECRET={client_secret}\n')
             f.write('SHARE_BASE_URL=http://localhost:5000\n')
+            bridge_pw = generate_password()
+            f.write(f'BRIDGE_PASSWORD={bridge_pw}\n')
+            f.write(f'FLASK_SECRET_KEY={secrets.token_hex(32)}\n')
 
         # Stap 8: Herlaad .env en update globale variabelen
         load_dotenv(env_path, override=True)
@@ -564,6 +568,23 @@ FOLDER_ICONS = {
 
 
 @app.before_request
+def check_bridge_auth():
+    if not BRIDGE_MODE:
+        return
+
+    public_routes = ['bridge_login', 'view_shared_file', 'static']
+
+    if request.endpoint in public_routes:
+        return
+
+    if request.path.startswith('/share/') or request.path.startswith('/share-password/'):
+        return
+
+    if not session.get('bridge_authenticated'):
+        return redirect(url_for('bridge_login'))
+
+
+@app.before_request
 def check_bridge_mode():
     if not BRIDGE_MODE:
         return
@@ -606,6 +627,31 @@ def inject_globals():
         'active_nav': active,
         'bridge_mode': BRIDGE_MODE,
     }
+
+
+@app.route('/bridge-login', methods=['GET', 'POST'])
+def bridge_login():
+    if not BRIDGE_MODE:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        bridge_password = os.getenv('BRIDGE_PASSWORD', os.getenv('CSS_PASSWORD', ''))
+
+        if password == bridge_password:
+            session.permanent = True
+            session['bridge_authenticated'] = True
+            return redirect(url_for('index'))
+        else:
+            flash('Onjuist wachtwoord', 'error')
+
+    return render_template('bridge_login.html')
+
+
+@app.route('/bridge-logout')
+def bridge_logout():
+    session.pop('bridge_authenticated', None)
+    return redirect(url_for('bridge_login'))
 
 
 # LEGACY: HTTP-gebaseerde functies — bewaard voor toekomstige remote pod-toegang
@@ -1597,9 +1643,14 @@ if __name__ == '__main__':
     print()
 
     if BRIDGE_MODE:
+        bridge_pw = os.getenv('BRIDGE_PASSWORD', os.getenv('CSS_PASSWORD', ''))
         print("  === MySolido Bridge ===")
         print("  [BRIDGE] Read-only modus")
         print(f"  Pod: {SOLID_POD_URL}")
+        if bridge_pw:
+            print(f"  Wachtwoord: {bridge_pw}")
+        else:
+            print("  [WAARSCHUWING] Geen BRIDGE_PASSWORD of CSS_PASSWORD ingesteld!")
         print(f"  Start op http://127.0.0.1:5000")
         print("  ========================")
         print()
