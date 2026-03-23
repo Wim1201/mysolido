@@ -3,6 +3,9 @@ title MySolido — Jouw persoonlijke datakluis
 color 0A
 cd /d "%~dp0"
 
+:: Voeg lokale node en python toe aan PATH
+set "PATH=%~dp0node;%~dp0python;%~dp0python\Scripts;%~dp0node_modules\.bin;%PATH%"
+
 echo.
 echo   ============================================
 echo     MySolido — Jouw persoonlijke datakluis
@@ -11,31 +14,43 @@ echo.
 echo   Even geduld, MySolido wordt gestart...
 echo.
 
-:: Check of node beschikbaar is
-where node >nul 2>nul
-if errorlevel 1 (
-    echo   [FOUT] Node.js is niet gevonden.
-    echo   Installeer Node.js via https://nodejs.org
-    echo.
-    pause
-    exit /b 1
+:: Check of lokale node bestaat, anders systeem-node
+if exist "%~dp0node\node.exe" (
+    set "NODE_CMD=%~dp0node\node.exe"
+    set "NPX_CMD=%~dp0node\npx.cmd"
+) else (
+    where node >nul 2>nul
+    if errorlevel 1 (
+        echo   [FOUT] Node.js is niet gevonden.
+        echo   Installeer MySolido opnieuw of installeer Node.js via https://nodejs.org
+        echo.
+        pause
+        exit /b 1
+    )
+    set "NODE_CMD=node"
+    set "NPX_CMD=npx"
 )
 
-:: Check of python beschikbaar is
-where python >nul 2>nul
-if errorlevel 1 (
-    echo   [FOUT] Python is niet gevonden.
-    echo   Installeer Python via https://python.org
-    echo.
-    pause
-    exit /b 1
+:: Check of lokale python bestaat, anders systeem-python
+if exist "%~dp0python\python.exe" (
+    set "PYTHON_CMD=%~dp0python\python.exe"
+) else (
+    where python >nul 2>nul
+    if errorlevel 1 (
+        echo   [FOUT] Python is niet gevonden.
+        echo   Installeer MySolido opnieuw of installeer Python via https://python.org
+        echo.
+        pause
+        exit /b 1
+    )
+    set "PYTHON_CMD=python"
 )
 
 :: Check of MySolido al draait
 netstat -ano | findstr "127.0.0.1:5000" >nul 2>nul
 if %ERRORLEVEL% equ 0 (
     echo   MySolido draait al. Browser wordt geopend...
-    start netstat -ano | findstr "127.0.0.1:5000"
+    start http://localhost:5000
     exit /b 0
 )
 
@@ -46,13 +61,13 @@ if not exist "%APPDATA%\npm" mkdir "%APPDATA%\npm"
 if not exist "node_modules" (
     echo   [1/3] Community Solid Server installeren...
     echo         Dit kan een paar minuten duren bij de eerste keer.
-    npm install @solid/community-server
+    call %NPX_CMD% --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json
     echo.
 )
 
 :: Start CSS op de achtergrond
 echo   [1/2] Solid Server starten...
-start /b "" cmd /c "npx --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
+start /b "" cmd /c "%NPX_CMD% --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
 
 :: Wacht tot CSS bereikbaar is (max 60 pogingen van 1 seconde)
 set /a attempts=0
@@ -74,7 +89,7 @@ echo   [OK] Solid Server draait
 
 :: Start Flask op de achtergrond
 echo   [2/2] MySolido starten...
-start /b "" cmd /c "python app.py > flask.log 2>&1"
+start /b "" cmd /c "%PYTHON_CMD% app.py > flask.log 2>&1"
 
 :: Wacht tot Flask bereikbaar is (max 30 pogingen)
 set /a attempts=0

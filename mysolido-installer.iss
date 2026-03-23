@@ -1,6 +1,6 @@
-; MySolido Inno Setup Script
-; Bouwt MySolido-Setup.exe — een Windows installer met wizard
-; Downloadt en installeert Node.js en Python automatisch indien nodig
+; MySolido Inno Setup Script — Portable Edition
+; Bouwt MySolido-Setup.exe — installeert Node.js en Python LOKAAL (geen admin nodig)
+; Downloads: Node.js portable zip + Python embeddable zip + get-pip.py
 
 [Setup]
 AppName=MySolido
@@ -9,7 +9,7 @@ AppVerName=MySolido 1.0.0
 AppPublisher=MySolido
 AppPublisherURL=https://mysolido.com
 AppSupportURL=https://github.com/Wim1201/mysolido/issues
-DefaultDirName=C:\MySolido
+DefaultDirName={localappdata}\MySolido
 DefaultGroupName=MySolido
 OutputDir=installer-output
 OutputBaseFilename=MySolido-Setup
@@ -19,7 +19,8 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 LicenseFile=LICENSE
-PrivilegesRequired=admin
+; GEEN admin-rechten nodig!
+PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
@@ -29,7 +30,7 @@ Name: "dutch"; MessagesFile: "compiler:Languages\Dutch.isl"
 
 [Messages]
 dutch.WelcomeLabel1=Welkom bij MySolido
-dutch.WelcomeLabel2=MySolido is jouw persoonlijke datakluis op je eigen pc.%n%nDeze wizard installeert alles wat nodig is:%n%n• MySolido applicatie%n• Node.js (indien nodig)%n• Python (indien nodig)%n• Alle afhankelijkheden%n%nDit kan 5-10 minuten duren.
+dutch.WelcomeLabel2=MySolido is jouw persoonlijke datakluis op je eigen pc.%n%nDeze wizard installeert alles wat nodig is. Er zijn geen admin-rechten nodig.%n%nDit kan 5-10 minuten duren bij de eerste keer.
 
 [Files]
 ; MySolido bronbestanden
@@ -61,52 +62,43 @@ Name: "{group}\MySolido Verwijderen"; Filename: "{uninstallexe}"
 Filename: "{app}\start-mysolido.bat"; Description: "MySolido nu starten"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallDelete]
+Type: filesandordirs; Name: "{app}\node"
+Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\node_modules"
 Type: filesandordirs; Name: "{app}\__pycache__"
-Type: filesandordirs; Name: "{app}\venv"
 
 [Code]
 var
   DownloadPage: TDownloadWizardPage;
   NeedNode, NeedPython: Boolean;
 
-// Check of een programma beschikbaar is via de command line
-function ProgramInstalled(const ProgramName: String): Boolean;
-var
-  ResultCode: Integer;
+function NodeExistsLocally: Boolean;
 begin
-  Result := Exec('cmd', '/c ' + ProgramName + ' --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+  Result := FileExists(ExpandConstant('{app}\node\node.exe'));
 end;
 
-function NodeInstalled: Boolean;
+function PythonExistsLocally: Boolean;
 begin
-  Result := ProgramInstalled('node');
-end;
-
-function PythonAvailable: Boolean;
-begin
-  Result := ProgramInstalled('python') or ProgramInstalled('python3');
+  Result := FileExists(ExpandConstant('{app}\python\python.exe'));
 end;
 
 procedure InitializeWizard;
 begin
   DownloadPage := CreateDownloadPage(
     'Benodigde software downloaden',
-    'Even geduld — benodigde software wordt gedownload...',
+    'Even geduld — Node.js en Python worden gedownload...',
     nil
   );
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
-var
-  ResultCode: Integer;
 begin
   Result := True;
 
   if CurPageID = wpReady then
   begin
-    NeedNode := not NodeInstalled;
-    NeedPython := not PythonAvailable;
+    NeedNode := not NodeExistsLocally;
+    NeedPython := not PythonExistsLocally;
 
     if NeedNode or NeedPython then
     begin
@@ -115,8 +107,8 @@ begin
       if NeedNode then
       begin
         DownloadPage.Add(
-          'https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi',
-          'node-installer.msi',
+          'https://nodejs.org/dist/v20.18.1/node-v20.18.1-win-x64.zip',
+          'node-portable.zip',
           ''
         );
       end;
@@ -124,8 +116,14 @@ begin
       if NeedPython then
       begin
         DownloadPage.Add(
-          'https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe',
-          'python-installer.exe',
+          'https://www.python.org/ftp/python/3.12.8/python-3.12.8-embed-amd64.zip',
+          'python-portable.zip',
+          ''
+        );
+        // get-pip.py voor pip installatie
+        DownloadPage.Add(
+          'https://bootstrap.pypa.io/get-pip.py',
+          'get-pip.py',
           ''
         );
       end;
@@ -142,8 +140,7 @@ begin
           end
           else begin
             SuppressibleMsgBox(
-              'Het downloaden van benodigde software is mislukt. ' +
-              'Controleer je internetverbinding en probeer het opnieuw.',
+              'Het downloaden is mislukt. Controleer je internetverbinding en probeer het opnieuw.',
               mbCriticalError, MB_OK, IDOK
             );
             Result := False;
@@ -153,42 +150,6 @@ begin
       finally
         DownloadPage.Hide;
       end;
-
-      // Node.js installeren (silent)
-      if NeedNode then
-      begin
-        WizardForm.StatusLabel.Caption := 'Node.js installeren...';
-        WizardForm.StatusLabel.Update;
-        if not Exec(
-          'msiexec',
-          '/i "' + ExpandConstant('{tmp}\node-installer.msi') + '" /qn /norestart',
-          '',
-          SW_HIDE,
-          ewWaitUntilTerminated,
-          ResultCode
-        ) then
-        begin
-          MsgBox('Node.js installatie mislukt. Installeer Node.js handmatig via https://nodejs.org', mbError, MB_OK);
-        end;
-      end;
-
-      // Python installeren (silent, met PATH toevoeging)
-      if NeedPython then
-      begin
-        WizardForm.StatusLabel.Caption := 'Python installeren...';
-        WizardForm.StatusLabel.Update;
-        if not Exec(
-          ExpandConstant('{tmp}\python-installer.exe'),
-          '/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1',
-          '',
-          SW_HIDE,
-          ewWaitUntilTerminated,
-          ResultCode
-        ) then
-        begin
-          MsgBox('Python installatie mislukt. Installeer Python handmatig via https://python.org', mbError, MB_OK);
-        end;
-      end;
     end;
   end;
 end;
@@ -196,30 +157,103 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
-  AppDir: String;
+  AppDir, NodeDir, PythonDir, NodeZip, PythonZip, GetPipPath: String;
+  PthFile: String;
 begin
   if CurStep = ssPostInstall then
   begin
     AppDir := ExpandConstant('{app}');
+    NodeDir := AppDir + '\node';
+    PythonDir := AppDir + '\python';
+    NodeZip := ExpandConstant('{tmp}\node-portable.zip');
+    PythonZip := ExpandConstant('{tmp}\python-portable.zip');
+    GetPipPath := ExpandConstant('{tmp}\get-pip.py');
 
-    // pip install
+    // Node.js uitpakken
+    if NeedNode and FileExists(NodeZip) then
+    begin
+      WizardForm.StatusLabel.Caption := 'Node.js uitpakken...';
+      WizardForm.StatusLabel.Update;
+      ForceDirectories(NodeDir);
+      // Uitpakken met PowerShell, daarna submappen platslaan
+      Exec(
+        'powershell',
+        '-NoProfile -Command "Expand-Archive -Path ''' + NodeZip + ''' -DestinationPath ''' + NodeDir + ''' -Force; ' +
+        'Get-ChildItem ''' + NodeDir + ''' -Directory | Where-Object { $_.Name -like ''node-*'' } | ForEach-Object { ' +
+        'Get-ChildItem $_.FullName | Move-Item -Destination ''' + NodeDir + ''' -Force; ' +
+        'Remove-Item $_.FullName -Force -Recurse }"',
+        '',
+        SW_HIDE,
+        ewWaitUntilTerminated,
+        ResultCode
+      );
+    end;
+
+    // Python uitpakken
+    if NeedPython and FileExists(PythonZip) then
+    begin
+      WizardForm.StatusLabel.Caption := 'Python uitpakken...';
+      WizardForm.StatusLabel.Update;
+      ForceDirectories(PythonDir);
+      Exec(
+        'powershell',
+        '-NoProfile -Command "Expand-Archive -Path ''' + PythonZip + ''' -DestinationPath ''' + PythonDir + ''' -Force"',
+        '',
+        SW_HIDE,
+        ewWaitUntilTerminated,
+        ResultCode
+      );
+
+      // Python embeddable heeft een ._pth bestand dat import beperkt
+      // Pas het aan zodat pip en site-packages werken
+      PthFile := PythonDir + '\python312._pth';
+      if FileExists(PthFile) then
+      begin
+        SaveStringToFile(PthFile,
+          'python312.zip' + #13#10 +
+          '.' + #13#10 +
+          'Lib' + #13#10 +
+          'Lib\site-packages' + #13#10 +
+          'import site' + #13#10,
+          False
+        );
+      end;
+
+      // Installeer pip via get-pip.py
+      if FileExists(GetPipPath) then
+      begin
+        WizardForm.StatusLabel.Caption := 'pip installeren...';
+        WizardForm.StatusLabel.Update;
+        CopyFile(GetPipPath, PythonDir + '\get-pip.py', False);
+        Exec(
+          PythonDir + '\python.exe',
+          'get-pip.py --no-warn-script-location',
+          PythonDir,
+          SW_HIDE,
+          ewWaitUntilTerminated,
+          ResultCode
+        );
+      end;
+    end;
+
+    // pip install requirements
     WizardForm.StatusLabel.Caption := 'Python pakketten installeren...';
     WizardForm.StatusLabel.Update;
     Exec(
-      'cmd',
-      '/c pip install -r "' + AppDir + '\requirements.txt" --break-system-packages 2>nul || pip install -r "' + AppDir + '\requirements.txt"',
+      PythonDir + '\python.exe',
+      '-m pip install -r "' + AppDir + '\requirements.txt" --no-warn-script-location',
       AppDir,
       SW_HIDE,
       ewWaitUntilTerminated,
       ResultCode
     );
 
-    // npm install
-    WizardForm.StatusLabel.Caption := 'Community Solid Server installeren (dit kan even duren)...';
+    // npm install community-solid-server
+    WizardForm.StatusLabel.Caption := 'Community Solid Server installeren (even geduld)...';
     WizardForm.StatusLabel.Update;
     Exec(
-      'cmd',
-      '/c npm install @solid/community-server',
+      NodeDir + '\npm.cmd',
+      'install @solid/community-server',
       AppDir,
       SW_HIDE,
       ewWaitUntilTerminated,
