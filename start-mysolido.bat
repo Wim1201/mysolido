@@ -2,6 +2,7 @@
 title MySolido — Jouw persoonlijke datakluis
 color 0A
 cd /d "%~dp0"
+set "PYTHONPATH=%~dp0"
 
 :: Voeg lokale node en python toe aan PATH
 set "PATH=%~dp0node;%~dp0python;%~dp0python\Scripts;%~dp0node_modules\.bin;%PATH%"

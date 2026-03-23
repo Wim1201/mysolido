@@ -214,7 +214,8 @@ begin
           '.' + #13#10 +
           'Lib' + #13#10 +
           'Lib\site-packages' + #13#10 +
-          'import site' + #13#10,
+          'import site' + #13#10 +
+          AppDir + #13#10,
           False
         );
       end;
