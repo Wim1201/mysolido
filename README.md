@@ -15,7 +15,7 @@ MySolido is open source software die een persoonlijke datakluis (Solid Pod) op j
 - **20 categorieën** — Identiteit, medisch, financieel, juridisch, verzekeringen, en meer
 - **Upload via drag & drop** — Bestanden slepen naar je kluis
 - **Delen met rechten** — Alleen lezen, schrijven, tijdelijk, intrekbaar (via Solid WAC)
-- **Deellinks** — Deel bestanden via een beveiligde link, zonder dat de ontvanger Solid nodig heeft. Optioneel wachtwoord en verloopdatum.
+- **Deellinks** — Deel bestanden via beveiligde token-URL's met optioneel wachtwoord en verloopdatum
 - **Zoeken** — Recursief zoeken over alle mappen
 - **Inline preview** — PDF's en afbeeldingen direct in de browser bekijken
 - **Prullenbak** — Verwijderde bestanden 30 dagen herstellen
@@ -23,7 +23,22 @@ MySolido is open source software die een persoonlijke datakluis (Solid Pod) op j
 - **Dark mode** — Licht en donker thema
 - **Backup** — Exporteer je hele kluis als ZIP
 - **Dashboard** — Statistieken: aantal bestanden, opslaggrootte, mappen, actieve deellinks
-- **Bridge-modus** — Read-only modus voor altijd-bereikbare kopie op een server (in ontwikkeling)
+- **Bridge** — Je kluis bereikbaar via internet, op je telefoon, als read-only spiegel
+
+---
+
+## Bridge — Je kluis, overal bereikbaar
+
+MySolido Bridge spiegelt je lokale kluis naar een Nederlandse server. Je pc blijft de master — de Bridge is een read-only kopie.
+
+- **Altijd bereikbaar** — Open je kluis op je telefoon via bridge.mysolido.com
+- **Deellinks** — Deel bestanden via een beveiligde URL, ontvangers hoeven geen Solid te hebben
+- **Backup** — Automatische tweede kopie op een Nederlandse VPS
+- **Beveiligd** — HTTPS + wachtwoord-authenticatie, read-only (geen uploads/deletes via internet)
+
+Lokaal is master. De Bridge synchroniseert mee.
+
+🌐 **Live demo:** [bridge.mysolido.com](https://bridge.mysolido.com)
 
 ---
 
@@ -102,20 +117,15 @@ Je data staat in de `.data/` map op je eigen harde schijf. Niets verlaat je comp
 
 ---
 
-## Bridge (in ontwikkeling)
+## Roadmap
 
-De Bridge is een altijd-bereikbare kopie van je kluis op een Nederlandse server. Je lokale pc blijft de master — de Bridge synchroniseert mee.
-
-**Wat het oplost:**
-- Je kluis is bereikbaar op je telefoon
-- Deellinks werken via internet (niet alleen localhost)
-- Je pc hoeft niet aan te staan
-- Automatische backup
-
-Start de Bridge met:
-```bash
-python app.py --bridge
-```
+* **AI-ready vault** — Je documenten, chatgeschiedenis en voorkeuren veilig lokaal beschikbaar voor persoonlijke AI-agents
+* Encryptie per map
+* OCR / documenten scannen
+* ODRL policy engine (data delen onder jouw voorwaarden)
+* EUDI Wallet / Jouw.id koppeling
+* API-koppelingen (MijnOverheid, verzekeraars, banken)
+* Portable installer (USB-stick, geen installatie nodig)
 
 ---
 
@@ -127,7 +137,17 @@ python app.py --bridge
 | Protocol | [Solid](https://solidproject.org) (W3C-standaard) |
 | Frontend | [Flask](https://flask.palletsprojects.com) (Python) |
 | Data-formaat | RDF / Linked Data |
+| Bridge | Nederlandse VPS (mijn.host) + Nginx + Let's Encrypt |
 | Licentie | GPLv3 |
+
+---
+
+## Privacy
+
+* Je data staat op je eigen pc — niet in de cloud
+* Geen account bij een derde partij nodig
+* Geen telemetrie, geen tracking
+* **Bridge optioneel** — De Bridge is een betaalde toevoeging. MySolido werkt volledig zonder, 100% offline
 
 ---
 
@@ -140,7 +160,7 @@ Nee. De data staat in een Solid pod met RDF-metadata. Elke Solid-compatibele app
 Nextcloud is een self-hosted cloud — het vervangt Google Drive als server. MySolido is anders: het is een lokale desktop-kluis gebouwd op Solid. De data blijft op je pc, niet op een server. Ze zijn complementair, niet concurrerend.
 
 **Wat als mijn pc crasht?**
-Exporteer regelmatig een backup (ZIP) via de instellingen. Met de Bridge-dienst (binnenkort) heb je automatisch een kopie op een tweede locatie.
+Exporteer regelmatig een backup (ZIP) via de instellingen. Met de Bridge heb je automatisch een kopie op een tweede locatie.
 
 **Werkt het op Mac/Linux?**
 De code is platform-onafhankelijk (Python + Node.js), maar de installer en start-scripts zijn nu Windows-specifiek. Mac/Linux gebruikers kunnen de handmatige installatie volgen.
@@ -164,6 +184,7 @@ MySolido is open source onder de GPLv3-licentie. Bijdragen zijn welkom:
 - 🌐 Website: [mysolido.com](https://mysolido.com)
 - 📦 Releases: [GitHub Releases](https://github.com/Wim1201/mysolido/releases)
 - 🔷 Solid protocol: [solidproject.org](https://solidproject.org)
+- 🌉 Bridge: [bridge.mysolido.com](https://bridge.mysolido.com) (live Bridge)
 - 💬 Solid Community Forum: [forum.solidproject.org](https://forum.solidproject.org)
 
 ---
