@@ -51,5 +51,4 @@ tweakers-post-final.txt
 installer-output/
 mysolido.ico
 generate_ico.py
-css.log
-flask.log
+*.log

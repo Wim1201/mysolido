@@ -1806,7 +1806,7 @@ if __name__ == '__main__':
         print(f"  Start op http://127.0.0.1:5000")
         print("  ========================")
         print()
-        app.run(port=5000, debug=True)
+        app.run(port=5000, debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
     else:
         print("  === MySolido ===")
 
@@ -1823,4 +1823,4 @@ if __name__ == '__main__':
         print("  ================")
         print()
 
-        app.run(port=5000, debug=True)
+        app.run(port=5000, debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
