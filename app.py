@@ -551,7 +551,7 @@ VIEWABLE_TYPES = {
 # Default folders to create on init
 DEFAULT_FOLDERS = [
     'identiteit', 'medisch', 'financieel', 'wonen', 'zakelijk',
-    'werk', 'voertuigen', 'juridisch', 'media', 'wachtwoorden',
+    'werk', 'voertuigen', 'juridisch', 'media', 'accounts',
     'gezin', 'abonnementen', 'inbox', 'verzekeringen',
     'huisdieren', 'opleiding', 'reizen', 'digitaal-testament',
     'persoonlijk', 'projecten',
@@ -595,7 +595,7 @@ FOLDER_ICONS = {
         'color': '#d06090',
         'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#d06090" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><circle cx="18" cy="6" r="1"/></svg>'
     },
-    'wachtwoorden': {
+    'accounts': {
         'color': '#c8a050',
         'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#c8a050" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>'
     },
