@@ -1,0 +1,143 @@
+name: Build macOS DMG
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create .app bundle structure
+        run: |
+          APP_NAME="MySolido"
+          APP_DIR="${APP_NAME}.app"
+          CONTENTS="${APP_DIR}/Contents"
+          MACOS="${CONTENTS}/MacOS"
+          RESOURCES="${CONTENTS}/Resources"
+          APP_FILES="${RESOURCES}/app"
+
+          # Create directory structure
+          mkdir -p "${MACOS}"
+          mkdir -p "${RESOURCES}"
+          mkdir -p "${APP_FILES}"
+
+          # Copy MySolido source files
+          cp app.py "${APP_FILES}/"
+          cp requirements.txt "${APP_FILES}/"
+          cp -r templates "${APP_FILES}/"
+          cp -r static "${APP_FILES}/"
+          cp start-mysolido.sh "${APP_FILES}/"
+
+          # Copy optional files if they exist
+          for f in share_links.py shares.py audit.py trash.py notifications.py sync_bridge.py package.json .env.example LICENSE README.md; do
+            [ -f "$f" ] && cp "$f" "${APP_FILES}/"
+          done
+
+          # Create launcher script
+          cat > "${MACOS}/MySolido" << 'LAUNCHER'
+          #!/bin/bash
+          # MySolido macOS App Launcher
+          DIR="$(cd "$(dirname "$0")/../Resources/app" && pwd)"
+
+          # Open Terminal with the start script
+          osascript -e "tell application \"Terminal\"
+            activate
+            do script \"cd '$DIR' && bash start-mysolido.sh\"
+          end tell"
+          LAUNCHER
+          chmod +x "${MACOS}/MySolido"
+
+          # Create Info.plist
+          cat > "${CONTENTS}/Info.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>MySolido</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.mysolido.app</string>
+            <key>CFBundleName</key>
+            <string>MySolido</string>
+            <key>CFBundleDisplayName</key>
+            <string>MySolido</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleSignature</key>
+            <string>????</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.15</string>
+          </dict>
+          </plist>
+          PLIST
+
+          echo "App bundle created: ${APP_DIR}"
+          ls -la "${APP_DIR}/"
+
+      - name: Create DMG
+        run: |
+          # Create a temporary folder for DMG contents
+          mkdir -p dmg-contents
+          cp -r MySolido.app dmg-contents/
+
+          # Add a symlink to Applications for drag-and-drop install
+          ln -s /Applications dmg-contents/Applications
+
+          # Add a README for first-time users
+          cat > dmg-contents/LEES-MIJ.txt << 'README'
+          MySolido — Jouw persoonlijke datakluis op je eigen pc
+
+          INSTALLATIE:
+          1. Sleep MySolido.app naar de Applications map
+          2. Open MySolido vanuit Applications
+          3. macOS kan een waarschuwing tonen:
+             → Ga naar Systeeminstellingen → Privacy en beveiliging → "Toch openen"
+
+          VEREISTEN:
+          - Node.js 18+ (https://nodejs.org of: brew install node)
+          - Python 3.8+ (https://python.org of: brew install python)
+
+          Bij de eerste start worden alle dependencies automatisch geinstalleerd.
+
+          Meer info: https://mysolido.com
+          GitHub: https://github.com/Wim1201/mysolido
+          README
+
+          # Build the DMG
+          hdiutil create -volname "MySolido" \
+            -srcfolder dmg-contents \
+            -ov -format UDZO \
+            MySolido-Installer.dmg
+
+          echo "DMG created"
+          ls -la MySolido-Installer.dmg
+
+      - name: Upload DMG to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MySolido-Installer.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload DMG as artifact (for manual testing)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: MySolido-macOS-DMG
+          path: MySolido-Installer.dmg
