@@ -47,6 +47,9 @@ MySolido_Begrippenlijst.pdf
 claude-code-prompt-*.md
 tweakers-post-final.txt
 
+# Watermark temp files
+temp/
+
 # Installer
 installer-output/
 mysolido.ico

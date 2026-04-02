@@ -2,3 +2,6 @@ flask
 requests
 python-dotenv
 bcrypt
+reportlab
+Pillow
+PyPDF2

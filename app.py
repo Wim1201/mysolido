@@ -30,6 +30,8 @@ from sync_bridge import (
     sync_in_background,
     auto_sync_after_change
 )
+from watermark import watermark_pdf, watermark_image, get_watermark_text
+import tempfile as _tempfile
 
 load_dotenv()
 
@@ -47,6 +49,28 @@ SOLID_POD_URL = os.getenv('SOLID_POD_URL', 'http://127.0.0.1:3000/mysolido/')
 WEBID = os.getenv('WEBID', 'http://127.0.0.1:3000/mysolido/profile/card#me')
 OWNER_WEBID = WEBID
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMP_DIR = os.path.join(PROJECT_DIR, 'temp')
+
+# Ensure temp directory exists
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+
+def is_watermark_enabled():
+    """Check if watermarking is enabled (default: True)"""
+    return os.getenv('WATERMARK_ENABLED', 'true').lower() in ('true', '1', 'yes')
+
+
+def cleanup_temp_files(max_age_seconds=3600):
+    """Remove temp files older than max_age_seconds"""
+    now = time.time()
+    if os.path.isdir(TEMP_DIR):
+        for fname in os.listdir(TEMP_DIR):
+            fpath = os.path.join(TEMP_DIR, fname)
+            if os.path.isfile(fpath) and (now - os.path.getmtime(fpath)) > max_age_seconds:
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
 
 
 def get_pod_data_path():
@@ -1471,6 +1495,31 @@ def view_shared_file(token):
     import mimetypes
     content_type, _ = mimetypes.guess_type(link['file_name'])
 
+    # Apply watermark for PDFs and images if enabled
+    if is_watermark_enabled() and content_type:
+        ext = os.path.splitext(link['file_name'])[1].lower()
+        wm_text = get_watermark_text()
+        temp_path = os.path.join(TEMP_DIR, f"wm_{token}_{link['file_name']}")
+
+        if content_type == 'application/pdf':
+            if watermark_pdf(full_path, temp_path, wm_text):
+                response = send_file(temp_path, mimetype=content_type)
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+                return response
+
+        elif content_type.startswith('image/') and ext in ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'):
+            if watermark_image(full_path, temp_path, wm_text):
+                response = send_file(temp_path, mimetype=content_type)
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+                return response
+
+    # Fallback: serve original without watermark
     if content_type and (content_type.startswith('image/') or content_type == 'application/pdf'):
         return send_file(full_path, mimetype=content_type)
     else:
@@ -1728,7 +1777,43 @@ def change_bridge_password():
 @app.route('/settings')
 def settings():
     """Show settings page"""
-    return render_template('settings.html')
+    return render_template('settings.html', watermark_enabled=is_watermark_enabled())
+
+
+@app.route('/settings/watermark', methods=['POST'])
+def toggle_watermark():
+    """Toggle watermark setting in .env"""
+    if BRIDGE_MODE:
+        flash('Niet beschikbaar in Bridge-modus', 'error')
+        return redirect(url_for('settings'))
+
+    enabled = 'true' if request.form.get('enabled') == 'true' else 'false'
+    env_path = os.path.join(PROJECT_DIR, '.env')
+
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            lines = f.readlines()
+
+        found = False
+        with open(env_path, 'w') as f:
+            for line in lines:
+                if line.startswith('WATERMARK_ENABLED='):
+                    f.write(f'WATERMARK_ENABLED={enabled}\n')
+                    found = True
+                else:
+                    f.write(line)
+            if not found:
+                f.write(f'WATERMARK_ENABLED={enabled}\n')
+    else:
+        with open(env_path, 'w') as f:
+            f.write(f'WATERMARK_ENABLED={enabled}\n')
+
+    # Reload env so the change takes effect immediately
+    os.environ['WATERMARK_ENABLED'] = enabled
+
+    status = 'ingeschakeld' if enabled == 'true' else 'uitgeschakeld'
+    flash(f'Watermerken {status}', 'success')
+    return redirect(url_for('settings'))
 
 
 @app.route('/settings/export', methods=['POST'])
@@ -2345,6 +2430,9 @@ if __name__ == '__main__':
 
         # Initialize default ODRL policies for all standard folders
         init_default_policies()
+
+        # Clean up old watermark temp files
+        cleanup_temp_files()
 
         print()
         print(f"  Pod: {os.getenv('SOLID_POD_URL')}")

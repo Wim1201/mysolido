@@ -21,6 +21,22 @@
     </div>
 
     <div class="settings-card">
+        <h2>&#x1f517; Deellinks</h2>
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">Watermerken op deellinks</div>
+                <div class="setting-desc">Voegt automatisch een watermerk toe aan PDF's en afbeeldingen die via deellinks worden geopend</div>
+            </div>
+            <form action="{{ url_for('toggle_watermark') }}" method="post">
+                <label class="toggle">
+                    <input type="checkbox" name="enabled" value="true" {{ 'checked' if watermark_enabled }} onchange="this.form.submit()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </form>
+        </div>
+    </div>
+
+    <div class="settings-card">
         <h2>{{ icon_zip() }} Backup</h2>
         <div class="setting-row">
             <div>
