@@ -70,6 +70,18 @@
     </form>
     {% endif %}
 
+    <!-- Consent Stats -->
+    {% if consent_stats and consent_stats.total > 0 %}
+    <div class="consent-stats-bar">
+        <a href="{{ url_for('consent_list') }}" class="consent-stats-link">
+            <span class="consent-stat"><span class="consent-stat-icon">&#x2705;</span> {{ consent_stats.active }} actief</span>
+            {% if consent_stats.expired > 0 %}<span class="consent-stat"><span class="consent-stat-icon">&#x23f0;</span> {{ consent_stats.expired }} verlopen</span>{% endif %}
+            {% if consent_stats.withdrawn > 0 %}<span class="consent-stat"><span class="consent-stat-icon">&#x274c;</span> {{ consent_stats.withdrawn }} ingetrokken</span>{% endif %}
+            <span class="consent-stat-label">Toestemmingen &rarr;</span>
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Folder Grid -->
     {% if items %}
     <h2 style="font-size: 1rem; color: var(--color-primary); margin-bottom: 12px;">Mappen</h2>
@@ -78,6 +90,9 @@
         <a href="{{ url_for('browse', folder_path=name) }}" class="folder-card" style="--folder-color: {{ folder_icons[name].color }}">
             {{ folder_icons[name].svg | safe }}
             <div class="folder-card-name">{{ name.capitalize() }}</div>
+            {% if folder_policies.get(name) %}
+            <span class="policy-badge" title="{{ folder_policies[name] }}">&#x1f6e1;&#xfe0f;</span>
+            {% endif %}
         </a>
         {% endfor %}
     </div>
@@ -220,6 +235,11 @@
                 <span class="current">{{ crumb.name }}</span>
             {% endif %}
         {% endfor %}
+        {% if folder_policy_summary %}
+        <a href="{{ url_for('edit_policy', folder_path=folder_path) }}" class="policy-indicator" title="{{ folder_policy_summary }}">
+            &#x1f6e1;&#xfe0f; {{ folder_policy_summary }}
+        </a>
+        {% endif %}
     </div>
 
     <!-- Search bar -->

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left %}
+
+{% block title %}Nieuwe toestemming - MySolido{% endblock %}
+
+{% block content %}
+    <div class="breadcrumbs">
+        <a href="{{ url_for('consent_list') }}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
+        <span class="current">Nieuwe toestemming</span>
+    </div>
+
+    <div class="consent-form-card">
+        <h2>&#x2705; Nieuwe toestemming vastleggen</h2>
+
+        <form action="{{ url_for('consent_new') }}" method="post" class="consent-form">
+            <label for="title">Titel <span class="required">*</span></label>
+            <input type="text" name="title" id="title" placeholder="Bijv. Huisarts — inzage medisch dossier" required>
+
+            <label for="description">Omschrijving</label>
+            <textarea name="description" id="description" rows="3" placeholder="Wat wordt er precies gedeeld?"></textarea>
+
+            <label for="receiver">Ontvanger <span class="required">*</span></label>
+            <input type="text" name="receiver" id="receiver" placeholder="Naam van de partij die toegang krijgt" required>
+
+            <label for="purpose">Doel <span class="required">*</span></label>
+            <select name="purpose" id="purpose">
+                {% for key, val in purposes.items() %}
+                <option value="{{ key }}">{{ val.label }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="category">Datacategorie <span class="required">*</span></label>
+            <select name="category" id="category">
+                {% for key, val in categories.items() %}
+                <option value="{{ key }}">{{ val.label }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="expires">Geldig tot (optioneel)</label>
+            <input type="date" name="expires" id="expires">
+
+            <label for="note">Opmerking (optioneel)</label>
+            <textarea name="note" id="note" rows="2" placeholder="Extra opmerkingen..."></textarea>
+
+            <div class="consent-form-actions">
+                <a href="{{ url_for('consent_list') }}" class="btn btn-secondary">Annuleren</a>
+                <button type="submit" class="btn">Toestemming vastleggen</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

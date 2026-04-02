@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left %}
+
+{% block title %}Toestemming - MySolido{% endblock %}
+
+{% block content %}
+    <div class="breadcrumbs">
+        <a href="{{ url_for('consent_list') }}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
+        <span class="current">{{ consent.get('dct:title', 'Toestemming') }}</span>
+    </div>
+
+    <div class="consent-detail-card">
+        <div class="consent-detail-header">
+            <h2>{{ consent.get('dct:title', 'Zonder titel') }}</h2>
+            <span class="consent-status-badge {{ consent._status.class }}">{{ consent._status.icon }} {{ consent._status.label }}</span>
+        </div>
+
+        {% if consent.get('dct:description') %}
+        <p class="consent-description">{{ consent.get('dct:description') }}</p>
+        {% endif %}
+
+        <table class="consent-detail-table">
+            <tr>
+                <th>ID</th>
+                <td>{{ consent.get('@id', '') }}</td>
+            </tr>
+            <tr>
+                <th>Ontvanger</th>
+                <td>
+                    {% set controller = consent.get('dpv:hasDataController', {}) %}
+                    {{ controller.get('dct:title', 'Onbekend') if controller is mapping else controller }}
+                </td>
+            </tr>
+            <tr>
+                <th>Doel</th>
+                <td>
+                    {% set purpose = consent.get('dpv:hasPurpose', {}) %}
+                    {{ purpose.get('dct:description', purpose.get('@type', 'Onbekend')) if purpose is mapping else purpose }}
+                </td>
+            </tr>
+            <tr>
+                <th>Datacategorie</th>
+                <td>{{ consent.get('dpv:hasPersonalDataCategory', 'Onbekend') }}</td>
+            </tr>
+            <tr>
+                <th>Aangemaakt</th>
+                <td>{{ consent.get('dct:created', '')[:19].replace('T', ' ') }}</td>
+            </tr>
+            <tr>
+                <th>Laatst gewijzigd</th>
+                <td>{{ consent.get('dct:modified', '')[:19].replace('T', ' ') }}</td>
+            </tr>
+            {% set expiry = consent.get('dpv:hasExpiry', {}) %}
+            {% if expiry and expiry is mapping and expiry.get('dpv:hasExpiryTime') %}
+            <tr>
+                <th>Geldig tot</th>
+                <td>{{ expiry.get('dpv:hasExpiryTime', '')[:10] }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <th>Status</th>
+                <td>{{ consent.get('dpv:hasConsentStatus', '').replace('dpv:', '') }}</td>
+            </tr>
+            <tr>
+                <th>Juridische basis</th>
+                <td>{{ consent.get('dpv:hasLegalBasis', '').replace('dpv:', '') }}</td>
+            </tr>
+            <tr>
+                <th>Recht</th>
+                <td>{{ consent.get('dpv:hasRight', '').replace('dpv:', '') }}</td>
+            </tr>
+            {% if consent.get('dpv:note') %}
+            <tr>
+                <th>Opmerking</th>
+                <td>{{ consent.get('dpv:note') }}</td>
+            </tr>
+            {% endif %}
+        </table>
+
+        {% if not bridge_mode %}
+        <div class="consent-detail-actions">
+            {% if consent._status.class == 'status-active' %}
+            <form action="{{ url_for('consent_withdraw', consent_id=consent._id) }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt intrekken?')">
+                <button type="submit" class="btn" style="background: var(--color-secondary);">Intrekken</button>
+            </form>
+            {% endif %}
+            <form action="{{ url_for('consent_delete', consent_id=consent._id) }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt verwijderen?')">
+                <button type="submit" class="btn btn-danger">Verwijderen</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <details class="policy-raw">
+            <summary>Bekijk ruwe consent record (JSON-LD)</summary>
+            <pre><code>{{ consent | tojson(indent=2) }}</code></pre>
+        </details>
+    </div>
+{% endblock %}

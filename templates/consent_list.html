@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left, icon_plus %}
+
+{% block title %}Toestemmingen - MySolido{% endblock %}
+
+{% block content %}
+    <div class="breadcrumbs">
+        <a href="{{ url_for('index') }}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
+        <span class="current">Toestemmingen</span>
+    </div>
+
+    <div class="consent-header">
+        <h2>&#x2705; Toestemmingen</h2>
+        {% if not bridge_mode %}
+        <a href="{{ url_for('consent_new') }}" class="btn">{{ icon_plus() }} Nieuwe toestemming</a>
+        {% endif %}
+    </div>
+
+    {% if consents %}
+    <div class="consent-list">
+        {% for c in consents %}
+        <div class="consent-item consent-{{ c._status.class }}">
+            <div class="consent-item-header">
+                <span class="consent-status-badge {{ c._status.class }}">{{ c._status.icon }} {{ c._status.label }}</span>
+                <span class="consent-date">{{ c.get('dct:created', '')[:10] }}</span>
+            </div>
+            <div class="consent-item-body">
+                <h3 class="consent-title">{{ c.get('dct:title', 'Zonder titel') }}</h3>
+                <div class="consent-meta">
+                    <span>Ontvanger: <strong>{{ c._receiver }}</strong></span>
+                    <span>Doel: {{ c._purpose }}</span>
+                    {% if c._expiry_date %}
+                    <span>Geldig tot: {{ c._expiry_date }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="consent-item-actions">
+                <a href="{{ url_for('consent_detail', consent_id=c._id) }}" class="btn btn-sm btn-secondary">Bekijken</a>
+                {% if not bridge_mode and c._status.class == 'status-active' %}
+                <form action="{{ url_for('consent_withdraw', consent_id=c._id) }}" method="post" style="display:inline;" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt intrekken?')">
+                    <button type="submit" class="btn btn-sm" style="background: var(--color-secondary);">Intrekken</button>
+                </form>
+                {% endif %}
+                {% if not bridge_mode %}
+                <form action="{{ url_for('consent_delete', consent_id=c._id) }}" method="post" style="display:inline;" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt verwijderen? Dit kan niet ongedaan worden gemaakt.')">
+                    <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p class="empty-state-title">Nog geen toestemmingen vastgelegd</p>
+        <p class="empty-state-sub">Leg vast wie toegang heeft tot jouw gegevens en waarom.</p>
+        {% if not bridge_mode %}
+        <a href="{{ url_for('consent_new') }}" class="btn" style="margin-top: 12px;">{{ icon_plus() }} Eerste toestemming vastleggen</a>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endblock %}

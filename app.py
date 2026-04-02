@@ -554,7 +554,7 @@ DEFAULT_FOLDERS = [
     'werk', 'voertuigen', 'juridisch', 'media', 'accounts',
     'gezin', 'abonnementen', 'inbox', 'verzekeringen',
     'huisdieren', 'opleiding', 'reizen', 'digitaal-testament',
-    'persoonlijk', 'projecten',
+    'persoonlijk', 'projecten', 'toestemmingen',
 ]
 
 # Folder icons with SVG and colors (matching mysolido.com landing page)
@@ -639,6 +639,10 @@ FOLDER_ICONS = {
         'color': '#9068a0',
         'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#9068a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>'
     },
+    'toestemmingen': {
+        'color': '#2e8b57',
+        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#2e8b57" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+    },
 }
 
 
@@ -694,6 +698,10 @@ def inject_globals():
         'profile': 'profiel',
         'settings': 'profiel',
         'notifications_page': '',
+        'consent_list': 'kluis',
+        'consent_new': 'kluis',
+        'consent_detail': 'kluis',
+        'edit_policy': 'kluis',
     }
     active = nav_map.get(request.endpoint, '')
     return {
@@ -1007,6 +1015,27 @@ def browse_folder(folder_path):
     recent_files = get_recent_files() if not folder_path else []
     share_link_url = request.args.get('share_link', '')
     stats = get_pod_stats_filesystem() if not folder_path else None
+    consent_stats = get_consent_stats() if not folder_path else None
+
+    # Get policy info for current folder
+    folder_policy = None
+    folder_policy_summary = None
+    if folder_path:
+        fp = safe_pod_path(folder_path)
+        if fp and os.path.isdir(fp):
+            folder_policy = get_container_policy(fp)
+            folder_policy_summary = policy_summary_nl(folder_policy)
+
+    # Build policy summaries for folder grid on dashboard
+    folder_policies = {}
+    if not folder_path:
+        pod_path = get_pod_data_path()
+        for fname in DEFAULT_FOLDERS:
+            fdir = os.path.join(pod_path, fname)
+            if os.path.isdir(fdir):
+                p = get_container_policy(fdir)
+                folder_policies[fname] = policy_summary_nl(p)
+
     return render_template('index.html',
         items=items,
         pod_url=SOLID_POD_URL,
@@ -1022,6 +1051,10 @@ def browse_folder(folder_path):
         current_sort=sort_by,
         share_link_url=share_link_url,
         stats=stats,
+        consent_stats=consent_stats,
+        folder_policy=folder_policy,
+        folder_policy_summary=folder_policy_summary,
+        folder_policies=folder_policies,
     )
 
 
@@ -1788,6 +1821,497 @@ def redirect_to_folder(folder_path):
     return redirect(url_for('index'))
 
 
+# === ODRL POLICY FUNCTIONS ===
+
+import json as _json
+
+
+def get_container_policy(container_path):
+    """Read the ODRL policy for a container, return dict or None"""
+    policy_file = os.path.join(container_path, '.policy.jsonld')
+    if os.path.exists(policy_file):
+        with open(policy_file, 'r', encoding='utf-8') as f:
+            return _json.load(f)
+    return None
+
+
+def policy_summary_nl(policy):
+    """Generate a Dutch summary of an ODRL policy"""
+    if policy is None:
+        return "Geen policy ingesteld"
+
+    permissions = policy.get('permission', [])
+    prohibitions = policy.get('prohibition', [])
+
+    parts = []
+    has_owner_only = False
+    has_anyone_read = False
+    has_distribute_prohibition = False
+    has_temporal = False
+
+    for perm in permissions:
+        assignee = perm.get('assignee', 'onbekend')
+        actions = perm.get('action', [])
+        if isinstance(actions, str):
+            actions = [actions]
+        if assignee == 'urn:mysolido:owner':
+            has_owner_only = True
+        elif assignee == 'urn:mysolido:anyone':
+            has_anyone_read = 'read' in actions
+            if perm.get('constraint'):
+                has_temporal = True
+
+    for prohib in prohibitions:
+        actions = prohib.get('action', [])
+        if isinstance(actions, str):
+            actions = [actions]
+        if 'distribute' in actions:
+            has_distribute_prohibition = True
+
+    if has_temporal and has_anyone_read:
+        return "Tijdelijk delen"
+    elif has_anyone_read and has_distribute_prohibition:
+        return "Lezen, niet downloaden"
+    elif has_anyone_read:
+        return "Lezen toegestaan"
+    elif has_owner_only and has_distribute_prohibition:
+        return "Alleen eigenaar \u2014 niet delen"
+    elif has_owner_only:
+        return "Alleen eigenaar"
+    else:
+        return "Aangepaste policy"
+
+
+def build_policy(folder_name, rule):
+    """Build an ODRL policy dict for a given rule type"""
+    policy = {
+        "@context": [
+            "http://www.w3.org/ns/odrl.jsonld",
+            {"dpv": "https://w3id.org/dpv#"}
+        ],
+        "@type": "Set",
+        "uid": f"urn:mysolido:policy:{folder_name}",
+        "profile": "http://www.w3.org/ns/odrl/2/core",
+        "permission": [
+            {
+                "target": f"urn:mysolido:container:{folder_name}",
+                "assignee": "urn:mysolido:owner",
+                "action": ["read", "write", "delete"]
+            }
+        ],
+        "prohibition": [
+            {
+                "target": f"urn:mysolido:container:{folder_name}",
+                "action": "distribute"
+            }
+        ]
+    }
+
+    if rule == 'read':
+        policy['permission'].append({
+            "target": f"urn:mysolido:container:{folder_name}",
+            "assignee": "urn:mysolido:anyone",
+            "action": "read"
+        })
+        policy['prohibition'] = []
+    elif rule == 'read-no-download':
+        policy['permission'].append({
+            "target": f"urn:mysolido:container:{folder_name}",
+            "assignee": "urn:mysolido:anyone",
+            "action": "read"
+        })
+    elif rule == 'temporal':
+        policy['permission'].append({
+            "target": f"urn:mysolido:container:{folder_name}",
+            "assignee": "urn:mysolido:anyone",
+            "action": "read",
+            "constraint": {
+                "leftOperand": "dateTime",
+                "operator": "lteq",
+                "rightOperand": {
+                    "@type": "xsd:dateTime",
+                    "@value": (datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%dT%H:%M:%SZ')
+                }
+            }
+        })
+    # rule == 'owner' uses the default (owner only, no distribute)
+
+    return policy
+
+
+def detect_policy_rule(policy):
+    """Detect which rule type a policy represents"""
+    if policy is None:
+        return 'owner'
+
+    permissions = policy.get('permission', [])
+    prohibitions = policy.get('prohibition', [])
+
+    has_anyone_read = False
+    has_temporal = False
+    has_distribute_prohibition = False
+
+    for perm in permissions:
+        if perm.get('assignee') == 'urn:mysolido:anyone' and 'read' in (perm.get('action') if isinstance(perm.get('action'), list) else [perm.get('action', '')]):
+            has_anyone_read = True
+            if perm.get('constraint'):
+                has_temporal = True
+
+    for prohib in prohibitions:
+        actions = prohib.get('action', [])
+        if isinstance(actions, str):
+            actions = [actions]
+        if 'distribute' in actions:
+            has_distribute_prohibition = True
+
+    if has_temporal:
+        return 'temporal'
+    elif has_anyone_read and has_distribute_prohibition:
+        return 'read-no-download'
+    elif has_anyone_read:
+        return 'read'
+    return 'owner'
+
+
+def init_default_policies():
+    """Create default .policy.jsonld for each standard folder if not present"""
+    pod_path = get_pod_data_path()
+    for folder in DEFAULT_FOLDERS:
+        folder_path = os.path.join(pod_path, folder)
+        if not os.path.isdir(folder_path):
+            continue
+        policy_file = os.path.join(folder_path, '.policy.jsonld')
+        if not os.path.exists(policy_file):
+            policy = build_policy(folder, 'owner')
+            with open(policy_file, 'w', encoding='utf-8') as f:
+                _json.dump(policy, f, indent=4, ensure_ascii=False)
+
+
+@app.route('/policy/<path:folder_path>', methods=['GET', 'POST'])
+def edit_policy(folder_path):
+    """View and edit the ODRL policy for a container"""
+    if BRIDGE_MODE:
+        flash('Niet beschikbaar in Bridge-modus', 'error')
+        return redirect(url_for('index'))
+
+    folder_path = folder_path.strip('/')
+    full_path = safe_pod_path(folder_path)
+    if not full_path or not os.path.isdir(full_path):
+        flash('Map niet gevonden', 'error')
+        return redirect(url_for('index'))
+
+    folder_name = folder_path.split('/')[-1] if '/' in folder_path else folder_path
+
+    if request.method == 'POST':
+        rule = request.form.get('rule', 'owner')
+        policy = build_policy(folder_name, rule)
+        policy_file = os.path.join(full_path, '.policy.jsonld')
+        with open(policy_file, 'w', encoding='utf-8') as f:
+            _json.dump(policy, f, indent=4, ensure_ascii=False)
+        flash(f'Policy bijgewerkt voor {folder_name}', 'success')
+        log_action('policy_update', {'folder': folder_path, 'rule': rule})
+        return redirect(url_for('edit_policy', folder_path=folder_path))
+
+    policy = get_container_policy(full_path)
+    current_rule = detect_policy_rule(policy)
+    summary = policy_summary_nl(policy)
+    breadcrumbs = build_breadcrumbs(folder_path)
+
+    return render_template('policy_edit.html',
+        folder_path=folder_path,
+        folder_name=folder_name,
+        policy=policy,
+        current_rule=current_rule,
+        summary=summary,
+        breadcrumbs=breadcrumbs,
+    )
+
+
+# === CONSENT MODULE ===
+
+PURPOSE_MAP = {
+    'medical': {'@type': 'dpv:ServiceProvision', 'label': 'Medische behandeling'},
+    'legal': {'@type': 'dpv:LegalCompliance', 'label': 'Juridisch advies'},
+    'financial': {'@type': 'dpv:ServiceProvision', 'label': 'Financieel advies'},
+    'insurance': {'@type': 'dpv:ServiceProvision', 'label': 'Verzekering'},
+    'government': {'@type': 'dpv:LegalObligation', 'label': 'Overheid'},
+    'education': {'@type': 'dpv:ServiceProvision', 'label': 'Onderwijs'},
+    'other': {'@type': 'dpv:Purpose', 'label': 'Overig'},
+}
+
+DATA_CATEGORY_MAP = {
+    'identity': {'@type': 'dpv:Identifying', 'label': 'Identiteitsgegevens'},
+    'medical': {'@type': 'dpv:MedicalHealth', 'label': 'Medische gegevens'},
+    'financial': {'@type': 'dpv:Financial', 'label': 'Financi\u00eble gegevens'},
+    'legal': {'@type': 'dpv:Official', 'label': 'Juridische documenten'},
+    'work': {'@type': 'dpv:Professional', 'label': 'Werkgerelateerd'},
+    'other': {'@type': 'dpv:PersonalData', 'label': 'Overig'},
+}
+
+
+def get_consent_dir():
+    """Return the absolute path to the toestemmingen folder"""
+    return safe_pod_path('toestemmingen')
+
+
+def load_all_consents():
+    """Load all consent records from the toestemmingen folder"""
+    consent_dir = get_consent_dir()
+    if not consent_dir or not os.path.isdir(consent_dir):
+        return []
+
+    consents = []
+    for fname in os.listdir(consent_dir):
+        if fname.endswith('.jsonld') and not fname.startswith('.'):
+            fpath = os.path.join(consent_dir, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    record = _json.load(f)
+                record['_filename'] = fname
+                record['_id'] = fname.replace('.jsonld', '')
+                consents.append(record)
+            except (_json.JSONDecodeError, IOError):
+                continue
+
+    consents.sort(key=lambda r: r.get('dct:created', ''), reverse=True)
+    return consents
+
+
+def get_consent_status_display(record):
+    """Return status display info for a consent record"""
+    status = record.get('dpv:hasConsentStatus', '')
+    if status == 'dpv:ConsentStatusWithdrawn':
+        return {'label': 'Ingetrokken', 'icon': '\u274c', 'class': 'status-withdrawn'}
+
+    expiry = record.get('dpv:hasExpiry', {})
+    expiry_time = expiry.get('dpv:hasExpiryTime', '') if isinstance(expiry, dict) else ''
+    if expiry_time:
+        try:
+            exp_dt = datetime.fromisoformat(expiry_time.replace('Z', '+00:00'))
+            if exp_dt < datetime.now(exp_dt.tzinfo):
+                return {'label': 'Verlopen', 'icon': '\u23f0', 'class': 'status-expired'}
+        except (ValueError, TypeError):
+            pass
+
+    if status == 'dpv:ConsentStatusGiven':
+        return {'label': 'Actief', 'icon': '\u2705', 'class': 'status-active'}
+
+    return {'label': 'Onbekend', 'icon': '\u2753', 'class': 'status-unknown'}
+
+
+def get_consent_stats():
+    """Return consent statistics for the dashboard"""
+    consents = load_all_consents()
+    active = 0
+    expired = 0
+    withdrawn = 0
+    for c in consents:
+        status = get_consent_status_display(c)
+        if status['class'] == 'status-active':
+            active += 1
+        elif status['class'] == 'status-expired':
+            expired += 1
+        elif status['class'] == 'status-withdrawn':
+            withdrawn += 1
+    return {'active': active, 'expired': expired, 'withdrawn': withdrawn, 'total': len(consents)}
+
+
+def generate_consent_id():
+    """Generate a unique consent ID: urn:mysolido:consent:YYYYMMDD-NNN"""
+    consent_dir = get_consent_dir()
+    date_str = datetime.utcnow().strftime('%Y%m%d')
+    existing = []
+    if consent_dir and os.path.isdir(consent_dir):
+        for fname in os.listdir(consent_dir):
+            if fname.startswith(date_str) and fname.endswith('.jsonld'):
+                try:
+                    num = int(fname.replace('.jsonld', '').split('-')[-1])
+                    existing.append(num)
+                except (ValueError, IndexError):
+                    pass
+    next_num = max(existing, default=0) + 1
+    return f"{date_str}-{next_num:03d}"
+
+
+@app.route('/consent')
+def consent_list():
+    """Overview of all consent records"""
+    consents = load_all_consents()
+    enriched = []
+    for c in consents:
+        c['_status'] = get_consent_status_display(c)
+        # Extract readable fields
+        controller = c.get('dpv:hasDataController', {})
+        c['_receiver'] = controller.get('dct:title', 'Onbekend') if isinstance(controller, dict) else str(controller)
+        purpose = c.get('dpv:hasPurpose', {})
+        c['_purpose'] = purpose.get('dct:description', purpose.get('@type', 'Onbekend')) if isinstance(purpose, dict) else str(purpose)
+        expiry = c.get('dpv:hasExpiry', {})
+        c['_expiry_date'] = expiry.get('dpv:hasExpiryTime', '')[:10] if isinstance(expiry, dict) else ''
+        enriched.append(c)
+
+    return render_template('consent_list.html', consents=enriched)
+
+
+@app.route('/consent/new', methods=['GET', 'POST'])
+def consent_new():
+    """Create a new consent record"""
+    if BRIDGE_MODE:
+        flash('Niet beschikbaar in Bridge-modus', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        receiver = request.form.get('receiver', '').strip()
+        purpose_key = request.form.get('purpose', 'other')
+        category_key = request.form.get('category', 'other')
+        expires = request.form.get('expires', '').strip()
+        note = request.form.get('note', '').strip()
+
+        if not title or not receiver:
+            flash('Titel en ontvanger zijn verplicht', 'error')
+            return redirect(url_for('consent_new'))
+
+        consent_id = generate_consent_id()
+        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        purpose_info = PURPOSE_MAP.get(purpose_key, PURPOSE_MAP['other'])
+        category_info = DATA_CATEGORY_MAP.get(category_key, DATA_CATEGORY_MAP['other'])
+
+        record = {
+            "@context": [
+                "http://www.w3.org/ns/odrl.jsonld",
+                {
+                    "dpv": "https://w3id.org/dpv#",
+                    "dct": "http://purl.org/dc/terms/",
+                    "xsd": "http://www.w3.org/2001/XMLSchema#"
+                }
+            ],
+            "@type": "dpv:ConsentRecord",
+            "@id": f"urn:mysolido:consent:{consent_id}",
+            "dct:title": title,
+            "dct:created": now,
+            "dct:modified": now,
+            "dpv:hasDataSubject": "urn:mysolido:owner",
+            "dpv:hasDataController": {
+                "@id": f"urn:mysolido:party:{secrets.token_hex(4)}",
+                "dct:title": receiver
+            },
+            "dpv:hasPurpose": {
+                "@type": purpose_info['@type'],
+                "dct:description": purpose_info['label']
+            },
+            "dpv:hasPersonalDataCategory": category_info['@type'],
+            "dpv:hasConsentStatus": "dpv:ConsentStatusGiven",
+            "dpv:hasLegalBasis": "dpv:Consent",
+            "dpv:hasRight": "dpv:RightToWithdrawConsent"
+        }
+
+        if description:
+            record["dct:description"] = description
+        if note:
+            record["dpv:note"] = note
+        if expires:
+            record["dpv:hasExpiry"] = {
+                "@type": "dpv:TemporalDuration",
+                "dpv:hasExpiryTime": f"{expires}T00:00:00Z"
+            }
+
+        consent_dir = get_consent_dir()
+        if consent_dir:
+            os.makedirs(consent_dir, exist_ok=True)
+            fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
+            with open(fpath, 'w', encoding='utf-8') as f:
+                _json.dump(record, f, indent=4, ensure_ascii=False)
+            flash(f'Toestemming "{title}" vastgelegd', 'success')
+            log_action('consent_create', {'title': title, 'receiver': receiver})
+        else:
+            flash('Toestemmingen-map niet gevonden', 'error')
+
+        return redirect(url_for('consent_list'))
+
+    return render_template('consent_form.html',
+        purposes=PURPOSE_MAP,
+        categories=DATA_CATEGORY_MAP,
+    )
+
+
+@app.route('/consent/<consent_id>')
+def consent_detail(consent_id):
+    """View a single consent record"""
+    consent_dir = get_consent_dir()
+    if not consent_dir:
+        flash('Toestemmingen-map niet gevonden', 'error')
+        return redirect(url_for('consent_list'))
+
+    fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Toestemming niet gevonden', 'error')
+        return redirect(url_for('consent_list'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    record['_id'] = consent_id
+    record['_status'] = get_consent_status_display(record)
+
+    return render_template('consent_detail.html', consent=record)
+
+
+@app.route('/consent/<consent_id>/withdraw', methods=['POST'])
+def consent_withdraw(consent_id):
+    """Withdraw a consent record"""
+    if BRIDGE_MODE:
+        flash('Niet beschikbaar in Bridge-modus', 'error')
+        return redirect(url_for('consent_list'))
+
+    consent_dir = get_consent_dir()
+    if not consent_dir:
+        flash('Toestemmingen-map niet gevonden', 'error')
+        return redirect(url_for('consent_list'))
+
+    fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Toestemming niet gevonden', 'error')
+        return redirect(url_for('consent_list'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    record['dpv:hasConsentStatus'] = 'dpv:ConsentStatusWithdrawn'
+    record['dct:modified'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    with open(fpath, 'w', encoding='utf-8') as f:
+        _json.dump(record, f, indent=4, ensure_ascii=False)
+
+    title = record.get('dct:title', consent_id)
+    flash(f'Toestemming "{title}" ingetrokken', 'success')
+    log_action('consent_withdraw', {'id': consent_id, 'title': title})
+    return redirect(url_for('consent_list'))
+
+
+@app.route('/consent/<consent_id>/delete', methods=['POST'])
+def consent_delete(consent_id):
+    """Delete a consent record"""
+    if BRIDGE_MODE:
+        flash('Niet beschikbaar in Bridge-modus', 'error')
+        return redirect(url_for('consent_list'))
+
+    consent_dir = get_consent_dir()
+    if not consent_dir:
+        flash('Toestemmingen-map niet gevonden', 'error')
+        return redirect(url_for('consent_list'))
+
+    fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Toestemming niet gevonden', 'error')
+        return redirect(url_for('consent_list'))
+
+    os.remove(fpath)
+    flash('Toestemming verwijderd', 'success')
+    log_action('consent_delete', {'id': consent_id})
+    return redirect(url_for('consent_list'))
+
+
 if __name__ == '__main__':
     print()
 
@@ -1816,6 +2340,9 @@ if __name__ == '__main__':
             print("  npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json")
             print()
             exit(1)
+
+        # Initialize default ODRL policies for all standard folders
+        init_default_policies()
 
         print()
         print(f"  Pod: {os.getenv('SOLID_POD_URL')}")
