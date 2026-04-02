@@ -698,9 +698,11 @@ def inject_globals():
         'profile': 'profiel',
         'settings': 'profiel',
         'notifications_page': '',
-        'consent_list': 'kluis',
-        'consent_new': 'kluis',
-        'consent_detail': 'kluis',
+        'consent_list': 'toestemmingen',
+        'consent_new': 'toestemmingen',
+        'consent_detail': 'toestemmingen',
+        'consent_withdraw': 'toestemmingen',
+        'consent_delete': 'toestemmingen',
         'edit_policy': 'kluis',
     }
     active = nav_map.get(request.endpoint, '')

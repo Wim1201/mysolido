@@ -53,6 +53,7 @@
             <a href="{{ url_for('shares_overview') }}" class="{{ 'active' if active_nav == 'gedeeld' }}">{{ icon_share() }} Gedeeld</a>
             <a href="{{ url_for('trash_overview') }}" class="{{ 'active' if active_nav == 'prullenbak' }}">{{ icon_trash() }} Prullenbak</a>
             <a href="{{ url_for('audit') }}" class="{{ 'active' if active_nav == 'logboek' }}">{{ icon_file() }} Logboek</a>
+            <a href="{{ url_for('consent_list') }}" class="{{ 'active' if active_nav == 'toestemmingen' }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Toestemmingen</a>
             <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }} Profiel</a>
         </nav>
     </header>
