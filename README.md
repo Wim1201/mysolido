@@ -26,6 +26,10 @@ MySolido is open source software that runs a personal data vault (Solid Pod) on 
 - **Backup** — Export your entire vault as ZIP
 - **Dashboard** — Statistics: file count, storage size, folders, active share links
 - **Bridge** — Access your vault from anywhere, on your phone, as a read-only mirror
+- **ODRL policies** — Machine-readable sharing rules per folder (W3C Recommendation). Control who can do what: owner only, read allowed, or temporary sharing
+- **Consent management** — Record who has access to your data and why, compliant with ISO/IEC TS 27560:2023 and W3C Data Privacy Vocabulary
+- **Watermarks** — Automatic watermark on PDFs and images when viewed via share links. The original stays untouched
+- **macOS support** — `.dmg` installer available, or manual installation via Terminal
 
 ---
 
@@ -87,14 +91,34 @@ Open <http://localhost:5000> in your browser.
 
 On first launch, MySolido automatically creates an account and pod.
 
+### macOS
+
+Download `MySolido-Installer.dmg` from the [Releases](https://github.com/Wim1201/mysolido/releases) page.
+
+Or install manually:
+
+```bash
+git clone https://github.com/Wim1201/mysolido.git
+cd mysolido
+npm install
+pip3 install -r requirements.txt
+bash start-mysolido.sh
+```
+
+> macOS may show a warning about an unknown developer. Go to System Settings → Privacy & Security → "Open Anyway".
+
 ### Starting after installation
 
 ```bash
 # Windows: double-click
 start-mysolido.bat
 
+# macOS
+bash start-mysolido.sh
+
 # Stop
-stop-mysolido.bat
+stop-mysolido.bat       # Windows
+# macOS: Ctrl+C in terminal
 ```
 
 ---
@@ -121,10 +145,20 @@ Your data lives in the `.data/` folder on your own hard drive. Nothing leaves yo
 
 ## Roadmap
 
+### Available
+
+* ODRL policy engine — sharing rules per folder (W3C ODRL 2.2)
+* Consent management — consent records compliant with ISO/IEC TS 27560:2023
+* Watermarks on share links — automatic watermark on PDFs and images
+* macOS installer (.dmg)
+* Bridge — always reachable via bridge.mysolido.com
+
+### Planned
+
 * **AI-ready vault** — Your documents, chat history and preferences safely available locally for personal AI agents
 * Per-folder encryption
 * OCR / document scanning
-* ODRL policy engine (share data under your own terms)
+* A4DS/UMA authorisation (role-based access)
 * EUDI Wallet / Jouw.id integration
 * API connections (government services, insurers, banks)
 * Portable installer (USB stick, no installation needed)
@@ -140,6 +174,9 @@ Your data lives in the `.data/` folder on your own hard drive. Nothing leaves yo
 | Protocol | [Solid](https://solidproject.org) (W3C standard) |
 | Data format | RDF / Linked Data |
 | Storage | Local on your own PC |
+| Policies | ODRL 2.2 (W3C Recommendation) + JSON-LD |
+| Consent | W3C Data Privacy Vocabulary v2.3 + ISO/IEC TS 27560:2023 |
+| Watermarks | reportlab (PDF) + Pillow (images) |
 | Bridge | Dutch VPS (mijn.host) + Nginx + Let's Encrypt |
 
 MySolido uses the same standard as [Athumi](https://athumi.be) (Flemish government), the [Dutch Data Vault](https://jouw.id) (Upod) and the EU Digital Identity Wallet — fully interoperable.
@@ -169,7 +206,7 @@ Nextcloud is a self-hosted cloud — it replaces Google Drive as a server. MySol
 Export regular backups (ZIP) via the settings. With the Bridge, you automatically have a copy on a second location.
 
 **Does it work on Mac/Linux?**
-The code is platform-independent (Python + Node.js), but the installer and start scripts are currently Windows-specific. Mac/Linux users can follow the manual installation.
+macOS is supported with a `.dmg` installer and `start-mysolido.sh` launcher script. Linux users can follow the manual installation (Python + Node.js).
 
 ---
 

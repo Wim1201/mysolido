@@ -26,6 +26,10 @@ MySolido is open source software die een persoonlijke datakluis (Solid Pod) op j
 - **Backup** — Exporteer je hele kluis als ZIP
 - **Dashboard** — Statistieken: aantal bestanden, opslaggrootte, mappen, actieve deellinks
 - **Bridge** — Je kluis bereikbaar via internet, op je telefoon, als read-only spiegel
+- **ODRL policies** — Machine-leesbare deelregels per map (W3C Recommendation). Bepaal per map wie wat mag: alleen eigenaar, lezen toegestaan, of tijdelijk delen
+- **Toestemmingen** — Leg vast wie toegang heeft tot jouw gegevens en waarom, conform ISO/IEC TS 27560:2023 en W3C Data Privacy Vocabulary
+- **Watermerken** — Automatisch watermerk op PDF's en afbeeldingen bij deellinks. Origineel blijft onaangeroerd
+- **macOS ondersteuning** — `.dmg` installer beschikbaar, of handmatige installatie via Terminal
 
 ---
 
@@ -87,14 +91,34 @@ Open [http://localhost:5000](http://localhost:5000) in je browser.
 
 Bij eerste opstart maakt MySolido automatisch een account en pod aan.
 
+### macOS
+
+Download `MySolido-Installer.dmg` van de [Releases](https://github.com/Wim1201/mysolido/releases) pagina.
+
+Of handmatig installeren:
+
+```bash
+git clone https://github.com/Wim1201/mysolido.git
+cd mysolido
+npm install
+pip3 install -r requirements.txt
+bash start-mysolido.sh
+```
+
+> macOS kan een waarschuwing tonen over een onbekende ontwikkelaar. Ga naar Systeeminstellingen → Privacy en beveiliging → "Toch openen".
+
 ### Opstarten na installatie
 
 ```bash
 # Windows: dubbelklik op
 start-mysolido.bat
 
+# macOS
+bash start-mysolido.sh
+
 # Stoppen
-stop-mysolido.bat
+stop-mysolido.bat       # Windows
+# macOS: Ctrl+C in terminal
 ```
 
 ---
@@ -121,10 +145,20 @@ Je data staat in de `.data/` map op je eigen harde schijf. Niets verlaat je comp
 
 ## Roadmap
 
+### Beschikbaar
+
+* ODRL policy engine — deelregels per map (W3C ODRL 2.2)
+* Consent-module — toestemmingen conform ISO/IEC TS 27560:2023
+* Watermerken op deellinks — automatisch watermerk op PDF's en afbeeldingen
+* macOS installer (.dmg)
+* Bridge — altijd bereikbaar via bridge.mysolido.com
+
+### Gepland
+
 * **AI-ready vault** — Je documenten, chatgeschiedenis en voorkeuren veilig lokaal beschikbaar voor persoonlijke AI-agents
 * Encryptie per map
 * OCR / documenten scannen
-* ODRL policy engine (data delen onder jouw voorwaarden)
+* A4DS/UMA autorisatie (rolgebaseerde toegang)
 * EUDI Wallet / Jouw.id koppeling
 * API-koppelingen (MijnOverheid, verzekeraars, banken)
 * Portable installer (USB-stick, geen installatie nodig)
@@ -139,6 +173,9 @@ Je data staat in de `.data/` map op je eigen harde schijf. Niets verlaat je comp
 | Protocol | [Solid](https://solidproject.org) (W3C-standaard) |
 | Frontend | [Flask](https://flask.palletsprojects.com) (Python) |
 | Data-formaat | RDF / Linked Data |
+| Policies | ODRL 2.2 (W3C Recommendation) + JSON-LD |
+| Consent | W3C Data Privacy Vocabulary v2.3 + ISO/IEC TS 27560:2023 |
+| Watermerken | reportlab (PDF) + Pillow (afbeeldingen) |
 | Bridge | Nederlandse VPS (mijn.host) + Nginx + Let's Encrypt |
 | Licentie | GPLv3 |
 
@@ -165,7 +202,7 @@ Nextcloud is een self-hosted cloud — het vervangt Google Drive als server. MyS
 Exporteer regelmatig een backup (ZIP) via de instellingen. Met de Bridge heb je automatisch een kopie op een tweede locatie.
 
 **Werkt het op Mac/Linux?**
-De code is platform-onafhankelijk (Python + Node.js), maar de installer en start-scripts zijn nu Windows-specifiek. Mac/Linux gebruikers kunnen de handmatige installatie volgen.
+macOS wordt ondersteund met een `.dmg` installer en `start-mysolido.sh` launcher script. Linux-gebruikers kunnen de handmatige installatie volgen (Python + Node.js).
 
 ---
 
