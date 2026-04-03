@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Verzoek ontvangen - MySolido{% endblock %}
+
+{% block content %}
+    <div class="card" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9989;</div>
+        <h2 style="font-size: 1.3rem; margin-bottom: 12px;">Uw verzoek is ontvangen</h2>
+        <p style="color: var(--color-text-muted); max-width: 500px; margin: 0 auto 20px;">
+            De eigenaar van de kluis zal uw verzoek beoordelen. U kunt de status van uw verzoek op elk moment controleren via de onderstaande link.
+        </p>
+
+        <div style="background: var(--color-bg-hover); border: 1px solid var(--color-border); border-radius: 8px; padding: 16px; margin: 20px auto; max-width: 500px;">
+            <p style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 8px;">Uw statuslink (bewaar deze!):</p>
+            <a href="{{ url_for('verzoek_status', status_token=status_token) }}"
+               style="word-break: break-all; font-size: 0.9rem;">
+                {{ request.url_root.rstrip('/') }}{{ url_for('verzoek_status', status_token=status_token) }}
+            </a>
+        </div>
+
+        <p style="font-size: 0.8rem; color: var(--color-text-muted);">
+            Bewaar deze link zodat u de status later kunt controleren.
+        </p>
+    </div>
+{% endblock %}

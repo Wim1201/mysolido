@@ -676,7 +676,10 @@ def check_bridge_auth():
     if not BRIDGE_MODE:
         return
 
-    public_routes = ['bridge_login', 'view_shared_file', 'static']
+    public_routes = [
+        'bridge_login', 'view_shared_file', 'static',
+        'verzoek_formulier', 'verzoek_submit', 'verzoek_status', 'verzoek_response',
+    ]
 
     if request.endpoint in public_routes:
         return
@@ -735,11 +738,16 @@ def inject_globals():
         'intentie_activate': 'profiel',
         'intentie_withdraw': 'profiel',
         'intentie_delete': 'profiel',
+        'verzoeken_overview': 'profiel',
+        'verzoek_detail_owner': 'profiel',
+        'verzoek_approve': 'profiel',
+        'verzoek_reject': 'profiel',
     }
     active = nav_map.get(request.endpoint, '')
     return {
         'folder_icons': FOLDER_ICONS,
         'unread_count': get_unread_count(),
+        'new_requests_count': count_new_requests(),
         'active_nav': active,
         'bridge_mode': BRIDGE_MODE,
         'bridge_sync_configured': bridge_sync_configured(),
@@ -2990,6 +2998,457 @@ def intentie_delete(intention_id):
     flash('Intentie verwijderd', 'success')
     log_action('intention_delete', {'id': intention_id})
     return redirect(url_for('intenties_overview'))
+
+
+# === CONSENT REQUEST MODULE (Fase 3 — verzoeken van buitenaf) ===
+
+REQUEST_CATEGORIES = {
+    'verzekeringen': {'label': 'Verzekeringen', 'description': 'Ik wil een verzekeringsaanbod doen'},
+    'financieel': {'label': 'Financieel advies', 'description': 'Ik wil financieel advies geven'},
+    'zorg': {'label': 'Zorg', 'description': 'Ik heb medische gegevens nodig'},
+    'juridisch': {'label': 'Juridisch', 'description': 'Ik heb juridische documenten nodig'},
+    'anders': {'label': 'Anders', 'description': 'Anders (toelichting hieronder)'},
+}
+
+APPROVAL_VALIDITY = {
+    '1d': {'label': '1 dag', 'days': 1},
+    '1w': {'label': '1 week', 'days': 7},
+    '1m': {'label': '1 maand', 'days': 30},
+    '3m': {'label': '3 maanden', 'days': 90},
+}
+
+# Simple in-memory rate limiter: {ip: [timestamp, ...]}
+_request_rate_limit = {}
+
+
+def is_rate_limited(ip, max_requests=10, window_seconds=3600):
+    """Check and enforce rate limit: max requests per window per IP"""
+    now = time.time()
+    timestamps = _request_rate_limit.get(ip, [])
+    # Remove old timestamps
+    timestamps = [t for t in timestamps if now - t < window_seconds]
+    if len(timestamps) >= max_requests:
+        _request_rate_limit[ip] = timestamps
+        return True
+    timestamps.append(now)
+    _request_rate_limit[ip] = timestamps
+    return False
+
+
+def get_verzoeken_dir():
+    """Return the absolute path to the verzoeken folder"""
+    return safe_pod_path('verzoeken')
+
+
+def load_all_requests():
+    """Load all consent request records from the verzoeken folder"""
+    verzoeken_dir = get_verzoeken_dir()
+    if not verzoeken_dir or not os.path.isdir(verzoeken_dir):
+        return []
+
+    requests_list = []
+    for fname in os.listdir(verzoeken_dir):
+        if fname.endswith('.jsonld') and not fname.startswith('.'):
+            fpath = os.path.join(verzoeken_dir, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    record = _json.load(f)
+                record['_id'] = fname.replace('.jsonld', '')
+                requests_list.append(record)
+            except (_json.JSONDecodeError, IOError):
+                continue
+
+    requests_list.sort(key=lambda r: r.get('schema:dateCreated', ''), reverse=True)
+    return requests_list
+
+
+def count_new_requests():
+    """Count unhandled (new) requests for badge display"""
+    try:
+        reqs = load_all_requests()
+        return sum(1 for r in reqs if r.get('mysolido:status') == 'nieuw')
+    except Exception:
+        return 0
+
+
+def find_request_by_status_token(token):
+    """Find a request record by its status token"""
+    verzoeken_dir = get_verzoeken_dir()
+    if not verzoeken_dir or not os.path.isdir(verzoeken_dir):
+        return None, None
+
+    for fname in os.listdir(verzoeken_dir):
+        if fname.endswith('.jsonld') and not fname.startswith('.'):
+            fpath = os.path.join(verzoeken_dir, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    record = _json.load(f)
+                if record.get('mysolido:statusToken') == token:
+                    record['_id'] = fname.replace('.jsonld', '')
+                    return record, fpath
+            except (_json.JSONDecodeError, IOError):
+                continue
+    return None, None
+
+
+def ensure_verzoeken_policy():
+    """Create ODRL policy for verzoeken folder if it doesn't exist"""
+    if not pod_exists('verzoeken/.policy.jsonld'):
+        policy = {
+            "@context": [
+                "http://www.w3.org/ns/odrl.jsonld",
+                {"dpv": "https://w3id.org/dpv#"}
+            ],
+            "@type": "Set",
+            "uid": "urn:mysolido:policy:verzoeken",
+            "profile": "http://www.w3.org/ns/odrl/2/core",
+            "permission": [{
+                "target": "urn:mysolido:container:verzoeken",
+                "assignee": "urn:mysolido:owner",
+                "action": ["read", "write", "delete"]
+            }],
+            "prohibition": [{
+                "target": "urn:mysolido:container:verzoeken",
+                "action": "distribute"
+            }]
+        }
+        pod_mkdir('verzoeken')
+        pod_write('verzoeken/.policy.jsonld',
+                  _json.dumps(policy, indent=2, ensure_ascii=False))
+
+
+def sanitize_input(value):
+    """Strip HTML tags and trim whitespace from user input"""
+    if not value:
+        return ''
+    # Remove HTML tags
+    clean = re.sub(r'<[^>]+>', '', str(value))
+    return clean.strip()
+
+
+# --- Public routes (work on Bridge too, no login needed) ---
+
+@app.route('/verzoek', methods=['GET'])
+def verzoek_formulier():
+    """Public consent request form"""
+    return render_template('verzoek_formulier.html',
+        categories=REQUEST_CATEGORIES,
+    )
+
+
+@app.route('/verzoek', methods=['POST'])
+def verzoek_submit():
+    """Submit a consent request (public, works on Bridge)"""
+    # Rate limiting
+    client_ip = request.remote_addr or 'unknown'
+    if is_rate_limited(client_ip):
+        flash('Te veel verzoeken. Probeer het later opnieuw.', 'error')
+        return redirect(url_for('verzoek_formulier'))
+
+    name = sanitize_input(request.form.get('name', ''))
+    organization = sanitize_input(request.form.get('organization', ''))
+    email = sanitize_input(request.form.get('email', ''))
+    category = request.form.get('category', 'anders')
+    purpose = sanitize_input(request.form.get('purpose', ''))
+    requested_data = request.form.getlist('requested_data')
+    agreed = request.form.get('agreed_terms') == 'yes'
+
+    # Validation
+    if not name or not email or not purpose:
+        flash('Naam, e-mailadres en toelichting zijn verplicht.', 'error')
+        return redirect(url_for('verzoek_formulier'))
+
+    if not agreed:
+        flash('U moet akkoord gaan met de voorwaarden.', 'error')
+        return redirect(url_for('verzoek_formulier'))
+
+    if not requested_data:
+        flash('Selecteer ten minste één gegevensgroep.', 'error')
+        return redirect(url_for('verzoek_formulier'))
+
+    # Basic email validation
+    if '@' not in email or '.' not in email:
+        flash('Voer een geldig e-mailadres in.', 'error')
+        return redirect(url_for('verzoek_formulier'))
+
+    cat_info = REQUEST_CATEGORIES.get(category, REQUEST_CATEGORIES['anders'])
+    request_id = str(uuid.uuid4())
+    status_token = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+
+    record = {
+        "@context": {
+            "mysolido": "https://mysolido.com/vocab#",
+            "dpv": "https://w3id.org/dpv#",
+            "schema": "https://schema.org/",
+            "xsd": "http://www.w3.org/2001/XMLSchema#"
+        },
+        "@type": "mysolido:ConsentRequest",
+        "@id": f"urn:mysolido:request:{request_id}",
+        "mysolido:statusToken": status_token,
+        "mysolido:status": "nieuw",
+        "schema:dateCreated": now.isoformat(),
+        "mysolido:requester": {
+            "schema:name": name,
+            "schema:worksFor": organization,
+            "schema:email": email,
+        },
+        "mysolido:category": category,
+        "mysolido:categoryLabel": cat_info['label'],
+        "mysolido:requestedData": requested_data,
+        "mysolido:purpose": purpose,
+        "mysolido:agreedToTerms": True,
+        "mysolido:approvedData": None,
+        "mysolido:responseLink": None,
+        "mysolido:validUntil": None,
+        "mysolido:rejectionReason": None,
+    }
+
+    pod_mkdir('verzoeken')
+    pod_write(f'verzoeken/{request_id}.jsonld',
+              _json.dumps(record, indent=2, ensure_ascii=False))
+    ensure_verzoeken_policy()
+
+    return render_template('verzoek_bevestiging.html',
+        status_token=status_token,
+    )
+
+
+@app.route('/verzoek/status/<status_token>')
+def verzoek_status(status_token):
+    """Public status page for a consent request"""
+    record, _ = find_request_by_status_token(status_token)
+    if not record:
+        return render_template('verzoek_status.html', found=False), 404
+
+    status = record.get('mysolido:status', 'nieuw')
+    response_link = record.get('mysolido:responseLink')
+    valid_until = record.get('mysolido:validUntil', '')
+
+    # Check if approved response has expired
+    if status == 'goedgekeurd' and valid_until:
+        try:
+            exp_dt = datetime.fromisoformat(valid_until)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if exp_dt < datetime.now(timezone.utc):
+                status = 'verlopen'
+        except (ValueError, TypeError):
+            pass
+
+    return render_template('verzoek_status.html',
+        found=True,
+        status=status,
+        response_link=response_link,
+        valid_until=valid_until[:10] if valid_until else '',
+        status_token=status_token,
+    )
+
+
+@app.route('/verzoek/response/<status_token>')
+def verzoek_response(status_token):
+    """Public page showing approved profile data"""
+    record, _ = find_request_by_status_token(status_token)
+    if not record:
+        return render_template('verzoek_response.html', found=False), 404
+
+    status = record.get('mysolido:status', 'nieuw')
+    valid_until = record.get('mysolido:validUntil', '')
+
+    if status != 'goedgekeurd':
+        return render_template('verzoek_response.html', found=False), 404
+
+    # Check expiry
+    if valid_until:
+        try:
+            exp_dt = datetime.fromisoformat(valid_until)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if exp_dt < datetime.now(timezone.utc):
+                return render_template('verzoek_response.html', found=True, expired=True,
+                                       valid_until=valid_until[:10])
+        except (ValueError, TypeError):
+            pass
+
+    # Load the response data
+    request_id = record['_id']
+    response_path = safe_pod_path(f'verzoeken/{request_id}_response.json')
+    if not response_path or not os.path.exists(response_path):
+        return render_template('verzoek_response.html', found=False), 404
+
+    with open(response_path, 'r', encoding='utf-8') as f:
+        response_data = _json.load(f)
+
+    return render_template('verzoek_response.html',
+        found=True,
+        expired=False,
+        response_data=response_data,
+        valid_until=valid_until[:10] if valid_until else '',
+    )
+
+
+# --- Owner routes (local only, blocked on Bridge) ---
+
+@app.route('/verzoeken')
+def verzoeken_overview():
+    """Overview of all incoming consent requests (owner only)"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    requests_list = load_all_requests()
+
+    # Enrich for display
+    for req in requests_list:
+        req['_status'] = req.get('mysolido:status', 'nieuw')
+        requester = req.get('mysolido:requester', {})
+        req['_name'] = requester.get('schema:name', 'Onbekend')
+        req['_organization'] = requester.get('schema:worksFor', '')
+        req['_category_label'] = req.get('mysolido:categoryLabel', 'Anders')
+        req['_date'] = req.get('schema:dateCreated', '')[:10]
+        req['_requested_data'] = req.get('mysolido:requestedData', [])
+
+    return render_template('verzoeken.html', requests=requests_list)
+
+
+@app.route('/verzoeken/<request_id>')
+def verzoek_detail_owner(request_id):
+    """Detail view of a consent request (owner only)"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    verzoeken_dir = get_verzoeken_dir()
+    if not verzoeken_dir:
+        flash('Verzoeken-map niet gevonden', 'error')
+        return redirect(url_for('verzoeken_overview'))
+
+    fpath = os.path.join(verzoeken_dir, f"{request_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Verzoek niet gevonden', 'error')
+        return redirect(url_for('verzoeken_overview'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    record['_id'] = request_id
+    record['_status'] = record.get('mysolido:status', 'nieuw')
+
+    # Load profile data for approval form
+    profile = load_profile_data()
+    profile_groups = extract_profile_groups(profile)
+
+    return render_template('verzoek_detail.html',
+        req=record,
+        profile_groups=profile_groups,
+        approval_validity=APPROVAL_VALIDITY,
+    )
+
+
+@app.route('/verzoeken/<request_id>/approve', methods=['POST'])
+def verzoek_approve(request_id):
+    """Approve a consent request (owner only)"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    verzoeken_dir = get_verzoeken_dir()
+    if not verzoeken_dir:
+        flash('Verzoeken-map niet gevonden', 'error')
+        return redirect(url_for('verzoeken_overview'))
+
+    fpath = os.path.join(verzoeken_dir, f"{request_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Verzoek niet gevonden', 'error')
+        return redirect(url_for('verzoeken_overview'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    # Get approved data groups from form
+    approved_groups = request.form.getlist('approved_data')
+    validity_key = request.form.get('validity', '1w')
+    val_info = APPROVAL_VALIDITY.get(validity_key, APPROVAL_VALIDITY['1w'])
+
+    if not approved_groups:
+        flash('Selecteer ten minste één gegevensgroep om te delen.', 'error')
+        return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+
+    # Build response data with only approved profile groups
+    profile = load_profile_data()
+    profile_groups = extract_profile_groups(profile)
+    response_data = {}
+
+    for group_key in approved_groups:
+        group = profile_groups.get(group_key)
+        if group and group['filled']:
+            response_data[group_key] = {
+                'label': group['label'],
+                'data': group['data'],
+            }
+
+    # Save response JSON
+    pod_write(f'verzoeken/{request_id}_response.json',
+              _json.dumps(response_data, indent=2, ensure_ascii=False))
+
+    # Update request record
+    now = datetime.now(timezone.utc)
+    valid_until = now + timedelta(days=val_info['days'])
+    status_token = record.get('mysolido:statusToken', '')
+
+    record['mysolido:status'] = 'goedgekeurd'
+    record['mysolido:approvedData'] = approved_groups
+    record['mysolido:responseLink'] = f'/verzoek/response/{status_token}'
+    record['mysolido:validUntil'] = valid_until.isoformat()
+
+    with open(fpath, 'w', encoding='utf-8') as f:
+        _json.dump(record, f, indent=2, ensure_ascii=False)
+
+    # Create consent record (using existing consent module pattern)
+    requester = record.get('mysolido:requester', {})
+    requester_name = requester.get('schema:name', 'Onbekend')
+    requester_org = requester.get('schema:worksFor', '')
+    receiver_label = f"{requester_name} ({requester_org})" if requester_org else requester_name
+
+    flash(f'Verzoek van {receiver_label} goedgekeurd.', 'success')
+    log_action('request_approve', {
+        'id': request_id,
+        'requester': requester_name,
+        'approved_data': approved_groups,
+        'valid_until': valid_until.isoformat(),
+    })
+    return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+
+
+@app.route('/verzoeken/<request_id>/reject', methods=['POST'])
+def verzoek_reject(request_id):
+    """Reject a consent request (owner only)"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    verzoeken_dir = get_verzoeken_dir()
+    if not verzoeken_dir:
+        flash('Verzoeken-map niet gevonden', 'error')
+        return redirect(url_for('verzoeken_overview'))
+
+    fpath = os.path.join(verzoeken_dir, f"{request_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Verzoek niet gevonden', 'error')
+        return redirect(url_for('verzoeken_overview'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    reason = sanitize_input(request.form.get('reason', ''))
+    record['mysolido:status'] = 'afgewezen'
+    if reason:
+        record['mysolido:rejectionReason'] = reason
+
+    with open(fpath, 'w', encoding='utf-8') as f:
+        _json.dump(record, f, indent=2, ensure_ascii=False)
+
+    requester = record.get('mysolido:requester', {})
+    requester_name = requester.get('schema:name', 'Onbekend')
+    flash(f'Verzoek van {requester_name} afgewezen.', 'success')
+    log_action('request_reject', {'id': request_id, 'requester': requester_name})
+    return redirect(url_for('verzoeken_overview'))
 
 
 if __name__ == '__main__':

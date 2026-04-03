@@ -1662,3 +1662,23 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
 .intentie-item-link:hover .consent-item {
     border-color: var(--color-primary);
 }
+
+/* --- Consent Request Badges --- */
+.badge-nieuw {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.badge-goedgekeurd {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-afgewezen {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+[data-theme="dark"] .badge-nieuw { background: #1a2e4a; color: #6db3f2; }
+[data-theme="dark"] .badge-goedgekeurd { background: #1e3a2a; color: #75d89a; }
+[data-theme="dark"] .badge-afgewezen { background: #3a1e20; color: #e07a7a; }

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Gedeelde gegevens - MySolido{% endblock %}
+
+{% block content %}
+    {% if not found %}
+    <div class="card" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 2.5rem; margin-bottom: 16px;">&#10067;</div>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Gegevens niet gevonden</h2>
+        <p style="color: var(--color-text-muted);">Deze link is ongeldig of de gegevens zijn niet meer beschikbaar.</p>
+    </div>
+
+    {% elif expired %}
+    <div class="card" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9203;</div>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Gegevens verlopen</h2>
+        <p style="color: var(--color-text-muted);">De geldigheidsduur van deze gedeelde gegevens is verstreken op {{ valid_until }}.</p>
+    </div>
+
+    {% else %}
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h2 style="font-size: 1.15rem;">Gedeelde gegevens</h2>
+            <span class="badge badge-goedgekeurd">Goedgekeurd</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 4px;">
+            Gedeeld via MySolido &mdash; geldig tot {{ valid_until }}
+        </p>
+    </div>
+
+    {% set group_labels = {
+        'housing': {'label': 'Woonsituatie', 'icon': '&#127968;'},
+        'household': {'label': 'Gezin', 'icon': '&#128106;'},
+        'vehicle': {'label': 'Voertuigen', 'icon': '&#128663;'},
+        'insurance': {'label': 'Verzekeringen', 'icon': '&#128737;&#65039;'},
+        'occupation': {'label': 'Werk', 'icon': '&#128188;'},
+        'health': {'label': 'Gezondheid', 'icon': '&#10084;&#65039;'}
+    } %}
+
+    {% for group_key, group_data in response_data.items() %}
+    <div class="card" style="margin-bottom: 12px;">
+        {% set meta = group_labels.get(group_key, {'label': group_key, 'icon': ''}) %}
+        <h3 style="font-size: 1rem;">{{ meta.icon|safe }} {{ group_data.get('label', meta.label) }}</h3>
+
+        {% set data = group_data.get('data', {}) %}
+
+        {% if data is mapping %}
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-top: 12px;">
+            {% for field_key, field_val in data.items() %}
+            {% if field_val %}
+            <div>
+                <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 2px;">{{ field_key }}</div>
+                {% if field_val is iterable and field_val is not string %}
+                    {% if field_val is mapping %}
+                    <p style="margin: 0; font-size: 0.9rem;">{{ field_val }}</p>
+                    {% else %}
+                    <ul style="margin: 0; padding-left: 16px; font-size: 0.9rem;">
+                        {% for item in field_val %}
+                        <li>{% if item is mapping %}{{ item.values()|join(', ') }}{% else %}{{ item }}{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                {% else %}
+                <p style="margin: 0; font-size: 0.9rem;">{{ field_val }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {% elif data is iterable and data is not string %}
+        <div style="margin-top: 12px;">
+            {% for item in data %}
+            <div style="background: var(--color-bg-hover); border: 1px solid var(--color-border); border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+                {% if item is mapping %}
+                    {% for k, v in item.items() %}
+                    {% if v %}<span style="font-size: 0.85rem;"><strong>{{ k }}:</strong> {{ v }}</span>{% if not loop.last %} &bull; {% endif %}{% endif %}
+                    {% endfor %}
+                {% else %}
+                <span style="font-size: 0.85rem;">{{ item }}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div style="text-align: center; margin: 24px 0;">
+        <p style="font-size: 0.8rem; color: var(--color-text-muted);">
+            Deze gegevens zijn gedeeld via <strong>MySolido</strong> &mdash; een persoonlijke datakluis.
+        </p>
+    </div>
+    {% endif %}
+{% endblock %}

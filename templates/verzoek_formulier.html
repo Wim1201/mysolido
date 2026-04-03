@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Gegevens opvragen - MySolido{% endblock %}
+
+{% block content %}
+    <style>
+    .verzoek-intro {
+        background: var(--color-surface);
+        border-radius: var(--radius-md);
+        padding: 20px;
+        box-shadow: var(--shadow-card);
+        margin-bottom: 20px;
+    }
+    .verzoek-intro h2 { font-size: 1.15rem; margin-bottom: 8px; }
+    .verzoek-intro p { font-size: 0.9rem; color: var(--color-text-muted); margin: 0; }
+    .data-check-group {
+        background: var(--color-bg-hover);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 6px;
+    }
+    .data-check-group label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+    .data-check-group input[type="checkbox"] { flex-shrink: 0; }
+    .agree-group {
+        background: var(--color-bg-hover);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        padding: 14px;
+        margin-top: 16px;
+    }
+    .agree-group label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.9rem; }
+    .agree-group input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+    </style>
+
+    <div class="verzoek-intro">
+        <h2>Gegevens opvragen</h2>
+        <p>U kunt hier een verzoek indienen om gegevens op te vragen bij de eigenaar van deze datakluis. De eigenaar beoordeelt uw verzoek en beslist welke gegevens worden gedeeld.</p>
+    </div>
+
+    <form action="{{ url_for('verzoek_submit') }}" method="post">
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>Uw gegevens</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 12px;">
+                <div style="display: flex; flex-direction: column;">
+                    <label for="name" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Naam <span style="color: var(--color-danger);">*</span></label>
+                    <input type="text" name="name" id="name" class="form-input" required placeholder="Uw volledige naam">
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <label for="organization" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Organisatie</label>
+                    <input type="text" name="organization" id="organization" class="form-input" placeholder="Optioneel">
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; margin-top: 12px;">
+                <label for="email" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">E-mailadres <span style="color: var(--color-danger);">*</span></label>
+                <input type="email" name="email" id="email" class="form-input" required placeholder="uw@email.nl">
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>Uw verzoek</h3>
+            <div style="display: flex; flex-direction: column; margin-top: 12px;">
+                <label for="category" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Categorie</label>
+                <select name="category" id="category" class="form-input">
+                    {% for key, cat in categories.items() %}
+                    <option value="{{ key }}">{{ cat.label }} &mdash; {{ cat.description }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 8px; display: block;">
+                    Welke gegevens vraagt u? <span style="color: var(--color-danger);">*</span>
+                </label>
+                <div class="data-check-group">
+                    <label><input type="checkbox" name="requested_data" value="housing"> Woonsituatie</label>
+                </div>
+                <div class="data-check-group">
+                    <label><input type="checkbox" name="requested_data" value="household"> Gezin</label>
+                </div>
+                <div class="data-check-group">
+                    <label><input type="checkbox" name="requested_data" value="vehicle"> Voertuigen</label>
+                </div>
+                <div class="data-check-group">
+                    <label><input type="checkbox" name="requested_data" value="insurance"> Verzekeringen</label>
+                </div>
+                <div class="data-check-group">
+                    <label><input type="checkbox" name="requested_data" value="occupation"> Werk</label>
+                </div>
+                <div class="data-check-group">
+                    <label><input type="checkbox" name="requested_data" value="health"> Gezondheid</label>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; margin-top: 16px;">
+                <label for="purpose" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">
+                    Toelichting <span style="color: var(--color-danger);">*</span>
+                </label>
+                <textarea name="purpose" id="purpose" class="form-input" rows="4" required
+                          placeholder="Waarom vraagt u deze gegevens? Waarvoor worden ze gebruikt?"
+                          style="resize: vertical; font-family: inherit;"></textarea>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="agree-group">
+                <label>
+                    <input type="checkbox" name="agreed_terms" value="yes" required>
+                    <span>Ik verklaar deze gegevens alleen te gebruiken voor het hierboven opgegeven doel en ga akkoord met de voorwaarden.</span>
+                </label>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 24px 0;">
+            <button type="submit" class="btn btn-primary" style="padding: 10px 40px; font-size: 1rem;">Verzoek indienen</button>
+            <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 8px;">
+                Uw contactgegevens worden alleen gebruikt om u te informeren over de status van uw verzoek.
+            </p>
+        </div>
+    </form>
+{% endblock %}
