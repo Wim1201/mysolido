@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left, icon_plus %}
+
+{% block title %}Mijn intenties - MySolido{% endblock %}
+
+{% block content %}
+    <div class="breadcrumbs">
+        <a href="{{ url_for('profile') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar profiel</a>
+        <span class="current">Mijn intenties</span>
+    </div>
+
+    <div class="consent-header">
+        <h2>Mijn intenties</h2>
+        {% if not bridge_mode %}
+        <a href="{{ url_for('intentie_new') }}" class="btn">{{ icon_plus() }} Nieuwe intentie</a>
+        {% endif %}
+    </div>
+
+    <div class="intentie-filters" style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+        <a href="{{ url_for('intenties_overview', status='alle') }}"
+           class="btn btn-compact {% if status_filter == 'alle' %}btn-primary{% endif %}">Alle</a>
+        <a href="{{ url_for('intenties_overview', status='concept') }}"
+           class="btn btn-compact {% if status_filter == 'concept' %}btn-primary{% endif %}">Concept</a>
+        <a href="{{ url_for('intenties_overview', status='actief') }}"
+           class="btn btn-compact {% if status_filter == 'actief' %}btn-primary{% endif %}">Actief</a>
+        <a href="{{ url_for('intenties_overview', status='verlopen') }}"
+           class="btn btn-compact {% if status_filter == 'verlopen' %}btn-primary{% endif %}">Verlopen</a>
+        <a href="{{ url_for('intenties_overview', status='ingetrokken') }}"
+           class="btn btn-compact {% if status_filter == 'ingetrokken' %}btn-primary{% endif %}">Ingetrokken</a>
+    </div>
+
+    {% if intentions %}
+    <div class="consent-list">
+        {% for intent in intentions %}
+        <a href="{{ url_for('intentie_detail', intention_id=intent._id) }}" class="intentie-item-link" style="text-decoration: none; color: inherit;">
+            <div class="consent-item">
+                <div class="consent-item-header">
+                    <span class="badge badge-{{ intent._status }}">{{ intent._status|capitalize }}</span>
+                    <span class="consent-date">{{ intent._date }}</span>
+                </div>
+                <div class="consent-item-body">
+                    <h3 class="consent-title">{{ intent._icon }} {{ intent._category_label }}</h3>
+                    <div class="consent-meta">
+                        <span>{{ intent._description[:100] }}{% if intent._description|length > 100 %}...{% endif %}</span>
+                        {% if intent.get('schema:validThrough') %}
+                        <span>Geldig tot: {{ intent['schema:validThrough'][:10] }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        {% if status_filter == 'alle' %}
+        <p class="empty-state-title">Nog geen intenties aangemaakt</p>
+        <p class="empty-state-sub">Met intenties geef je aan wat je zoekt — zoals een nieuwe verzekering of energiecontract. Je kiest zelf welke profielgegevens je wilt delen. Er wordt niets automatisch verzonden.</p>
+        {% if not bridge_mode %}
+        <a href="{{ url_for('intentie_new') }}" class="btn" style="margin-top: 12px;">{{ icon_plus() }} Eerste intentie aanmaken</a>
+        {% endif %}
+        {% else %}
+        <p class="empty-state-title">Geen intenties met status "{{ status_filter }}"</p>
+        <a href="{{ url_for('intenties_overview', status='alle') }}" class="btn btn-compact" style="margin-top: 8px;">Alle intenties tonen</a>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endblock %}

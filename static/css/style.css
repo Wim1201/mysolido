@@ -1624,3 +1624,41 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
     color: var(--color-text-muted);
     margin-top: 8px;
 }
+
+/* --- Intention Badges --- */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.badge-concept {
+    background: var(--color-border);
+    color: var(--color-text-muted);
+}
+
+.badge-actief {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-verlopen {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-ingetrokken {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+[data-theme="dark"] .badge-actief { background: #1e3a2a; color: #75d89a; }
+[data-theme="dark"] .badge-verlopen { background: #3a3020; color: #e0c36a; }
+[data-theme="dark"] .badge-ingetrokken { background: #3a1e20; color: #e07a7a; }
+
+.intentie-item-link:hover .consent-item {
+    border-color: var(--color-primary);
+}

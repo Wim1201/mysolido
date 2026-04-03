@@ -3,11 +3,12 @@ import os
 import io
 import sys
 import time
+import uuid
 import secrets
 import string
 import zipfile
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_file, session, abort
@@ -728,6 +729,12 @@ def inject_globals():
         'consent_withdraw': 'toestemmingen',
         'consent_delete': 'toestemmingen',
         'edit_policy': 'kluis',
+        'intenties_overview': 'profiel',
+        'intentie_new': 'profiel',
+        'intentie_detail': 'profiel',
+        'intentie_activate': 'profiel',
+        'intentie_withdraw': 'profiel',
+        'intentie_delete': 'profiel',
     }
     active = nav_map.get(request.endpoint, '')
     return {
@@ -2538,6 +2545,451 @@ def profiel_data_save():
 
     flash('Profielgegevens opgeslagen', 'success')
     return redirect(url_for('profiel_data'))
+
+
+# === INTENTION MODULE (Omgekeerde Google — Fase 2) ===
+
+INTENTION_CATEGORIES = {
+    'autoverzekering': {'label': 'Autoverzekering', 'icon': '\U0001f697', 'profile_fields': ['vehicle', 'insurance']},
+    'zorgverzekering': {'label': 'Zorgverzekering', 'icon': '\U0001f3e5', 'profile_fields': ['health', 'household']},
+    'woonverzekering': {'label': 'Woonverzekering', 'icon': '\U0001f3e0', 'profile_fields': ['housing', 'insurance']},
+    'energiecontract': {'label': 'Energiecontract', 'icon': '\u26a1', 'profile_fields': ['housing', 'household']},
+    'hypotheek': {'label': 'Hypotheek', 'icon': '\U0001f3e6', 'profile_fields': ['housing', 'occupation', 'household']},
+    'reisverzekering': {'label': 'Reisverzekering', 'icon': '\u2708\ufe0f', 'profile_fields': ['household', 'insurance']},
+    'rechtsbijstand': {'label': 'Rechtsbijstand', 'icon': '\u2696\ufe0f', 'profile_fields': ['occupation', 'household']},
+    'pensioen': {'label': 'Pensioen', 'icon': '\U0001f9d3', 'profile_fields': ['occupation', 'household']},
+    'internet_tv': {'label': 'Internet & TV', 'icon': '\U0001f4e1', 'profile_fields': ['housing', 'household']},
+    'anders': {'label': 'Anders', 'icon': '\U0001f4cb', 'profile_fields': []},
+}
+
+VALIDITY_OPTIONS = {
+    '1w': {'label': '1 week', 'days': 7},
+    '2w': {'label': '2 weken', 'days': 14},
+    '1m': {'label': '1 maand', 'days': 30},
+    '3m': {'label': '3 maanden', 'days': 90},
+}
+
+
+def get_intenties_dir():
+    """Return the absolute path to the intenties folder"""
+    return safe_pod_path('intenties')
+
+
+def load_profile_data():
+    """Load the profile data from profiel.jsonld"""
+    profile_path = safe_pod_path('profiel/profiel.jsonld')
+    if profile_path and os.path.exists(profile_path):
+        try:
+            with open(profile_path, 'r', encoding='utf-8') as f:
+                return _json.load(f)
+        except (ValueError, IOError):
+            pass
+    return {}
+
+
+def extract_profile_groups(profile):
+    """Extract profile data organized by group for display in intention form"""
+    groups = {}
+
+    # Housing
+    housing_parts = []
+    if profile.get('pd:HousingOwnership'):
+        housing_parts.append(profile['pd:HousingOwnership'])
+    if profile.get('mysolido:housingType'):
+        housing_parts.append(profile['mysolido:housingType'])
+    if profile.get('pd:Location'):
+        housing_parts.append(profile['pd:Location'])
+    groups['housing'] = {
+        'label': 'Woonsituatie',
+        'icon': '\U0001f3e0',
+        'filled': bool(housing_parts),
+        'summary': ', '.join(housing_parts),
+        'data': {
+            'ownership': profile.get('pd:HousingOwnership', ''),
+            'type': profile.get('mysolido:housingType', ''),
+            'region': profile.get('pd:Location', ''),
+        }
+    }
+
+    # Household
+    household_parts = []
+    household_data = {}
+    if profile.get('pd:HouseholdSize'):
+        household_parts.append(f"{profile['pd:HouseholdSize']} personen")
+        household_data['size'] = profile['pd:HouseholdSize']
+    family = profile.get('pd:FamilyStructure', {})
+    children = family.get('children', [])
+    if children:
+        ages = [c.get('ageCategory', '') for c in children]
+        household_parts.append(f"{len(children)} kind(eren): {', '.join(ages)}")
+        household_data['children'] = children
+    groups['household'] = {
+        'label': 'Gezin',
+        'icon': '\U0001f468\u200d\U0001f469\u200d\U0001f467\u200d\U0001f466',
+        'filled': bool(household_parts),
+        'summary': ', '.join(household_parts),
+        'data': household_data
+    }
+
+    # Vehicle
+    vehicles = profile.get('pd:Vehicle', [])
+    vehicle = vehicles[0] if vehicles else {}
+    vehicle_parts = []
+    if vehicle.get('type'):
+        vehicle_parts.append(vehicle['type'])
+    if vehicle.get('fuel'):
+        vehicle_parts.append(vehicle['fuel'])
+    if vehicle.get('yearBuilt'):
+        vehicle_parts.append(str(vehicle['yearBuilt']))
+    groups['vehicle'] = {
+        'label': 'Voertuigen',
+        'icon': '\U0001f697',
+        'filled': bool(vehicle_parts),
+        'summary': ', '.join(vehicle_parts),
+        'data': vehicle
+    }
+
+    # Insurance
+    insurances = profile.get('pd:Insurance', [])
+    ins_parts = []
+    for ins in insurances:
+        parts = []
+        if ins.get('type'):
+            parts.append(ins['type'])
+        if ins.get('provider'):
+            parts.append(ins['provider'])
+        if parts:
+            ins_parts.append(' - '.join(parts))
+    groups['insurance'] = {
+        'label': 'Verzekeringen',
+        'icon': '\U0001f6e1\ufe0f',
+        'filled': bool(ins_parts),
+        'summary': '; '.join(ins_parts),
+        'data': insurances
+    }
+
+    # Occupation
+    occupation = profile.get('pd:Occupation', {})
+    occ_parts = []
+    if occupation.get('sector'):
+        occ_parts.append(occupation['sector'])
+    if occupation.get('employmentType'):
+        occ_parts.append(occupation['employmentType'])
+    groups['occupation'] = {
+        'label': 'Werk',
+        'icon': '\U0001f4bc',
+        'filled': bool(occ_parts),
+        'summary': ', '.join(occ_parts),
+        'data': occupation
+    }
+
+    # Health (only smokingStatus, not gpPractice)
+    health = profile.get('pd:HealthData', {})
+    health_parts = []
+    health_data = {}
+    if health.get('smokingStatus'):
+        smoking_labels = {'ja': 'roker', 'nee': 'niet-roker', 'gestopt': 'gestopt met roken'}
+        health_parts.append(smoking_labels.get(health['smokingStatus'], health['smokingStatus']))
+        health_data['smokingStatus'] = health['smokingStatus']
+    groups['health'] = {
+        'label': 'Gezondheid',
+        'icon': '\u2764\ufe0f',
+        'filled': bool(health_parts),
+        'summary': ', '.join(health_parts),
+        'data': health_data
+    }
+
+    return groups
+
+
+def load_all_intentions():
+    """Load all intention records from the intenties folder"""
+    intenties_dir = get_intenties_dir()
+    if not intenties_dir or not os.path.isdir(intenties_dir):
+        return []
+
+    intentions = []
+    for fname in os.listdir(intenties_dir):
+        if fname.endswith('.jsonld') and not fname.startswith('.'):
+            fpath = os.path.join(intenties_dir, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    record = _json.load(f)
+                record['_id'] = fname.replace('.jsonld', '')
+                intentions.append(record)
+            except (_json.JSONDecodeError, IOError):
+                continue
+
+    intentions.sort(key=lambda r: r.get('schema:dateCreated', ''), reverse=True)
+    return intentions
+
+
+def check_expired_intentions(intentions):
+    """Check and update expired intentions, returns updated list"""
+    now = datetime.now(timezone.utc)
+    intenties_dir = get_intenties_dir()
+    if not intenties_dir:
+        return intentions
+
+    for intention in intentions:
+        if intention.get('mysolido:status') != 'actief':
+            continue
+        valid_through = intention.get('schema:validThrough', '')
+        if not valid_through:
+            continue
+        try:
+            exp_dt = datetime.fromisoformat(valid_through)
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if exp_dt < now:
+                intention['mysolido:status'] = 'verlopen'
+                fpath = os.path.join(intenties_dir, f"{intention['_id']}.jsonld")
+                save_data = {k: v for k, v in intention.items() if not k.startswith('_')}
+                with open(fpath, 'w', encoding='utf-8') as f:
+                    _json.dump(save_data, f, indent=2, ensure_ascii=False)
+        except (ValueError, TypeError):
+            continue
+
+    return intentions
+
+
+def ensure_intenties_policy():
+    """Create ODRL policy for intenties folder if it doesn't exist"""
+    if not pod_exists('intenties/.policy.jsonld'):
+        policy = {
+            "@context": [
+                "http://www.w3.org/ns/odrl.jsonld",
+                {"dpv": "https://w3id.org/dpv#"}
+            ],
+            "@type": "Set",
+            "uid": "urn:mysolido:policy:intenties",
+            "profile": "http://www.w3.org/ns/odrl/2/core",
+            "permission": [{
+                "target": "urn:mysolido:container:intenties",
+                "assignee": "urn:mysolido:owner",
+                "action": ["read", "write", "delete"]
+            }],
+            "prohibition": [{
+                "target": "urn:mysolido:container:intenties",
+                "action": "distribute"
+            }]
+        }
+        pod_mkdir('intenties')
+        pod_write('intenties/.policy.jsonld',
+                  _json.dumps(policy, indent=2, ensure_ascii=False))
+
+
+@app.route('/intenties')
+def intenties_overview():
+    """Overview of all intentions"""
+    intentions = load_all_intentions()
+    intentions = check_expired_intentions(intentions)
+
+    # Enrich with display data
+    status_filter = request.args.get('status', 'alle')
+    enriched = []
+    for intent in intentions:
+        cat_key = intent.get('mysolido:category', 'anders')
+        cat_info = INTENTION_CATEGORIES.get(cat_key, INTENTION_CATEGORIES['anders'])
+        intent['_icon'] = cat_info['icon']
+        intent['_category_label'] = cat_info['label']
+        intent['_status'] = intent.get('mysolido:status', 'concept')
+        intent['_date'] = intent.get('schema:dateCreated', '')[:10]
+        intent['_description'] = intent.get('schema:description', '')
+
+        if status_filter == 'alle' or intent['_status'] == status_filter:
+            enriched.append(intent)
+
+    return render_template('intenties.html',
+        intentions=enriched,
+        status_filter=status_filter,
+    )
+
+
+@app.route('/intenties/nieuw', methods=['GET', 'POST'])
+def intentie_new():
+    """Create a new intention"""
+    if BRIDGE_MODE:
+        flash('Niet beschikbaar in Bridge-modus', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    if request.method == 'POST':
+        category = request.form.get('category', 'anders')
+        description = request.form.get('description', '').strip()
+        validity = request.form.get('validity', '1m')
+
+        if not description:
+            flash('Omschrijving is verplicht', 'error')
+            return redirect(url_for('intentie_new'))
+
+        cat_info = INTENTION_CATEGORIES.get(category, INTENTION_CATEGORIES['anders'])
+        val_info = VALIDITY_OPTIONS.get(validity, VALIDITY_OPTIONS['1m'])
+
+        now = datetime.now(timezone.utc)
+        valid_through = now + timedelta(days=val_info['days'])
+        intention_id = str(uuid.uuid4())
+
+        # Build shared profile data
+        profile = load_profile_data()
+        profile_groups = extract_profile_groups(profile)
+        shared_data = {}
+        selected_fields = request.form.getlist('profile_fields')
+
+        for group_key, group_info in profile_groups.items():
+            shared_data[group_key] = {
+                'included': group_key in selected_fields,
+            }
+            if group_key in selected_fields and group_info['filled']:
+                shared_data[group_key]['data'] = group_info['data']
+
+        record = {
+            "@context": {
+                "mysolido": "https://mysolido.com/vocab#",
+                "dpv": "https://w3id.org/dpv#",
+                "schema": "https://schema.org/",
+                "xsd": "http://www.w3.org/2001/XMLSchema#"
+            },
+            "@type": "mysolido:Intention",
+            "@id": f"urn:mysolido:intention:{intention_id}",
+            "mysolido:category": category,
+            "mysolido:categoryLabel": cat_info['label'],
+            "schema:description": description,
+            "mysolido:status": "concept",
+            "schema:dateCreated": now.isoformat(),
+            "schema:validThrough": valid_through.isoformat(),
+            "mysolido:sharedProfileData": shared_data,
+        }
+
+        pod_mkdir('intenties')
+        pod_write(f'intenties/{intention_id}.jsonld',
+                  _json.dumps(record, indent=2, ensure_ascii=False))
+        ensure_intenties_policy()
+
+        flash(f'Intentie "{cat_info["label"]}" opgeslagen als concept', 'success')
+        log_action('intention_create', {'id': intention_id, 'category': category})
+        return redirect(url_for('intenties_overview'))
+
+    # GET: show form
+    profile = load_profile_data()
+    profile_groups = extract_profile_groups(profile)
+
+    return render_template('intentie_nieuw.html',
+        categories=INTENTION_CATEGORIES,
+        validity_options=VALIDITY_OPTIONS,
+        profile_groups=profile_groups,
+    )
+
+
+@app.route('/intenties/<intention_id>')
+def intentie_detail(intention_id):
+    """View a single intention"""
+    intenties_dir = get_intenties_dir()
+    if not intenties_dir:
+        flash('Intenties-map niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Intentie niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    record['_id'] = intention_id
+    cat_key = record.get('mysolido:category', 'anders')
+    cat_info = INTENTION_CATEGORIES.get(cat_key, INTENTION_CATEGORIES['anders'])
+    record['_icon'] = cat_info['icon']
+    record['_category_label'] = cat_info['label']
+    record['_status'] = record.get('mysolido:status', 'concept')
+
+    # Load current profile data for display
+    profile = load_profile_data()
+    profile_groups = extract_profile_groups(profile)
+
+    return render_template('intentie_detail.html',
+        intention=record,
+        profile_groups=profile_groups,
+        read_only=BRIDGE_MODE,
+    )
+
+
+@app.route('/intenties/<intention_id>/activate', methods=['POST'])
+def intentie_activate(intention_id):
+    """Activate an intention"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    intenties_dir = get_intenties_dir()
+    if not intenties_dir:
+        flash('Intenties-map niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Intentie niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    record['mysolido:status'] = 'actief'
+    with open(fpath, 'w', encoding='utf-8') as f:
+        _json.dump(record, f, indent=2, ensure_ascii=False)
+
+    flash('Intentie geactiveerd', 'success')
+    log_action('intention_activate', {'id': intention_id})
+    return redirect(url_for('intentie_detail', intention_id=intention_id))
+
+
+@app.route('/intenties/<intention_id>/withdraw', methods=['POST'])
+def intentie_withdraw(intention_id):
+    """Withdraw an intention"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    intenties_dir = get_intenties_dir()
+    if not intenties_dir:
+        flash('Intenties-map niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Intentie niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    record['mysolido:status'] = 'ingetrokken'
+    with open(fpath, 'w', encoding='utf-8') as f:
+        _json.dump(record, f, indent=2, ensure_ascii=False)
+
+    flash('Intentie ingetrokken', 'success')
+    log_action('intention_withdraw', {'id': intention_id})
+    return redirect(url_for('intentie_detail', intention_id=intention_id))
+
+
+@app.route('/intenties/<intention_id>/delete', methods=['POST'])
+def intentie_delete(intention_id):
+    """Delete an intention"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    intenties_dir = get_intenties_dir()
+    if not intenties_dir:
+        flash('Intenties-map niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
+    if not os.path.exists(fpath):
+        flash('Intentie niet gevonden', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    os.remove(fpath)
+    flash('Intentie verwijderd', 'success')
+    log_action('intention_delete', {'id': intention_id})
+    return redirect(url_for('intenties_overview'))
 
 
 if __name__ == '__main__':

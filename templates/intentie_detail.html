@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left %}
+
+{% block title %}{{ intention._category_label }} - MySolido{% endblock %}
+
+{% block content %}
+    <div class="breadcrumbs">
+        <a href="{{ url_for('intenties_overview') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar intenties</a>
+        <span class="current">{{ intention._category_label }}</span>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+            <h3>{{ intention._icon }} {{ intention._category_label }}</h3>
+            <span class="badge badge-{{ intention._status }}">{{ intention._status|capitalize }}</span>
+        </div>
+
+        <div style="margin-top: 16px;">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Omschrijving</div>
+            <p style="margin: 0;">{{ intention.get('schema:description', '') }}</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 16px;">
+            <div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Aangemaakt</div>
+                <p style="margin: 0;">{{ intention.get('schema:dateCreated', '')[:10] }}</p>
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Geldig tot</div>
+                <p style="margin: 0;">{{ intention.get('schema:validThrough', '')[:10] }}</p>
+            </div>
+        </div>
+    </div>
+
+    {% set shared = intention.get('mysolido:sharedProfileData', {}) %}
+    {% set has_shared = shared.values()|selectattr('included')|list|length > 0 if shared is mapping else false %}
+
+    {% if has_shared %}
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>Geselecteerde gegevens</h3>
+        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 12px;">
+            Deze profielgegevens horen bij deze intentie.
+        </p>
+
+        {% for group_key, group_data in shared.items() %}
+        {% if group_data is mapping and group_data.get('included') %}
+        {% set group_meta = profile_groups.get(group_key, {}) %}
+        <div style="background: var(--color-bg-hover); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">
+                {{ group_meta.get('icon', '') }} {{ group_meta.get('label', group_key) }}
+            </div>
+            {% if group_meta.get('filled') %}
+            <div style="font-size: 0.85rem; color: var(--color-text-muted);">
+                {{ group_meta.get('summary', '') }}
+            </div>
+            {% else %}
+            <div style="font-size: 0.85rem; color: var(--color-text-muted); font-style: italic;">
+                Niet ingevuld
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not read_only %}
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>Acties</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+            {% if intention._status == 'concept' %}
+            <form action="{{ url_for('intentie_activate', intention_id=intention._id) }}" method="post" style="display:inline;">
+                <button type="submit" class="btn btn-primary">Activeren</button>
+            </form>
+            <form action="{{ url_for('intentie_delete', intention_id=intention._id) }}" method="post" style="display:inline;"
+                  onsubmit="return confirm('Weet je zeker dat je deze intentie wilt verwijderen?')">
+                <button type="submit" class="btn btn-danger">Verwijderen</button>
+            </form>
+            {% elif intention._status == 'actief' %}
+            <form action="{{ url_for('intentie_withdraw', intention_id=intention._id) }}" method="post" style="display:inline;"
+                  onsubmit="return confirm('Weet je zeker dat je deze intentie wilt intrekken?')">
+                <button type="submit" class="btn" style="background: var(--color-secondary);">Intrekken</button>
+            </form>
+            {% elif intention._status in ['ingetrokken', 'verlopen'] %}
+            <form action="{{ url_for('intentie_delete', intention_id=intention._id) }}" method="post" style="display:inline;"
+                  onsubmit="return confirm('Weet je zeker dat je deze intentie wilt verwijderen?')">
+                <button type="submit" class="btn btn-danger">Verwijderen</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}

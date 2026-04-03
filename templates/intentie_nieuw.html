@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon_arrow_left %}
+
+{% block title %}Nieuwe intentie - MySolido{% endblock %}
+
+{% block content %}
+    <style>
+    .profile-check-group {
+        background: var(--color-bg-hover);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+    }
+    .profile-check-group label {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+    .profile-check-group input[type="checkbox"] {
+        margin-top: 3px;
+        flex-shrink: 0;
+    }
+    .profile-check-label {
+        font-weight: 600;
+    }
+    .profile-check-value {
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+        margin-top: 2px;
+    }
+    .profile-check-empty {
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+        font-style: italic;
+    }
+    </style>
+
+    <div class="breadcrumbs">
+        <a href="{{ url_for('intenties_overview') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar intenties</a>
+        <span class="current">Nieuwe intentie</span>
+    </div>
+
+    <form action="{{ url_for('intentie_new') }}" method="post">
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>Nieuwe intentie</h3>
+
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 12px;">
+                <div class="form-group" style="display: flex; flex-direction: column;">
+                    <label for="category" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Categorie</label>
+                    <select name="category" id="category" class="form-input" required>
+                        {% for key, cat in categories.items() %}
+                        <option value="{{ key }}">{{ cat.icon }} {{ cat.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; flex-direction: column;">
+                    <label for="validity" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Geldigheidsduur</label>
+                    <select name="validity" id="validity" class="form-input">
+                        {% for key, opt in validity_options.items() %}
+                        <option value="{{ key }}" {% if key == '1m' %}selected{% endif %}>{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="display: flex; flex-direction: column; margin-top: 12px;">
+                <label for="description" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Omschrijving</label>
+                <textarea name="description" id="description" class="form-input"
+                          rows="3" placeholder="Omschrijf wat je zoekt..." required
+                          style="resize: vertical; font-family: inherit;"></textarea>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>Welke gegevens wil je delen?</h3>
+            <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 12px;">
+                Vink aan welke profielgegevens bij deze intentie horen. Relevante groepen zijn al voorgeselecteerd.
+            </p>
+
+            {% for group_key, group in profile_groups.items() %}
+            <div class="profile-check-group">
+                <label>
+                    <input type="checkbox" name="profile_fields" value="{{ group_key }}"
+                           data-group="{{ group_key }}"
+                           {% if group.filled %}{% endif %}>
+                    <div>
+                        <div class="profile-check-label">{{ group.icon }} {{ group.label }}</div>
+                        {% if group.filled %}
+                        <div class="profile-check-value">{{ group.summary }}</div>
+                        {% else %}
+                        <div class="profile-check-empty">
+                            Niet ingevuld &mdash; <a href="{{ url_for('profiel_data') }}">vul aan</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="text-align: center; margin: 24px 0;">
+            <button type="submit" class="btn btn-primary" style="padding: 10px 40px; font-size: 1rem;">Intentie opslaan (als concept)</button>
+            <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 8px;">
+                Je intentie wordt alleen lokaal opgeslagen. Er wordt niets gedeeld of verzonden.
+            </p>
+        </div>
+    </form>
+
+    <script>
+    // Pre-select profile fields based on selected category
+    var categoryFields = {
+        {% for key, cat in categories.items() %}
+        '{{ key }}': {{ cat.profile_fields|tojson }},
+        {% endfor %}
+    };
+
+    function updateProfileFields() {
+        var category = document.getElementById('category').value;
+        var fields = categoryFields[category] || [];
+        var checkboxes = document.querySelectorAll('input[name="profile_fields"]');
+        checkboxes.forEach(function(cb) {
+            cb.checked = fields.indexOf(cb.value) !== -1;
+        });
+    }
+
+    document.getElementById('category').addEventListener('change', updateProfileFields);
+    // Set initial selection
+    updateProfileFields();
+    </script>
+{% endblock %}
