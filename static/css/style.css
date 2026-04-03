@@ -1516,3 +1516,111 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
     gap: 8px;
     margin-top: 16px;
 }
+
+/* --- Profiel Data Form --- */
+.profiel-card {
+    margin-bottom: 20px;
+}
+
+.profiel-section-title {
+    font-size: 1.05rem;
+    color: var(--color-primary);
+    margin-bottom: 16px;
+}
+
+.profiel-data-form .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+}
+
+@media (max-width: 768px) {
+    .profiel-data-form .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.profiel-data-form .form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.profiel-data-form .form-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    margin-bottom: 4px;
+}
+
+.profiel-data-form .form-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.profiel-data-form .dynamic-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--color-bg-hover);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.profiel-data-form .dynamic-item .form-input {
+    flex: 1;
+    min-width: 120px;
+}
+
+.profiel-data-form .dynamic-item-fields {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.profiel-data-form .dynamic-item-fields .form-input {
+    flex: 1;
+    min-width: 120px;
+}
+
+.profiel-data-form .btn-remove {
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.profiel-data-form .btn-remove:hover {
+    background: var(--color-danger);
+    color: #fff;
+}
+
+.profiel-save-section {
+    text-align: center;
+    margin: 24px 0;
+}
+
+.profiel-save-section .btn-primary {
+    padding: 10px 40px;
+    font-size: 1rem;
+}
+
+.profiel-save-section .text-secondary {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin-top: 8px;
+}

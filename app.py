@@ -372,7 +372,7 @@ def auto_setup():
             try:
                 r = requests.get(f'{css_base}/.account/',
                     headers={'Accept': 'application/json'},
-                    timeout=3)
+                    timeout=15)
                 if r.status_code == 200:
                     css_ready = True
                     break
@@ -2397,6 +2397,147 @@ def consent_delete(consent_id):
     flash('Toestemming verwijderd', 'success')
     log_action('consent_delete', {'id': consent_id})
     return redirect(url_for('consent_list'))
+
+
+# === PROFILE DATA MODULE (Omgekeerde Google) ===
+
+
+@app.route('/profiel-data', methods=['GET'])
+def profiel_data():
+    """Show profile data form (Omgekeerde Google)"""
+    data = {}
+    profile_path = safe_pod_path('profiel/profiel.jsonld')
+    if profile_path and os.path.exists(profile_path):
+        try:
+            with open(profile_path, 'r', encoding='utf-8') as f:
+                data = _json.load(f)
+        except (ValueError, IOError):
+            data = {}
+
+    return render_template('profiel_data.html',
+        data=data,
+        read_only=BRIDGE_MODE,
+    )
+
+
+@app.route('/profiel-data', methods=['POST'])
+def profiel_data_save():
+    """Save profile data as JSON-LD"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    form = request.form
+
+    # Build JSON-LD document
+    profile = {
+        "@context": {
+            "dpv": "https://w3id.org/dpv#",
+            "pd": "https://w3id.org/dpv/pd#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+            "mysolido": "https://mysolido.com/vocab#"
+        },
+        "@type": "dpv:PersonalData"
+    }
+
+    # Housing
+    if form.get('housing_type'):
+        profile['pd:HousingOwnership'] = form['housing_type']
+    if form.get('housing_kind'):
+        profile['mysolido:housingType'] = form['housing_kind']
+    if form.get('region'):
+        profile['pd:Location'] = form['region']
+
+    # Family
+    if form.get('household_size'):
+        try:
+            profile['pd:HouseholdSize'] = int(form['household_size'])
+        except ValueError:
+            pass
+    child_ages = form.getlist('child_age[]')
+    if child_ages:
+        children = [{"ageCategory": a} for a in child_ages if a]
+        if children:
+            profile['pd:FamilyStructure'] = {"children": children}
+
+    # Vehicles
+    v_type = form.get('vehicle_type')
+    if v_type:
+        vehicle = {"type": v_type}
+        if form.get('vehicle_fuel'):
+            vehicle['fuel'] = form['vehicle_fuel']
+        if form.get('vehicle_year'):
+            try:
+                vehicle['yearBuilt'] = int(form['vehicle_year'])
+            except ValueError:
+                pass
+        profile['pd:Vehicle'] = [vehicle]
+
+    # Insurance (multiple)
+    ins_types = form.getlist('ins_type[]')
+    ins_providers = form.getlist('ins_provider[]')
+    ins_dates = form.getlist('ins_enddate[]')
+    insurances = []
+    for i in range(len(ins_types)):
+        if ins_types[i]:
+            ins = {"type": ins_types[i]}
+            if i < len(ins_providers) and ins_providers[i]:
+                ins['provider'] = ins_providers[i]
+            if i < len(ins_dates) and ins_dates[i]:
+                ins['endDate'] = ins_dates[i]
+            insurances.append(ins)
+    if insurances:
+        profile['pd:Insurance'] = insurances
+
+    # Work
+    if form.get('work_sector') or form.get('employment_type'):
+        occupation = {}
+        if form.get('work_sector'):
+            occupation['sector'] = form['work_sector']
+        if form.get('employment_type'):
+            occupation['employmentType'] = form['employment_type']
+        profile['pd:Occupation'] = occupation
+
+    # Health
+    if form.get('smoking') or form.get('gp_practice'):
+        health = {}
+        if form.get('smoking'):
+            health['smokingStatus'] = form['smoking']
+        if form.get('gp_practice'):
+            health['gpPractice'] = form['gp_practice']
+        profile['pd:HealthData'] = health
+
+    # Ensure profiel directory exists
+    pod_mkdir('profiel')
+
+    # Write profile JSON-LD
+    pod_write('profiel/profiel.jsonld',
+              _json.dumps(profile, indent=2, ensure_ascii=False))
+
+    # Create ODRL policy if it doesn't exist yet
+    if not pod_exists('profiel/.policy.jsonld'):
+        policy = {
+            "@context": [
+                "http://www.w3.org/ns/odrl.jsonld",
+                {"dpv": "https://w3id.org/dpv#"}
+            ],
+            "@type": "Set",
+            "uid": "urn:mysolido:policy:profiel",
+            "profile": "http://www.w3.org/ns/odrl/2/core",
+            "permission": [{
+                "target": "urn:mysolido:container:profiel",
+                "assignee": "urn:mysolido:owner",
+                "action": ["read", "write", "delete"]
+            }],
+            "prohibition": [{
+                "target": "urn:mysolido:container:profiel",
+                "action": "distribute"
+            }]
+        }
+        pod_write('profiel/.policy.jsonld',
+                  _json.dumps(policy, indent=2, ensure_ascii=False))
+
+    flash('Profielgegevens opgeslagen', 'success')
+    return redirect(url_for('profiel_data'))
 
 
 if __name__ == '__main__':
