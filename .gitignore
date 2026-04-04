@@ -50,6 +50,9 @@ tweakers-post-final.txt
 # Watermark temp files
 temp/
 
+# Crash reports
+crash-reports/
+
 # Installer
 installer-output/
 mysolido.ico

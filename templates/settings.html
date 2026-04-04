@@ -37,6 +37,22 @@
     </div>
 
     <div class="settings-card">
+        <h2>&#x1f6e1; Privacy</h2>
+        <div class="setting-row">
+            <div>
+                <div class="setting-label">Anonieme foutmeldingen</div>
+                <div class="setting-desc">Stuur automatisch anonieme foutmeldingen naar MySolido om de software te verbeteren. Er worden geen persoonsgegevens verstuurd — alleen versienummer, besturingssysteem en de foutmelding.</div>
+            </div>
+            <form action="{{ url_for('toggle_crash_reporting') }}" method="post">
+                <label class="toggle">
+                    <input type="checkbox" name="enabled" value="true" {{ 'checked' if crash_reporting_enabled }} onchange="this.form.submit()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </form>
+        </div>
+    </div>
+
+    <div class="settings-card">
         <h2>{{ icon_zip() }} Backup</h2>
         <div class="setting-row">
             <div>

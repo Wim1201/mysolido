@@ -32,6 +32,7 @@ from sync_bridge import (
     auto_sync_after_change
 )
 from watermark import watermark_pdf, watermark_image, get_watermark_text
+import platform
 import tempfile as _tempfile
 
 load_dotenv()
@@ -59,6 +60,53 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 def is_watermark_enabled():
     """Check if watermarking is enabled (default: True)"""
     return os.getenv('WATERMARK_ENABLED', 'true').lower() in ('true', '1', 'yes')
+
+
+def is_crash_reporting_enabled():
+    """Check if anonymous crash reporting is enabled (default: False, opt-in)"""
+    return os.getenv('CRASH_REPORTING', 'false').lower() in ('true', '1', 'yes')
+
+
+# PRIVACY: send_crash_report() sends ONLY:
+# - MySolido version number
+# - Operating system (Windows/Mac/Linux) + version
+# - Python version
+# - Error type and error message (max 500 chars)
+# - Context (max 200 chars, e.g. "bestand uploaden")
+#
+# It NEVER sends:
+# - Name, email, IP address
+# - File names or pod contents
+# - Path information or folder names
+# - Network data or location
+def send_crash_report(error_type, error_message, context=""):
+    """Send an anonymous crash report to the Bridge (if enabled)"""
+    try:
+        if not is_crash_reporting_enabled():
+            return
+
+        bridge_url = os.getenv('SHARE_BASE_URL', '')
+        if not bridge_url:
+            return
+
+        report = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "version": "1.2.0",
+            "os": platform.system(),
+            "os_version": platform.version(),
+            "python_version": platform.python_version(),
+            "error_type": str(error_type)[:200],
+            "error_message": str(error_message)[:500],
+            "context": str(context)[:200],
+        }
+
+        requests.post(
+            f"{bridge_url}/crash-report",
+            json=report,
+            timeout=5
+        )
+    except Exception:
+        pass  # Silent fail — crash reporting must never break the app
 
 
 def cleanup_temp_files(max_age_seconds=3600):
@@ -550,6 +598,7 @@ def auto_setup():
         return True
 
     except Exception as e:
+        send_crash_report("auto_setup_failed", str(e), "eerste keer opstarten")
         print(f"  [FOUT] Setup mislukt: {e}")
         import traceback
         traceback.print_exc()
@@ -679,6 +728,7 @@ def check_bridge_auth():
     public_routes = [
         'bridge_login', 'view_shared_file', 'static',
         'verzoek_formulier', 'verzoek_submit', 'verzoek_status', 'verzoek_response',
+        'crash_report_receive',
     ]
 
     if request.endpoint in public_routes:
@@ -1118,12 +1168,16 @@ def upload():
     else:
         relative_path = file.filename
 
-    if pod_write(relative_path, file.read()):
-        flash(f'"{file.filename}" succesvol geupload!', 'success')
-        log_action('upload', {'file': file.filename, 'folder': folder_path or 'root'})
-        auto_sync_after_change()
-    else:
-        flash('Upload mislukt: kon bestand niet opslaan', 'error')
+    try:
+        if pod_write(relative_path, file.read()):
+            flash(f'"{file.filename}" succesvol geupload!', 'success')
+            log_action('upload', {'file': file.filename, 'folder': folder_path or 'root'})
+            auto_sync_after_change()
+        else:
+            flash('Upload mislukt: kon bestand niet opslaan', 'error')
+    except Exception as e:
+        send_crash_report("upload_failed", str(e), "bestand uploaden")
+        flash('Upload mislukt', 'error')
 
     return redirect_to_folder(folder_path)
 
@@ -1432,13 +1486,17 @@ def share():
         flash('Vul een WebID in of kies openbaar', 'error')
         return redirect_to_folder(folder_path)
 
-    add_share(resource_url, resource_path, webid, modes, expires)
-    write_acl(resource_url)
+    try:
+        add_share(resource_url, resource_path, webid, modes, expires)
+        write_acl(resource_url)
 
-    resource_name = resource_url.rstrip('/').split('/')[-1]
-    display_webid = 'iedereen (openbaar)' if webid == 'public' else webid
-    flash(f'"{resource_name}" gedeeld met {display_webid}', 'success')
-    log_action('share', {'resource': resource_path, 'webid': webid, 'modes': modes})
+        resource_name = resource_url.rstrip('/').split('/')[-1]
+        display_webid = 'iedereen (openbaar)' if webid == 'public' else webid
+        flash(f'"{resource_name}" gedeeld met {display_webid}', 'success')
+        log_action('share', {'resource': resource_path, 'webid': webid, 'modes': modes})
+    except Exception as e:
+        send_crash_report("share_failed", str(e), "deellink aanmaken")
+        flash('Delen mislukt', 'error')
 
     return redirect_to_folder(folder_path)
 
@@ -1792,7 +1850,9 @@ def change_bridge_password():
 @app.route('/settings')
 def settings():
     """Show settings page"""
-    return render_template('settings.html', watermark_enabled=is_watermark_enabled())
+    return render_template('settings.html',
+                           watermark_enabled=is_watermark_enabled(),
+                           crash_reporting_enabled=is_crash_reporting_enabled())
 
 
 @app.route('/settings/watermark', methods=['POST'])
@@ -1828,6 +1888,41 @@ def toggle_watermark():
 
     status = 'ingeschakeld' if enabled == 'true' else 'uitgeschakeld'
     flash(f'Watermerken {status}', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/crash-reporting', methods=['POST'])
+def toggle_crash_reporting():
+    """Toggle anonymous crash reporting setting in .env"""
+    if BRIDGE_MODE:
+        flash('Niet beschikbaar in Bridge-modus', 'error')
+        return redirect(url_for('settings'))
+
+    enabled = 'true' if request.form.get('enabled') == 'true' else 'false'
+    env_path = os.path.join(PROJECT_DIR, '.env')
+
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            lines = f.readlines()
+
+        found = False
+        with open(env_path, 'w') as f:
+            for line in lines:
+                if line.startswith('CRASH_REPORTING='):
+                    f.write(f'CRASH_REPORTING={enabled}\n')
+                    found = True
+                else:
+                    f.write(line)
+            if not found:
+                f.write(f'CRASH_REPORTING={enabled}\n')
+    else:
+        with open(env_path, 'w') as f:
+            f.write(f'CRASH_REPORTING={enabled}\n')
+
+    os.environ['CRASH_REPORTING'] = enabled
+
+    status = 'ingeschakeld' if enabled == 'true' else 'uitgeschakeld'
+    flash(f'Foutmeldingen {status}', 'success')
     return redirect(url_for('settings'))
 
 
@@ -3359,62 +3454,68 @@ def verzoek_approve(request_id):
         flash('Verzoek niet gevonden', 'error')
         return redirect(url_for('verzoeken_overview'))
 
-    with open(fpath, 'r', encoding='utf-8') as f:
-        record = _json.load(f)
+    try:
+        with open(fpath, 'r', encoding='utf-8') as f:
+            record = _json.load(f)
 
-    # Get approved data groups from form
-    approved_groups = request.form.getlist('approved_data')
-    validity_key = request.form.get('validity', '1w')
-    val_info = APPROVAL_VALIDITY.get(validity_key, APPROVAL_VALIDITY['1w'])
+        # Get approved data groups from form
+        approved_groups = request.form.getlist('approved_data')
+        validity_key = request.form.get('validity', '1w')
+        val_info = APPROVAL_VALIDITY.get(validity_key, APPROVAL_VALIDITY['1w'])
 
-    if not approved_groups:
-        flash('Selecteer ten minste één gegevensgroep om te delen.', 'error')
+        if not approved_groups:
+            flash('Selecteer ten minste één gegevensgroep om te delen.', 'error')
+            return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+
+        # Build response data with only approved profile groups
+        profile = load_profile_data()
+        profile_groups = extract_profile_groups(profile)
+        response_data = {}
+
+        for group_key in approved_groups:
+            group = profile_groups.get(group_key)
+            if group and group['filled']:
+                response_data[group_key] = {
+                    'label': group['label'],
+                    'data': group['data'],
+                }
+
+        # Save response JSON
+        pod_write(f'verzoeken/{request_id}_response.json',
+                  _json.dumps(response_data, indent=2, ensure_ascii=False))
+
+        # Update request record
+        now = datetime.now(timezone.utc)
+        valid_until = now + timedelta(days=val_info['days'])
+        status_token = record.get('mysolido:statusToken', '')
+
+        record['mysolido:status'] = 'goedgekeurd'
+        record['mysolido:approvedData'] = approved_groups
+        record['mysolido:responseLink'] = f'/verzoek/response/{status_token}'
+        record['mysolido:validUntil'] = valid_until.isoformat()
+
+        with open(fpath, 'w', encoding='utf-8') as f:
+            _json.dump(record, f, indent=2, ensure_ascii=False)
+
+        # Create consent record (using existing consent module pattern)
+        requester = record.get('mysolido:requester', {})
+        requester_name = requester.get('schema:name', 'Onbekend')
+        requester_org = requester.get('schema:worksFor', '')
+        receiver_label = f"{requester_name} ({requester_org})" if requester_org else requester_name
+
+        flash(f'Verzoek van {receiver_label} goedgekeurd.', 'success')
+        log_action('request_approve', {
+            'id': request_id,
+            'requester': requester_name,
+            'approved_data': approved_groups,
+            'valid_until': valid_until.isoformat(),
+        })
         return redirect(url_for('verzoek_detail_owner', request_id=request_id))
 
-    # Build response data with only approved profile groups
-    profile = load_profile_data()
-    profile_groups = extract_profile_groups(profile)
-    response_data = {}
-
-    for group_key in approved_groups:
-        group = profile_groups.get(group_key)
-        if group and group['filled']:
-            response_data[group_key] = {
-                'label': group['label'],
-                'data': group['data'],
-            }
-
-    # Save response JSON
-    pod_write(f'verzoeken/{request_id}_response.json',
-              _json.dumps(response_data, indent=2, ensure_ascii=False))
-
-    # Update request record
-    now = datetime.now(timezone.utc)
-    valid_until = now + timedelta(days=val_info['days'])
-    status_token = record.get('mysolido:statusToken', '')
-
-    record['mysolido:status'] = 'goedgekeurd'
-    record['mysolido:approvedData'] = approved_groups
-    record['mysolido:responseLink'] = f'/verzoek/response/{status_token}'
-    record['mysolido:validUntil'] = valid_until.isoformat()
-
-    with open(fpath, 'w', encoding='utf-8') as f:
-        _json.dump(record, f, indent=2, ensure_ascii=False)
-
-    # Create consent record (using existing consent module pattern)
-    requester = record.get('mysolido:requester', {})
-    requester_name = requester.get('schema:name', 'Onbekend')
-    requester_org = requester.get('schema:worksFor', '')
-    receiver_label = f"{requester_name} ({requester_org})" if requester_org else requester_name
-
-    flash(f'Verzoek van {receiver_label} goedgekeurd.', 'success')
-    log_action('request_approve', {
-        'id': request_id,
-        'requester': requester_name,
-        'approved_data': approved_groups,
-        'valid_until': valid_until.isoformat(),
-    })
-    return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+    except Exception as e:
+        send_crash_report("approval_failed", str(e), "verzoek goedkeuren")
+        flash('Goedkeuren mislukt', 'error')
+        return redirect(url_for('verzoeken_overview'))
 
 
 @app.route('/verzoeken/<request_id>/reject', methods=['POST'])
@@ -3449,6 +3550,126 @@ def verzoek_reject(request_id):
     flash(f'Verzoek van {requester_name} afgewezen.', 'success')
     log_action('request_reject', {'id': request_id, 'requester': requester_name})
     return redirect(url_for('verzoeken_overview'))
+
+
+# === Crash report endpoints (Bridge) ===
+
+_crash_report_rate_limit = {}
+
+
+def is_crash_rate_limited(ip, max_requests=10, window_seconds=3600):
+    """Rate limit crash reports: max 10 per hour per IP"""
+    now = time.time()
+    timestamps = _crash_report_rate_limit.get(ip, [])
+    timestamps = [t for t in timestamps if now - t < window_seconds]
+    if len(timestamps) >= max_requests:
+        _crash_report_rate_limit[ip] = timestamps
+        return True
+    timestamps.append(now)
+    _crash_report_rate_limit[ip] = timestamps
+    return False
+
+
+def get_crash_reports_dir():
+    """Return the crash-reports directory path"""
+    if BRIDGE_MODE:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'crash-reports')
+    return os.path.join(PROJECT_DIR, 'crash-reports')
+
+
+@app.route('/crash-report', methods=['POST'])
+def crash_report_receive():
+    """Receive an anonymous crash report (public, no auth required)"""
+    if not BRIDGE_MODE:
+        abort(404)
+
+    if is_crash_rate_limited(request.remote_addr):
+        return {'status': 'rate_limited'}, 429
+
+    data = request.get_json(silent=True)
+    if not data:
+        return {'status': 'invalid'}, 400
+
+    required_fields = ['timestamp', 'version', 'error_type', 'error_message']
+    if not all(f in data for f in required_fields):
+        return {'status': 'missing_fields'}, 400
+
+    report = {
+        'timestamp': sanitize_input(str(data.get('timestamp', ''))[:50]),
+        'version': sanitize_input(str(data.get('version', ''))[:20]),
+        'os': sanitize_input(str(data.get('os', ''))[:50]),
+        'os_version': sanitize_input(str(data.get('os_version', ''))[:100]),
+        'python_version': sanitize_input(str(data.get('python_version', ''))[:20]),
+        'error_type': sanitize_input(str(data.get('error_type', ''))[:200]),
+        'error_message': sanitize_input(str(data.get('error_message', ''))[:500]),
+        'context': sanitize_input(str(data.get('context', ''))[:200]),
+    }
+
+    crash_dir = get_crash_reports_dir()
+    os.makedirs(crash_dir, exist_ok=True)
+
+    safe_timestamp = re.sub(r'[^a-zA-Z0-9_\-]', '_', report['timestamp'][:30])
+    safe_error_type = re.sub(r'[^a-zA-Z0-9_\-]', '_', report['error_type'][:50])
+    filename = f"{safe_timestamp}_{safe_error_type}.json"
+
+    filepath = os.path.join(crash_dir, filename)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        _json.dump(report, f, indent=2, ensure_ascii=False)
+
+    return {'status': 'received'}, 200
+
+
+@app.route('/crash-reports')
+def crash_reports_overview():
+    """Show crash reports overview (Bridge login required)"""
+    if not BRIDGE_MODE:
+        abort(404)
+
+    crash_dir = get_crash_reports_dir()
+    reports = []
+
+    if os.path.isdir(crash_dir):
+        for fname in os.listdir(crash_dir):
+            if fname.endswith('.json'):
+                fpath = os.path.join(crash_dir, fname)
+                try:
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        report = _json.load(f)
+                    report['_filename'] = fname
+                    reports.append(report)
+                except (_json.JSONDecodeError, IOError):
+                    continue
+
+    reports.sort(key=lambda r: r.get('timestamp', ''), reverse=True)
+    return render_template('crash_reports.html', reports=reports)
+
+
+@app.route('/crash-reports/delete/<filename>', methods=['POST'])
+def crash_report_delete(filename):
+    """Delete a crash report (Bridge login required)"""
+    if not BRIDGE_MODE:
+        abort(404)
+
+    safe_filename = re.sub(r'[^a-zA-Z0-9_\-.]', '', filename)
+    if not safe_filename.endswith('.json'):
+        abort(400)
+
+    crash_dir = get_crash_reports_dir()
+    fpath = os.path.join(crash_dir, safe_filename)
+
+    if os.path.exists(fpath) and os.path.dirname(os.path.abspath(fpath)) == os.path.abspath(crash_dir):
+        os.remove(fpath)
+        flash('Rapport verwijderd', 'success')
+    else:
+        flash('Rapport niet gevonden', 'error')
+
+    return redirect(url_for('crash_reports_overview'))
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    send_crash_report("internal_server_error", str(error), request.path[:200])
+    return render_template('error.html', error="Er is een interne fout opgetreden."), 500
 
 
 if __name__ == '__main__':
