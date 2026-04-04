@@ -14,7 +14,7 @@ MySolido is open source software that runs a personal data vault (Solid Pod) on 
 
 ## What can MySolido do?
 
-- **20 categories** — Identity, medical, financial, legal, insurance, and more
+- **25 categories** — Identity, medical, financial, legal, insurance, pets, education, travel, and more
 - **Drag & drop upload** — Drop files into your vault
 - **Sharing with permissions** — Read-only, write, temporary, revocable (via Solid WAC)
 - **Share links** — Share files via secure token URLs with optional password and expiry
@@ -29,7 +29,34 @@ MySolido is open source software that runs a personal data vault (Solid Pod) on 
 - **ODRL policies** — Machine-readable sharing rules per folder (W3C Recommendation). Control who can do what: owner only, read allowed, or temporary sharing
 - **Consent management** — Record who has access to your data and why, compliant with ISO/IEC TS 27560:2023 and W3C Data Privacy Vocabulary
 - **Watermarks** — Automatic watermark on PDFs and images when viewed via share links. The original stays untouched
+- **Profile module** — Store structured personal attributes (housing, family, vehicles, insurance, work, health) as JSON-LD with W3C Data Privacy Vocabulary
+- **Intention module** — Create anonymous intentions ("I'm looking for car insurance") linked to your profile data. Foundation for the Intention Economy
+- **Consent requests** — External parties can request access to your data via the Bridge. You review, approve or reject — and choose exactly which data to share
+- **Crash reporting** — Optional, anonymous error reporting to help improve MySolido. No personal data is ever sent
 - **macOS support** — `.dmg` installer available, or manual installation via Terminal
+
+---
+
+## The Intention Economy
+
+MySolido is more than a file vault. It enables a new model for how consumers interact with businesses — the **Intention Economy**.
+
+**How it works today (the Google model):** You search for "car insurance." Google sells your search behaviour to insurers. You get ads. The insurer pays Google. You get nothing.
+
+**How it works with MySolido:** Your vault contains structured data — family size, car details, current insurance. When you want a new policy, you create an intention: "I'm looking for car insurance." MySolido can share this anonymously with the market. Insurers bid on your intention — without knowing your name. You choose the best offer, on your terms.
+
+This is sometimes called the "Reverse Google" — instead of companies harvesting your data, you control it and share it voluntarily.
+
+**What's built today:**
+- **Profile module** — Structured attributes stored locally as JSON-LD
+- **Intention module** — Create, manage and activate intentions linked to your profile
+- **Consent requests** — External parties (e.g. insurance agents) can request data access via the Bridge. You approve or reject, choosing exactly which data to share
+
+**What's coming:**
+- AI assistant — A local LLM that searches your vault, summarises documents, reminds you of expiring policies
+- Marketplace — Anonymous matching of intentions and offers
+
+The requesting party pays — not the consumer.
 
 ---
 
@@ -39,6 +66,7 @@ MySolido Bridge mirrors your local vault to a Dutch server. Your PC remains the 
 
 - **Always reachable** — Open your vault on your phone via bridge.mysolido.com
 - **Share links** — Share files via a secure URL, recipients don't need Solid
+- **Consent requests** — External parties can submit data requests via the Bridge
 - **Backup** — Automatic second copy on a Dutch VPS
 - **Secured** — HTTPS + password authentication, read-only (no uploads/deletes via internet)
 
@@ -58,14 +86,7 @@ Local is master. The Bridge syncs along.
 
 ### Quick install (Windows)
 
-Download the [latest release](https://github.com/Wim1201/mysolido/releases) and run `installeer-mysolido.bat`. The script automatically installs:
-
-1. Node.js (if not present)
-2. Python (if not present)
-3. MySolido source code
-4. Python dependencies
-5. Community Solid Server
-6. Starts the app and opens your browser
+Download the [latest release](https://github.com/Wim1201/mysolido/releases) and run `MySolido-Setup.exe`. The installer sets up everything automatically.
 
 ### Manual installation
 
@@ -143,6 +164,22 @@ Your data lives in the `.data/` folder on your own hard drive. Nothing leaves yo
 
 ---
 
+## For insurance agents and intermediaries
+
+MySolido offers a new way to reach clients — with their permission.
+
+1. You open `bridge.mysolido.com/verzoek` and submit a data request
+2. Your client sees the request in their MySolido vault
+3. They choose exactly which data to share (e.g. vehicle details, current policies)
+4. You receive a temporary, secure link to the approved data
+5. Every consent is registered according to ISO 27560 — legally stronger than cookie banners
+
+The data cannot be resold (enforced via ODRL policy). Watermarks make any leak traceable.
+
+**Pricing:** Per request (€0.50–2) or monthly subscription (€25–50/month). The requesting party pays — not the client.
+
+---
+
 ## Roadmap
 
 ### Available
@@ -150,12 +187,17 @@ Your data lives in the `.data/` folder on your own hard drive. Nothing leaves yo
 * ODRL policy engine — sharing rules per folder (W3C ODRL 2.2)
 * Consent management — consent records compliant with ISO/IEC TS 27560:2023
 * Watermarks on share links — automatic watermark on PDFs and images
-* macOS installer (.dmg)
+* macOS installer (.dmg) and Windows installer (.exe)
 * Bridge — always reachable via bridge.mysolido.com
+* Profile module — structured personal attributes with W3C DPV vocabulary
+* Intention module — anonymous intentions linked to profile data
+* Consent requests — external parties can request data via the Bridge
+* Anonymous crash reporting — opt-in, no personal data sent
 
 ### Planned
 
-* **AI-ready vault** — Your documents, chat history and preferences safely available locally for personal AI agents
+* **AI assistant** — A local LLM that searches your vault, summarises documents, and reminds you of expiring policies — without cloud
+* **Marketplace** — Anonymous matching of intentions and offers (Intention Economy)
 * Per-folder encryption
 * OCR / document scanning
 * A4DS/UMA authorisation (role-based access)
@@ -169,13 +211,13 @@ Your data lives in the `.data/` folder on your own hard drive. Nothing leaves yo
 
 | Component | Technology |
 |-----------|-----------|
-| Pod storage | [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer) v7.1.8 |
+| Pod storage | [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer) v7.1.9 |
 | Interface | Flask (Python) |
 | Protocol | [Solid](https://solidproject.org) (W3C standard) |
-| Data format | RDF / Linked Data |
-| Storage | Local on your own PC |
-| Policies | ODRL 2.2 (W3C Recommendation) + JSON-LD |
+| Data format | RDF / Linked Data / JSON-LD |
+| Policies | ODRL 2.2 (W3C Recommendation) |
 | Consent | W3C Data Privacy Vocabulary v2.3 + ISO/IEC TS 27560:2023 |
+| Profile data | W3C DPV Personal Data Categories + JSON-LD |
 | Watermarks | reportlab (PDF) + Pillow (images) |
 | Bridge | Dutch VPS (mijn.host) + Nginx + Let's Encrypt |
 
@@ -191,6 +233,19 @@ MySolido uses the same standard as [Athumi](https://athumi.be) (Flemish governme
 * **No third party** — Your data never leaves your computer unless you choose to share
 * **Open source** — Verify what the software does yourself
 * **Bridge optional** — The Bridge is an optional add-on. MySolido works fully offline without it
+* **Crash reporting opt-in** — Anonymous error reports are only sent if you enable them in settings. No personal data is included.
+
+---
+
+## Three layers of protection when sharing
+
+| Layer | How |
+|-------|-----|
+| **Technical** | Watermarks on shared documents. Traceable if leaked. No download button. |
+| **Legal** | ODRL policies: machine-readable rules. "Read only, do not distribute, valid until date X." Enforceable. |
+| **Registration** | Every consent recorded per ISO 27560 + W3C DPV. Burden of proof on the requester. |
+
+Cookie banners offer zero protection. MySolido offers three layers.
 
 ---
 
@@ -207,6 +262,9 @@ Export regular backups (ZIP) via the settings. With the Bridge, you automaticall
 
 **Does it work on Mac/Linux?**
 macOS is supported with a `.dmg` installer and `start-mysolido.sh` launcher script. Linux users can follow the manual installation (Python + Node.js).
+
+**Can a party that receives my data resell it?**
+No. The ODRL policy prohibits distribution. Every consent is registered with a specific purpose. Reselling violates the agreement and GDPR. Watermarks make any leak traceable.
 
 ---
 
