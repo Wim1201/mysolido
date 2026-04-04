@@ -984,6 +984,262 @@ footer {
   .bridge-arrow { transform: rotate(90deg); padding-top: 0; }
   .bridge-node { flex: 0 1 auto; width: 100%; max-width: 260px; }
 }
+
+/* ════════════════════════════════════
+   INTENTION ECONOMY
+   ════════════════════════════════════ */
+.intention {
+  background: var(--white);
+  border-top: 1px solid var(--slate-200);
+}
+
+.intention h2 { margin-bottom: 12px; }
+
+.intention-sub {
+  color: var(--text-muted);
+  max-width: 640px;
+  margin-bottom: 48px;
+}
+
+.intention-flow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.intention-step {
+  flex: 0 1 200px;
+  padding: 24px 20px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.intention-step-num {
+  width: 32px; height: 32px;
+  background: var(--green-600);
+  color: var(--white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin: 0 auto 12px;
+}
+
+.intention-step h3 {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--slate-800);
+}
+
+.intention-step p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.intention-flow-arrow {
+  display: flex;
+  align-items: center;
+  padding-top: 40px;
+  color: var(--green-400);
+}
+
+.intention-flow-arrow svg { width: 24px; height: 24px; }
+
+@media (max-width: 639px) {
+  .intention-flow { flex-direction: column; align-items: center; }
+  .intention-flow-arrow { transform: rotate(90deg); padding-top: 0; }
+  .intention-step { flex: 0 1 auto; width: 100%; max-width: 260px; }
+}
+
+.intention-highlight {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  color: var(--green-800);
+  text-align: center;
+}
+
+/* ════════════════════════════════════
+   BESCHERMING
+   ════════════════════════════════════ */
+.protection {
+  background: var(--slate-50);
+  border-top: 1px solid var(--slate-200);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.protection h2 { margin-bottom: 12px; }
+
+.protection-sub {
+  color: var(--text-muted);
+  max-width: 600px;
+  margin-bottom: 48px;
+}
+
+.protection-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .protection-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.protection-card {
+  padding: 28px;
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-sm);
+}
+
+.protection-card-icon {
+  width: 48px; height: 48px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.protection-card-icon svg { width: 24px; height: 24px; color: var(--green-600); }
+
+.protection-card h3 {
+  margin-bottom: 8px;
+  color: var(--slate-800);
+}
+
+.protection-card p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.protection-card ul {
+  list-style: none;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.protection-card ul li {
+  padding: 4px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.protection-card ul li::before {
+  content: '\2713';
+  position: absolute;
+  left: 0;
+  color: var(--green-500);
+  font-weight: 700;
+}
+
+/* ════════════════════════════════════
+   TUSSENPERSONEN
+   ════════════════════════════════════ */
+.intermediary {
+  background: var(--white);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.intermediary h2 { margin-bottom: 12px; }
+
+.intermediary-sub {
+  color: var(--text-muted);
+  max-width: 640px;
+  margin-bottom: 48px;
+}
+
+.intermediary-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+@media (min-width: 640px) {
+  .intermediary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .intermediary-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.intermediary-card {
+  padding: 24px;
+  background: var(--slate-50);
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  text-align: center;
+}
+
+.intermediary-card-icon {
+  font-size: 1.8rem;
+  margin-bottom: 12px;
+}
+
+.intermediary-card h3 {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--slate-800);
+}
+
+.intermediary-card p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.intermediary-pricing {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 28px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.intermediary-pricing h3 {
+  margin-bottom: 16px;
+  color: var(--green-800);
+}
+
+.pricing-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pricing-option {
+  padding: 10px 20px;
+  background: var(--white);
+  border: 1px solid var(--green-200);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--green-800);
+}
+
+.pricing-option strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--green-700);
+}
 </style>
 </head>
 <body>
@@ -1005,11 +1261,11 @@ footer {
         <h1>Jouw data.<br>Op jouw pc.<br><em>Jouw voorwaarden.</em></h1>
         <p class="hero-sub">MySolido is een persoonlijke datakluis die op je eigen computer draait. Geen cloud. Geen abonnement. Geen derde partij.</p>
         <div class="hero-buttons">
-          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Setup.exe" class="btn btn-primary">
+          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Setup.exe" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download voor Windows
           </a>
-          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Installer.dmg" class="btn btn-primary">
+          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Installer.dmg" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download voor macOS
           </a>
@@ -1208,8 +1464,8 @@ footer {
         <div class="feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
         </div>
-        <h3>20 categorieën</h3>
-        <p>Identiteit, medisch, financieel, juridisch en meer — overzichtelijk geordend.</p>
+        <h3>25 categorieën</h3>
+        <p>Identiteit, medisch, financieel, juridisch, huisdieren, opleiding, reizen en meer — overzichtelijk geordend.</p>
       </div>
 
       <div class="feature-card">
@@ -1294,6 +1550,42 @@ footer {
 
       <div class="feature-card">
         <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h3>Profielmodule</h3>
+        <p>Gestructureerde persoonlijke attributen (wonen, gezin, voertuigen, verzekeringen) opgeslagen als JSON-LD met W3C Data Privacy Vocabulary.</p>
+        <span class="feature-badge">Nieuw in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </div>
+        <h3>Intentiemodule</h3>
+        <p>Maak anonieme intenties aan zoals "Ik zoek een autoverzekering" — gekoppeld aan je profieldata. De markt komt naar jou.</p>
+        <span class="feature-badge">Nieuw in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+        </div>
+        <h3>Consent-verzoeken</h3>
+        <p>Externe partijen kunnen gegevens opvragen via de Bridge. Jij beoordeelt elk verzoek en kiest precies welke data gedeeld wordt.</p>
+        <span class="feature-badge">Nieuw in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3>Crash-rapportage</h3>
+        <p>Opt-in anonieme foutmeldingen. Alleen versie, OS en foutmelding — nooit persoonsgegevens.</p>
+        <span class="feature-badge">Nieuw in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
         </div>
         <h3>Encryptie per map</h3>
@@ -1359,7 +1651,160 @@ footer {
       </div>
 
       <div class="bridge-price">
-        Verwachte prijs: <strong>&euro;3-5 per maand</strong> &middot; Nederlandse server &middot; Geen Big Tech
+        Verwachte prijs: <strong>&euro;3&ndash;5 per maand</strong> &middot; Nederlandse server &middot; Geen Big Tech &middot; Consent-verzoeken: &euro;0,50&ndash;2 per stuk
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ INTENTION ECONOMY ════════════════ -->
+<section class="intention" id="intention-economy">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      Nieuw concept
+    </div>
+    <h2>De Intention Economy: het Omgekeerde Google</h2>
+    <p class="intention-sub">Bij Google zoek jij en betaal je met je data. Bij MySolido draai je het om: jij zegt wat je nodig hebt, en bedrijven komen naar jou — zonder je naam te kennen.</p>
+
+    <div class="intention-flow">
+      <div class="intention-step">
+        <div class="intention-step-num">1</div>
+        <h3>Vul je profiel</h3>
+        <p>Woonsituatie, gezin, voertuigen, verzekeringen — gestructureerd en onder jouw controle.</p>
+      </div>
+      <div class="intention-flow-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="intention-step">
+        <div class="intention-step-num">2</div>
+        <h3>Maak een intentie</h3>
+        <p>"Ik zoek een autoverzekering" — anoniem, gekoppeld aan je profieldata.</p>
+      </div>
+      <div class="intention-flow-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="intention-step">
+        <div class="intention-step-num">3</div>
+        <h3>Ontvang aanbiedingen</h3>
+        <p>Bedrijven bieden op jouw intentie. Zij betalen — niet jij.</p>
+      </div>
+      <div class="intention-flow-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="intention-step">
+        <div class="intention-step-num">4</div>
+        <h3>Jij kiest</h3>
+        <p>Keur een verzoek goed, deel alleen de data die je wilt, trek in wanneer je wilt.</p>
+      </div>
+    </div>
+
+    <div class="intention-highlight">
+      <strong>De vragende partij betaalt, niet de consument.</strong> Jouw data is van jou — en als iemand er toegang toe wil, dan betaalt diegene daarvoor.
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ BESCHERMING ════════════════ -->
+<section class="protection" id="bescherming">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Beveiliging
+    </div>
+    <h2>Drie lagen bescherming bij delen</h2>
+    <p class="protection-sub">Wanneer je data deelt via MySolido, ben je op drie niveaus beschermd.</p>
+
+    <div class="protection-grid">
+      <div class="protection-card">
+        <div class="protection-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <h3>Technisch</h3>
+        <p>Ingebouwde maatregelen die ongeautoriseerd gebruik voorkomen.</p>
+        <ul>
+          <li>Watermerken op gedeelde bestanden</li>
+          <li>Traceerbaar tot de ontvanger</li>
+          <li>Geen downloadknop voor ontvangers</li>
+          <li>Tijdelijke links met verloopdatum</li>
+        </ul>
+      </div>
+
+      <div class="protection-card">
+        <div class="protection-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h3>Juridisch</h3>
+        <p>Machine-leesbare regels die juridisch afdwingbaar zijn.</p>
+        <ul>
+          <li>ODRL 2.2 policies per map</li>
+          <li>Niet doorverkopen, niet kopi&euml;ren</li>
+          <li>Regels reizen mee met de data</li>
+          <li>W3C-standaard, geen vendor lock-in</li>
+        </ul>
+      </div>
+
+      <div class="protection-card">
+        <div class="protection-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3>Registratie</h3>
+        <p>Elke toestemming wordt vastgelegd als bewijs.</p>
+        <ul>
+          <li>ISO 27560 consent records</li>
+          <li>W3C Data Privacy Vocabulary</li>
+          <li>Intrekbaar met &eacute;&eacute;n klik</li>
+          <li>Volledige audit trail</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ TUSSENPERSONEN ════════════════ -->
+<section class="intermediary" id="tussenpersonen">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+      Voor professionals
+    </div>
+    <h2>Voor tussenpersonen en adviseurs</h2>
+    <p class="intermediary-sub">Verzekeringsagenten, hypotheekadviseurs en financieel planners kunnen via MySolido veilig klantdata opvragen — juridisch gedekt en AVG-compliant.</p>
+
+    <div class="intermediary-grid">
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#128233;</div>
+        <h3>Verzoek indienen</h3>
+        <p>Dien een verzoek in via bridge.mysolido.com/verzoek met je naam en organisatie.</p>
+      </div>
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#9989;</div>
+        <h3>Klant beoordeelt</h3>
+        <p>De klant ziet het verzoek, kiest welke data gedeeld wordt en keurt goed of wijst af.</p>
+      </div>
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#128274;</div>
+        <h3>Juridisch gedekt</h3>
+        <p>Elke goedkeuring wordt vastgelegd conform ISO 27560. ODRL voorkomt doorverkoop.</p>
+      </div>
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#128337;</div>
+        <h3>Tijdelijk en intrekbaar</h3>
+        <p>Goedgekeurde data is beschikbaar via een tijdelijke link. De klant kan altijd intrekken.</p>
+      </div>
+    </div>
+
+    <div class="intermediary-pricing">
+      <h3>Tarieven voor professionals</h3>
+      <div class="pricing-options">
+        <div class="pricing-option">
+          <strong>&euro;0,50 &ndash; &euro;2</strong>
+          per consent-verzoek
+        </div>
+        <div class="pricing-option">
+          <strong>&euro;25 &ndash; &euro;50/mnd</strong>
+          onbeperkt verzoeken
+        </div>
       </div>
     </div>
   </div>
@@ -1410,6 +1855,13 @@ footer {
           <div>
             <strong>ODRL 2.2</strong>
             <span>W3C Recommendation voor deelregels</span>
+          </div>
+        </div>
+        <div class="tech-badge">
+          <div class="tech-badge-icon">📋</div>
+          <div>
+            <strong>JSON-LD</strong>
+            <span>Linked Data voor profiel en intenties</span>
           </div>
         </div>
         <div class="tech-badge">
@@ -1546,11 +1998,11 @@ footer {
     <p class="cta-sub">Download MySolido en neem controle over je persoonlijke data. Geen registratie nodig.</p>
 
     <div class="cta-buttons">
-      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Setup.exe" class="btn btn-primary">
+      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Setup.exe" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download voor Windows
       </a>
-      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Installer.dmg" class="btn btn-primary">
+      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Installer.dmg" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download voor macOS
       </a>

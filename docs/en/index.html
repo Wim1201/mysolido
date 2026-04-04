@@ -984,6 +984,262 @@ footer {
   .bridge-arrow { transform: rotate(90deg); padding-top: 0; }
   .bridge-node { flex: 0 1 auto; width: 100%; max-width: 260px; }
 }
+
+/* ════════════════════════════════════
+   INTENTION ECONOMY
+   ════════════════════════════════════ */
+.intention {
+  background: var(--white);
+  border-top: 1px solid var(--slate-200);
+}
+
+.intention h2 { margin-bottom: 12px; }
+
+.intention-sub {
+  color: var(--text-muted);
+  max-width: 640px;
+  margin-bottom: 48px;
+}
+
+.intention-flow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.intention-step {
+  flex: 0 1 200px;
+  padding: 24px 20px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.intention-step-num {
+  width: 32px; height: 32px;
+  background: var(--green-600);
+  color: var(--white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin: 0 auto 12px;
+}
+
+.intention-step h3 {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--slate-800);
+}
+
+.intention-step p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.intention-flow-arrow {
+  display: flex;
+  align-items: center;
+  padding-top: 40px;
+  color: var(--green-400);
+}
+
+.intention-flow-arrow svg { width: 24px; height: 24px; }
+
+@media (max-width: 639px) {
+  .intention-flow { flex-direction: column; align-items: center; }
+  .intention-flow-arrow { transform: rotate(90deg); padding-top: 0; }
+  .intention-step { flex: 0 1 auto; width: 100%; max-width: 260px; }
+}
+
+.intention-highlight {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  color: var(--green-800);
+  text-align: center;
+}
+
+/* ════════════════════════════════════
+   BESCHERMING
+   ════════════════════════════════════ */
+.protection {
+  background: var(--slate-50);
+  border-top: 1px solid var(--slate-200);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.protection h2 { margin-bottom: 12px; }
+
+.protection-sub {
+  color: var(--text-muted);
+  max-width: 600px;
+  margin-bottom: 48px;
+}
+
+.protection-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .protection-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.protection-card {
+  padding: 28px;
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  box-shadow: var(--shadow-sm);
+}
+
+.protection-card-icon {
+  width: 48px; height: 48px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.protection-card-icon svg { width: 24px; height: 24px; color: var(--green-600); }
+
+.protection-card h3 {
+  margin-bottom: 8px;
+  color: var(--slate-800);
+}
+
+.protection-card p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.protection-card ul {
+  list-style: none;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.protection-card ul li {
+  padding: 4px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.protection-card ul li::before {
+  content: '\2713';
+  position: absolute;
+  left: 0;
+  color: var(--green-500);
+  font-weight: 700;
+}
+
+/* ════════════════════════════════════
+   TUSSENPERSONEN
+   ════════════════════════════════════ */
+.intermediary {
+  background: var(--white);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.intermediary h2 { margin-bottom: 12px; }
+
+.intermediary-sub {
+  color: var(--text-muted);
+  max-width: 640px;
+  margin-bottom: 48px;
+}
+
+.intermediary-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+@media (min-width: 640px) {
+  .intermediary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .intermediary-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.intermediary-card {
+  padding: 24px;
+  background: var(--slate-50);
+  border-radius: var(--radius);
+  border: 1px solid var(--slate-200);
+  text-align: center;
+}
+
+.intermediary-card-icon {
+  font-size: 1.8rem;
+  margin-bottom: 12px;
+}
+
+.intermediary-card h3 {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--slate-800);
+}
+
+.intermediary-card p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.intermediary-pricing {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 28px;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.intermediary-pricing h3 {
+  margin-bottom: 16px;
+  color: var(--green-800);
+}
+
+.pricing-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pricing-option {
+  padding: 10px 20px;
+  background: var(--white);
+  border: 1px solid var(--green-200);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--green-800);
+}
+
+.pricing-option strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--green-700);
+}
 </style>
 </head>
 <body>
@@ -1005,11 +1261,11 @@ footer {
         <h1>Your data.<br>On your PC.<br><em>Your terms.</em></h1>
         <p class="hero-sub">MySolido is a personal data vault that runs on your own computer. No cloud. No subscription. No third party.</p>
         <div class="hero-buttons">
-          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Setup.exe" class="btn btn-primary">
+          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Setup.exe" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download for Windows
           </a>
-          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Installer.dmg" class="btn btn-primary">
+          <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Installer.dmg" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download for macOS
           </a>
@@ -1208,8 +1464,8 @@ footer {
         <div class="feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
         </div>
-        <h3>20 categories</h3>
-        <p>Identity, medical, financial, legal and more — clearly organised.</p>
+        <h3>25 categories</h3>
+        <p>Identity, medical, financial, legal, pets, education, travel and more — clearly organised.</p>
       </div>
 
       <div class="feature-card">
@@ -1294,6 +1550,42 @@ footer {
 
       <div class="feature-card">
         <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h3>Profile module</h3>
+        <p>Structured personal attributes (housing, family, vehicles, insurance) stored as JSON-LD with W3C Data Privacy Vocabulary.</p>
+        <span class="feature-badge">New in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </div>
+        <h3>Intention module</h3>
+        <p>Create anonymous intentions like "I'm looking for car insurance" — linked to your profile data. The market comes to you.</p>
+        <span class="feature-badge">New in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+        </div>
+        <h3>Consent requests</h3>
+        <p>Third parties can request data via the Bridge. You review each request and choose exactly which data to share.</p>
+        <span class="feature-badge">New in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3>Crash reporting</h3>
+        <p>Opt-in anonymous error reports. Only version, OS and error message — never personal data.</p>
+        <span class="feature-badge">New in v1.2</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
         </div>
         <h3>Per-folder encryption</h3>
@@ -1359,7 +1651,160 @@ footer {
       </div>
 
       <div class="bridge-price">
-        Expected price: <strong>&euro;3-5 per month</strong> &middot; Dutch server &middot; No Big Tech
+        Expected price: <strong>&euro;3&ndash;5 per month</strong> &middot; Dutch server &middot; No Big Tech &middot; Consent requests: &euro;0.50&ndash;2 each
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ INTENTION ECONOMY ════════════════ -->
+<section class="intention" id="intention-economy">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      New concept
+    </div>
+    <h2>The Intention Economy: Reverse Google</h2>
+    <p class="intention-sub">With Google, you search and pay with your data. With MySolido, you reverse it: you state what you need, and companies come to you — without knowing your name.</p>
+
+    <div class="intention-flow">
+      <div class="intention-step">
+        <div class="intention-step-num">1</div>
+        <h3>Fill your profile</h3>
+        <p>Housing, family, vehicles, insurance — structured and under your control.</p>
+      </div>
+      <div class="intention-flow-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="intention-step">
+        <div class="intention-step-num">2</div>
+        <h3>Create an intention</h3>
+        <p>"I'm looking for car insurance" — anonymous, linked to your profile data.</p>
+      </div>
+      <div class="intention-flow-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="intention-step">
+        <div class="intention-step-num">3</div>
+        <h3>Receive offers</h3>
+        <p>Companies bid on your intention. They pay — not you.</p>
+      </div>
+      <div class="intention-flow-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="intention-step">
+        <div class="intention-step-num">4</div>
+        <h3>You choose</h3>
+        <p>Approve a request, share only the data you want, revoke whenever you want.</p>
+      </div>
+    </div>
+
+    <div class="intention-highlight">
+      <strong>The requesting party pays, not the consumer.</strong> Your data is yours — and if someone wants access, they pay for it.
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ PROTECTION ════════════════ -->
+<section class="protection" id="protection">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Security
+    </div>
+    <h2>Three layers of protection when sharing</h2>
+    <p class="protection-sub">When you share data via MySolido, you are protected on three levels.</p>
+
+    <div class="protection-grid">
+      <div class="protection-card">
+        <div class="protection-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <h3>Technical</h3>
+        <p>Built-in measures that prevent unauthorised use.</p>
+        <ul>
+          <li>Watermarks on shared files</li>
+          <li>Traceable to the recipient</li>
+          <li>No download button for recipients</li>
+          <li>Temporary links with expiry date</li>
+        </ul>
+      </div>
+
+      <div class="protection-card">
+        <div class="protection-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h3>Legal</h3>
+        <p>Machine-readable rules that are legally enforceable.</p>
+        <ul>
+          <li>ODRL 2.2 policies per folder</li>
+          <li>No reselling, no copying</li>
+          <li>Rules travel with the data</li>
+          <li>W3C standard, no vendor lock-in</li>
+        </ul>
+      </div>
+
+      <div class="protection-card">
+        <div class="protection-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3>Registration</h3>
+        <p>Every consent is recorded as proof.</p>
+        <ul>
+          <li>ISO 27560 consent records</li>
+          <li>W3C Data Privacy Vocabulary</li>
+          <li>Revocable with one click</li>
+          <li>Full audit trail</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ INTERMEDIARIES ════════════════ -->
+<section class="intermediary" id="intermediaries">
+  <div class="container">
+    <div class="section-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+      For professionals
+    </div>
+    <h2>For intermediaries and advisors</h2>
+    <p class="intermediary-sub">Insurance agents, mortgage advisors and financial planners can securely request client data via MySolido — legally covered and GDPR-compliant.</p>
+
+    <div class="intermediary-grid">
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#128233;</div>
+        <h3>Submit a request</h3>
+        <p>Submit a request via bridge.mysolido.com/verzoek with your name and organisation.</p>
+      </div>
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#9989;</div>
+        <h3>Client reviews</h3>
+        <p>The client sees the request, chooses which data to share, and approves or declines.</p>
+      </div>
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#128274;</div>
+        <h3>Legally covered</h3>
+        <p>Every approval is recorded under ISO 27560. ODRL prevents resale of data.</p>
+      </div>
+      <div class="intermediary-card">
+        <div class="intermediary-card-icon">&#128337;</div>
+        <h3>Temporary and revocable</h3>
+        <p>Approved data is available via a temporary link. The client can revoke at any time.</p>
+      </div>
+    </div>
+
+    <div class="intermediary-pricing">
+      <h3>Pricing for professionals</h3>
+      <div class="pricing-options">
+        <div class="pricing-option">
+          <strong>&euro;0.50 &ndash; &euro;2</strong>
+          per consent request
+        </div>
+        <div class="pricing-option">
+          <strong>&euro;25 &ndash; &euro;50/mo</strong>
+          unlimited requests
+        </div>
       </div>
     </div>
   </div>
@@ -1410,6 +1855,13 @@ footer {
           <div>
             <strong>ODRL 2.2</strong>
             <span>W3C Recommendation for sharing rules</span>
+          </div>
+        </div>
+        <div class="tech-badge">
+          <div class="tech-badge-icon">📋</div>
+          <div>
+            <strong>JSON-LD</strong>
+            <span>Linked Data for profile and intentions</span>
           </div>
         </div>
         <div class="tech-badge">
@@ -1546,11 +1998,11 @@ footer {
     <p class="cta-sub">Download MySolido and take control of your personal data. No registration needed.</p>
 
     <div class="cta-buttons">
-      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Setup.exe" class="btn btn-primary">
+      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Setup.exe" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download for Windows
       </a>
-      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.1.0/MySolido-Installer.dmg" class="btn btn-primary">
+      <a href="https://github.com/Wim1201/mysolido/releases/download/v1.2.0/MySolido-Installer.dmg" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download for macOS
       </a>
