@@ -36,6 +36,9 @@
             {% endif %}
         </a>
         <a href="{{ url_for('settings') }}" class="btn">{{ icon_settings() }} Instellingen</a>
+        {% if not bridge_mode %}
+        <a href="{{ url_for('ai_chat') }}" class="btn btn-primary">&#129302; AI-assistent</a>
+        {% endif %}
     </div>
 
     {% if not bridge_mode %}

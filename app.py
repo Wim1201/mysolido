@@ -756,6 +756,10 @@ def check_bridge_mode():
         'revoke_share_link',
         'init_folders',
         'init_folders_welcome',
+        'ai_chat',
+        'ai_ask',
+        'ai_index',
+        'ai_status',
     ]
 
     if request.endpoint in blocked_endpoints:
@@ -3664,6 +3668,71 @@ def crash_report_delete(filename):
         flash('Rapport niet gevonden', 'error')
 
     return redirect(url_for('crash_reports_overview'))
+
+
+# ---------------------------------------------------------------------------
+# AI-assistent (Fase 4 — Lokale LLM op pod-data)
+# ---------------------------------------------------------------------------
+
+@app.route('/ai')
+def ai_chat():
+    """AI-assistent chatvenster"""
+    if BRIDGE_MODE:
+        abort(403)
+    return render_template('ai_chat.html')
+
+
+@app.route('/ai/ask', methods=['POST'])
+def ai_ask():
+    """Beantwoord een vraag via de lokale AI"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    from flask import jsonify
+    data = request.get_json(silent=True) or {}
+    question = (data.get('question') or '').strip()
+    if not question:
+        return jsonify({"answer": "Stel een vraag.", "sources": []}), 400
+
+    try:
+        import ai_service
+        result = ai_service.ask(question)
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"answer": f"Er ging iets mis: {exc}", "sources": []}), 500
+
+
+@app.route('/ai/index', methods=['POST'])
+def ai_index():
+    """Bouw de AI-zoekindex op over alle pod-documenten"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    from flask import jsonify
+    try:
+        import ai_service
+        pod_path = get_pod_data_path()
+        result = ai_service.index_all_documents(pod_path)
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route('/ai/status')
+def ai_status():
+    """Status van Ollama en de zoekindex"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    from flask import jsonify
+    try:
+        import ai_service
+        ollama = ai_service.check_ollama_status()
+        index = ai_service.get_index_stats()
+        missing = ai_service.get_missing_dependencies()
+        return jsonify({"ollama": ollama, "index": index, "missing_deps": missing})
+    except Exception as exc:
+        return jsonify({"ollama": {"running": False, "error": str(exc)}, "index": {"total_chunks": 0, "status": "error"}, "missing_deps": {}}), 500
 
 
 @app.errorhandler(500)

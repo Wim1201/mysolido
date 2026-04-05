@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}AI-assistent - MySolido{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+    <span>&#128274;</span>
+    <span>Alles blijft lokaal. Je vragen en documenten verlaten nooit je computer. De AI draait volledig op je eigen pc via Ollama.</span>
+</div>
+
+<div class="card" id="status-bar" style="margin-bottom: 12px; padding: 10px 16px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.85rem;">
+            <span id="ollama-status">Ollama: controleren...</span>
+            <span id="index-status">Index: controleren...</span>
+        </div>
+        <button class="btn btn-compact btn-primary" id="reindex-btn" onclick="startIndexing()">Herindexeer</button>
+    </div>
+</div>
+
+<div class="card" id="setup-banner" style="display: none; margin-bottom: 12px;">
+    <h3>AI-assistent is nog niet geconfigureerd</h3>
+    <ol style="margin: 12px 0; padding-left: 20px; line-height: 1.8;">
+        <li>Installeer Ollama: <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a></li>
+        <li>Open een terminal en voer uit:<br>
+            <code style="display: block; margin: 6px 0; padding: 8px; background: var(--color-bg); border-radius: 4px;">ollama pull llama3.1:8b<br>ollama pull nomic-embed-text</code>
+        </li>
+        <li>Ollama draait automatisch na installatie</li>
+        <li>Klik op <strong>Herindexeer</strong> om je documenten te indexeren</li>
+    </ol>
+</div>
+
+<div class="card" id="missing-deps-banner" style="display: none; margin-bottom: 12px;">
+    <h3>Ontbrekende Python-pakketten</h3>
+    <p class="text-secondary" style="margin-bottom: 8px;">Installeer de volgende pakketten voor volledige ondersteuning:</p>
+    <pre id="missing-deps-list" style="padding: 8px; background: var(--color-bg); border-radius: 4px; overflow-x: auto; font-size: 0.85rem;"></pre>
+</div>
+
+<div class="card" style="display: flex; flex-direction: column; height: 60vh; min-height: 300px; padding: 0; overflow: hidden;">
+    <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div class="ai-msg" style="align-self: flex-start; max-width: 85%; padding: 10px 14px; border-radius: 12px; background: var(--color-surface-alt, var(--color-bg)); font-size: 0.9rem;">
+            Hallo! Ik ben de MySolido AI-assistent. Stel me een vraag over je documenten.
+        </div>
+    </div>
+    <div style="border-top: 1px solid var(--color-border); padding: 12px 16px; display: flex; gap: 8px;">
+        <input type="text" id="question-input" placeholder="Stel een vraag over je documenten..."
+               style="flex: 1; padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); color: var(--color-text); font-size: 0.9rem;"
+               onkeydown="if(event.key==='Enter')sendQuestion()">
+        <button class="btn btn-primary" onclick="sendQuestion()" id="send-btn">Verstuur</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .user-msg {
+        align-self: flex-end;
+        max-width: 85%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: var(--color-primary);
+        color: #fff;
+        font-size: 0.9rem;
+    }
+    .ai-msg {
+        align-self: flex-start;
+        max-width: 85%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: var(--color-surface-alt, var(--color-bg));
+        font-size: 0.9rem;
+    }
+    .ai-sources {
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+        margin-top: 6px;
+    }
+    .ai-sources span {
+        display: inline-block;
+        background: var(--color-bg);
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin: 2px 2px 0 0;
+    }
+    .ai-typing {
+        align-self: flex-start;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+        font-style: italic;
+    }
+    #reindex-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>
+<script>
+const chatMessages = document.getElementById('chat-messages');
+const questionInput = document.getElementById('question-input');
+const sendBtn = document.getElementById('send-btn');
+
+function addMessage(html, cls) {
+    const div = document.createElement('div');
+    div.className = cls;
+    div.innerHTML = html;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return div;
+}
+
+async function sendQuestion() {
+    const q = questionInput.value.trim();
+    if (!q) return;
+
+    addMessage(escapeHtml(q), 'user-msg');
+    questionInput.value = '';
+    sendBtn.disabled = true;
+    questionInput.disabled = true;
+
+    const typing = addMessage('Even geduld, ik doorzoek je kluis...', 'ai-typing');
+
+    try {
+        const resp = await fetch('/ai/ask', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({question: q})
+        });
+        const data = await resp.json();
+
+        typing.remove();
+
+        let html = escapeHtml(data.answer).replace(/\n/g, '<br>');
+        if (data.sources && data.sources.length > 0) {
+            html += '<div class="ai-sources">Bronnen: ';
+            html += data.sources.map(s => '<span>' + escapeHtml(s) + '</span>').join(' ');
+            html += '</div>';
+        }
+        addMessage(html, 'ai-msg');
+    } catch (err) {
+        typing.remove();
+        addMessage('Er ging iets mis bij het versturen van je vraag.', 'ai-msg');
+    }
+
+    sendBtn.disabled = false;
+    questionInput.disabled = false;
+    questionInput.focus();
+}
+
+async function startIndexing() {
+    const btn = document.getElementById('reindex-btn');
+    const statusEl = document.getElementById('index-status');
+    btn.disabled = true;
+    btn.textContent = 'Bezig...';
+    statusEl.textContent = 'Index: bezig met indexeren...';
+
+    try {
+        const resp = await fetch('/ai/index', {method: 'POST'});
+        const data = await resp.json();
+        if (data.error) {
+            statusEl.textContent = 'Index: fout — ' + data.error;
+        } else {
+            statusEl.textContent = 'Index: ' + data.indexed + ' bestanden geindexeerd';
+            if (data.errors > 0) {
+                statusEl.textContent += ' (' + data.errors + ' fouten)';
+            }
+        }
+    } catch (err) {
+        statusEl.textContent = 'Index: fout bij indexeren';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Herindexeer';
+}
+
+async function checkStatus() {
+    const ollamaEl = document.getElementById('ollama-status');
+    const indexEl = document.getElementById('index-status');
+    const setupBanner = document.getElementById('setup-banner');
+    const depsBanner = document.getElementById('missing-deps-banner');
+    const depsList = document.getElementById('missing-deps-list');
+
+    try {
+        const resp = await fetch('/ai/status');
+        const data = await resp.json();
+
+        // Ollama status
+        if (data.ollama && data.ollama.running) {
+            let parts = ['Ollama: actief'];
+            if (!data.ollama.has_llm) parts.push('(model ' + data.ollama.llm_model + ' ontbreekt)');
+            if (!data.ollama.has_embed) parts.push('(embed-model ' + data.ollama.embed_model + ' ontbreekt)');
+            ollamaEl.textContent = parts.join(' ');
+            ollamaEl.style.color = (data.ollama.has_llm && data.ollama.has_embed) ? 'var(--color-success)' : 'var(--color-warning, orange)';
+            setupBanner.style.display = 'none';
+        } else {
+            ollamaEl.textContent = 'Ollama: niet actief';
+            ollamaEl.style.color = 'var(--color-danger)';
+            setupBanner.style.display = '';
+        }
+
+        // Index status
+        if (data.index) {
+            if (data.index.status === 'ready') {
+                indexEl.textContent = 'Index: ' + data.index.total_chunks + ' chunks';
+                indexEl.style.color = 'var(--color-success)';
+            } else {
+                indexEl.textContent = 'Index: leeg';
+                indexEl.style.color = 'var(--color-text-muted)';
+            }
+        }
+
+        // Missing dependencies
+        if (data.missing_deps && Object.keys(data.missing_deps).length > 0) {
+            depsList.textContent = Object.values(data.missing_deps).join('\n');
+            depsBanner.style.display = '';
+        }
+    } catch (err) {
+        ollamaEl.textContent = 'Status: kon niet ophalen';
+        ollamaEl.style.color = 'var(--color-danger)';
+    }
+}
+
+function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+checkStatus();
+questionInput.focus();
+</script>
+{% endblock %}

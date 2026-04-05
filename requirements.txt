@@ -5,3 +5,8 @@ bcrypt
 reportlab
 Pillow
 PyPDF2
+chromadb
+pytesseract
+python-docx
+openpyxl
+pdf2image

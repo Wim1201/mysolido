@@ -63,6 +63,9 @@ temp/
 # Crash reports
 crash-reports/
 
+# AI vector database
+.chroma/
+
 # Installer
 installer-output/
 mysolido.ico
