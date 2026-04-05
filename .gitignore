@@ -31,12 +31,22 @@ Desktop.ini
 audit_log.json
 ~$*
 
+# Data backups
+.data-backup*/
+
 # Persoonlijke / vertrouwelijke documenten
+*.pptx
+*.docx
+*.pdf
 Aantekeningen MySolido.docx
 MySolido_Businessplan.pdf
 MySolido_Projectplan_v1.1.docx
 MySolido_Projectplan_v1.1.pdf
 MySolido_Ecosysteem_Diagram.html
+
+# Private keys
+*.pem
+*.key
 
 # App state
 shares.json

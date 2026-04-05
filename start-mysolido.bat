@@ -62,13 +62,13 @@ if not exist "%APPDATA%\npm" mkdir "%APPDATA%\npm"
 if not exist "node_modules" (
     echo   [1/3] Community Solid Server installeren...
     echo         Dit kan een paar minuten duren bij de eerste keer.
-    call %NPX_CMD% --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json
+    call %NPX_CMD% --yes @solid/community-server@7.1.9 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json
     echo.
 )
 
 :: Start CSS op de achtergrond
 echo   [1/2] Solid Server starten...
-start /b "" cmd /c "%NPX_CMD% --yes @solid/community-server@7.1.8 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
+start /b "" cmd /c "%NPX_CMD% --yes @solid/community-server@7.1.9 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
 
 :: Wacht tot CSS bereikbaar is (max 60 pogingen van 1 seconde)
 set /a attempts=0
