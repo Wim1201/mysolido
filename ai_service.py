@@ -19,6 +19,19 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "tinyllama")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
+# AI Provider niveaus (nu en toekomst)
+# Niveau 1: "local"     — Ollama voor alles (standaard)
+# Niveau 2: "hybrid"    — Lokaal indexeren + Claude API voor antwoorden
+# Niveau 3: "cloud_ocr" — Niveau 2 + Claude Vision voor OCR (toekomst, NIET gebouwd)
+#   - extract_text() krijgt ook een provider-keuze
+#   - Bij "cloud_ocr": afbeeldingen en gescande PDF's gaan naar Claude Vision
+#   - extract_ocr() wordt extract_ocr_local() + extract_ocr_claude()
+#   - Instelling: drie radiobuttons in plaats van twee
+
+AI_PROVIDER = os.getenv("AI_PROVIDER", "local")  # "local" of "hybrid"
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+
 CHROMA_PERSIST_DIR = os.getenv(
     "CHROMA_PERSIST_DIR",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), ".chroma"),
@@ -317,6 +330,22 @@ def check_ollama_status():
         return {"running": False, "models": [], "error": str(exc)}
 
 
+def check_ai_status():
+    """Controleer status van alle AI-componenten."""
+    ollama = check_ollama_status()
+    provider = AI_PROVIDER
+    claude_configured = bool(ANTHROPIC_API_KEY)
+
+    return {
+        "provider": provider,
+        "ollama": ollama,
+        "claude_configured": claude_configured,
+        "claude_model": ANTHROPIC_MODEL if claude_configured else None,
+        # Ollama is altijd nodig (voor embeddings), ook in hybrid-modus
+        "ready": ollama.get("running", False) and ollama.get("has_embed", False),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Indexing service
 # ---------------------------------------------------------------------------
@@ -431,26 +460,33 @@ def query_documents(question, n_results=5):
     ]
 
 
+_SYSTEM_PROMPT = (
+    "Je bent de MySolido AI-assistent. Je helpt de gebruiker met vragen "
+    "over documenten in zijn persoonlijke datakluis.\n\n"
+    "Regels:\n"
+    "- Beantwoord vragen alleen op basis van de aangeleverde context\n"
+    "- Als het antwoord niet in de context staat, zeg dat eerlijk\n"
+    "- Verwijs naar het bronbestand bij je antwoord\n"
+    "- Antwoord in het Nederlands tenzij de gebruiker Engels spreekt\n"
+    "- Wees beknopt en direct\n"
+    "- Geef nooit medisch, juridisch of financieel advies — verwijs naar professionals"
+)
+
+
 def generate_answer(question, context_docs):
-    """Generate an answer using Ollama chat, grounded in context documents."""
+    """Genereer antwoord via de geconfigureerde provider."""
+    if AI_PROVIDER == "hybrid" and ANTHROPIC_API_KEY:
+        return generate_answer_claude(question, context_docs)
+    return generate_answer_ollama(question, context_docs)
+
+
+def generate_answer_ollama(question, context_docs):
+    """Genereer antwoord via Ollama (lokaal)."""
     _require_requests()
 
     context = "\n\n---\n\n".join(
         f"[Bron: {doc['file_path']}]\n{doc['text']}" for doc in context_docs
     )
-
-    system_prompt = (
-        "Je bent de MySolido AI-assistent. Je helpt de gebruiker met vragen "
-        "over documenten in zijn persoonlijke datakluis.\n\n"
-        "Regels:\n"
-        "- Beantwoord vragen alleen op basis van de aangeleverde context\n"
-        "- Als het antwoord niet in de context staat, zeg dat eerlijk\n"
-        "- Verwijs naar het bronbestand bij je antwoord\n"
-        "- Antwoord in het Nederlands tenzij de gebruiker Engels spreekt\n"
-        "- Wees beknopt en direct\n"
-        "- Geef nooit medisch, juridisch of financieel advies — verwijs naar professionals"
-    )
-
     user_prompt = f"Context uit de datakluis:\n\n{context}\n\nVraag: {question}"
 
     try:
@@ -459,7 +495,7 @@ def generate_answer(question, context_docs):
             json={
                 "model": OLLAMA_MODEL,
                 "messages": [
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": _SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ],
                 "stream": False,
@@ -474,8 +510,51 @@ def generate_answer(question, context_docs):
     except _requests.exceptions.Timeout:
         return "Het genereren van een antwoord duurde te lang. Probeer een kortere vraag."
     except Exception as exc:
-        logger.error("generate_answer failed: %s", exc)
+        logger.error("generate_answer_ollama failed: %s", exc)
         return "Er ging iets mis bij het genereren van een antwoord."
+
+
+def generate_answer_claude(question, context_docs):
+    """Genereer antwoord via Claude API (hybride modus)."""
+    _require_requests()
+
+    context = "\n\n---\n\n".join(
+        f"[Bron: {doc['file_path']}]\n{doc['text']}" for doc in context_docs
+    )
+
+    try:
+        resp = _requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": ANTHROPIC_MODEL,
+                "max_tokens": 1024,
+                "system": _SYSTEM_PROMPT,
+                "messages": [
+                    {"role": "user", "content": f"Context uit de datakluis:\n\n{context}\n\nVraag: {question}"}
+                ],
+            },
+            timeout=60,
+        )
+
+        if resp.status_code == 200:
+            return resp.json()["content"][0]["text"]
+        if resp.status_code == 401:
+            return "Ongeldige API-key. Controleer je Anthropic API-key in de instellingen."
+        if resp.status_code == 429:
+            return "Te veel verzoeken. Probeer het over een minuut opnieuw."
+        return f"Fout bij Claude API (status {resp.status_code}). Probeer het opnieuw of schakel over naar lokaal."
+    except _requests.exceptions.ConnectionError:
+        return "Kan geen verbinding maken met de Claude API. Controleer je internetverbinding."
+    except _requests.exceptions.Timeout:
+        return "De Claude API reageert niet. Probeer het opnieuw."
+    except Exception as exc:
+        logger.error("generate_answer_claude failed: %s", exc)
+        return f"Onverwachte fout: {str(exc)[:200]}"
 
 
 def ask(question):

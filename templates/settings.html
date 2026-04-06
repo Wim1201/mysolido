@@ -53,6 +53,50 @@
     </div>
 
     <div class="settings-card">
+        <h2>&#x1f916; AI-assistent</h2>
+        <form action="{{ url_for('change_ai_provider') }}" method="post">
+            <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+                <div>
+                    <div class="setting-label">Antwoord-provider</div>
+                    <div class="setting-desc">Kies hoe de AI-assistent antwoorden genereert. Indexering en zoeken blijven altijd lokaal (Ollama).</div>
+                </div>
+
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="ai_provider" value="local" {{ 'checked' if ai_provider != 'hybrid' }} style="margin-top: 3px;">
+                    <div>
+                        <strong>Lokaal (Ollama)</strong><br>
+                        <span class="setting-desc">Volledig priv&eacute;. Antwoorden worden gegenereerd op je eigen pc. Kwaliteit afhankelijk van je hardware.</span>
+                    </div>
+                </label>
+
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="ai_provider" value="hybrid" {{ 'checked' if ai_provider == 'hybrid' }} style="margin-top: 3px;">
+                    <div>
+                        <strong>Hybride (Claude API)</strong><br>
+                        <span class="setting-desc">Betere antwoorden. Bij elke vraag worden kleine tekstfragmenten (~2500 woorden) tijdelijk naar Anthropic gestuurd. Je bestanden blijven lokaal — alleen relevante stukjes worden gedeeld.</span>
+                    </div>
+                </label>
+
+                <div id="api-key-section" style="margin-left: 24px; {{ '' if ai_provider == 'hybrid' else 'display: none;' }}">
+                    <label class="setting-label" for="anthropic_api_key">API-key</label>
+                    {% if api_key_set %}
+                    <div class="setting-desc" style="margin-bottom: 4px;">Huidige key: {{ api_key_masked }}</div>
+                    {% endif %}
+                    <input type="password" name="anthropic_api_key" id="anthropic_api_key" placeholder="sk-ant-..." autocomplete="off"
+                           style="width: 100%; max-width: 400px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg); color: var(--color-text); font-size: 0.85rem;">
+                    <div class="setting-desc" style="margin-top: 4px;">Verkrijg een key op <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>. {{ 'Laat leeg om de huidige key te behouden.' if api_key_set else '' }}</div>
+                    <div style="margin-top: 8px; padding: 8px 12px; background: var(--color-warning-bg, #fff3cd); border-radius: 6px; font-size: 0.8rem; color: var(--color-warning-text, #856404);">
+                        Let op: in hybride modus verlaten tekstfragmenten je computer bij elke vraag.
+                        Gebruik dit niet voor zeer gevoelige vragen.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" style="align-self: flex-start;">Opslaan</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="settings-card">
         <h2>{{ icon_zip() }} Backup</h2>
         <div class="setting-row">
             <div>
@@ -74,6 +118,18 @@
     if (toggle) {
         toggle.checked = document.documentElement.dataset.theme === 'dark';
     }
+})();
+
+// Show/hide API key section based on AI provider choice
+(function() {
+    var radios = document.querySelectorAll('input[name="ai_provider"]');
+    var section = document.getElementById('api-key-section');
+    if (!radios.length || !section) return;
+    radios.forEach(function(r) {
+        r.addEventListener('change', function() {
+            section.style.display = this.value === 'hybrid' ? '' : 'none';
+        });
+    });
 })();
 </script>
 {% endblock %}

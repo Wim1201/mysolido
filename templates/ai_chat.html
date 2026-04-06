@@ -3,9 +3,12 @@
 {% block title %}AI-assistent - MySolido{% endblock %}
 
 {% block content %}
-<div class="card" style="margin-bottom: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+<div class="card" id="privacy-banner" style="margin-bottom: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
     <span>&#128274;</span>
-    <span>Alles blijft lokaal. Je vragen en documenten verlaten nooit je computer. De AI draait volledig op je eigen pc via Ollama.</span>
+    <span id="privacy-text">Alles blijft lokaal. Je vragen en documenten verlaten nooit je computer. De AI draait volledig op je eigen pc via Ollama.</span>
+</div>
+<div class="card" id="hybrid-warning" style="display: none; margin-bottom: 12px; padding: 10px 16px; font-size: 0.85rem; background: var(--color-warning-bg, #fff3cd); color: var(--color-warning-text, #856404);">
+    &#9888;&#65039; Hybride modus: bij elke vraag worden kleine tekstfragmenten naar de Claude API gestuurd.
 </div>
 
 <div class="card" id="status-bar" style="margin-bottom: 12px; padding: 10px 16px;">
@@ -183,13 +186,32 @@ async function checkStatus() {
         const resp = await fetch('/ai/status');
         const data = await resp.json();
 
-        // Ollama status
+        // Provider + Ollama status
+        var isHybrid = data.provider === 'hybrid' && data.claude_configured;
+        var privacyText = document.getElementById('privacy-text');
+        var hybridWarn = document.getElementById('hybrid-warning');
+
+        if (isHybrid) {
+            privacyText.textContent = 'Hybride modus: indexering en zoeken blijven lokaal. Antwoorden komen van de Claude API.';
+            hybridWarn.style.display = '';
+        } else {
+            privacyText.textContent = 'Alles blijft lokaal. Je vragen en documenten verlaten nooit je computer. De AI draait volledig op je eigen pc via Ollama.';
+            hybridWarn.style.display = 'none';
+        }
+
         if (data.ollama && data.ollama.running) {
-            let parts = ['Ollama: actief'];
-            if (!data.ollama.has_llm) parts.push('(model ' + data.ollama.llm_model + ' ontbreekt)');
+            let parts = [];
+            if (isHybrid) {
+                parts.push('Claude API: actief');
+            } else {
+                parts.push('Ollama: actief');
+                if (!data.ollama.has_llm) parts.push('(model ' + data.ollama.llm_model + ' ontbreekt)');
+            }
             if (!data.ollama.has_embed) parts.push('(embed-model ' + data.ollama.embed_model + ' ontbreekt)');
+            var modus = isHybrid ? 'hybride' : 'lokaal (priv\u00e9)';
+            parts.push('| Modus: ' + modus);
             ollamaEl.textContent = parts.join(' ');
-            ollamaEl.style.color = (data.ollama.has_llm && data.ollama.has_embed) ? 'var(--color-success)' : 'var(--color-warning, orange)';
+            ollamaEl.style.color = (data.ollama.has_embed && (isHybrid || data.ollama.has_llm)) ? 'var(--color-success)' : 'var(--color-warning, orange)';
             setupBanner.style.display = 'none';
         } else {
             ollamaEl.textContent = 'Ollama: niet actief';

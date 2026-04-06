@@ -1868,9 +1868,37 @@ def change_bridge_password():
 @app.route('/settings')
 def settings():
     """Show settings page"""
+    ai_provider = os.environ.get('AI_PROVIDER', 'local')
+    api_key_raw = os.environ.get('ANTHROPIC_API_KEY', '')
+    api_key_masked = f'****{api_key_raw[-4:]}' if len(api_key_raw) >= 4 else ''
+
     return render_template('settings.html',
                            watermark_enabled=is_watermark_enabled(),
-                           crash_reporting_enabled=is_crash_reporting_enabled())
+                           crash_reporting_enabled=is_crash_reporting_enabled(),
+                           ai_provider=ai_provider,
+                           api_key_masked=api_key_masked,
+                           api_key_set=bool(api_key_raw))
+
+
+def update_env(env_path, key, value):
+    """Update of voeg een key-value paar toe in .env"""
+    lines = []
+    found = False
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            lines = f.readlines()
+
+    with open(env_path, 'w') as f:
+        for line in lines:
+            if line.startswith(f'{key}='):
+                f.write(f'{key}={value}\n')
+                found = True
+            else:
+                f.write(line)
+        if not found:
+            f.write(f'{key}={value}\n')
+
+    load_dotenv(env_path, override=True)
 
 
 @app.route('/settings/watermark', methods=['POST'])
@@ -1941,6 +1969,47 @@ def toggle_crash_reporting():
 
     status = 'ingeschakeld' if enabled == 'true' else 'uitgeschakeld'
     flash(f'Foutmeldingen {status}', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/ai-provider', methods=['POST'])
+def change_ai_provider():
+    """Wijzig AI-provider: lokaal (Ollama) of hybride (Claude API)"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    provider = request.form.get('ai_provider', 'local')
+    api_key = request.form.get('anthropic_api_key', '').strip()
+
+    if provider not in ('local', 'hybrid'):
+        flash('Ongeldige keuze', 'error')
+        return redirect(url_for('settings'))
+
+    if provider == 'hybrid' and not api_key:
+        # Check of er al een key in env staat
+        existing_key = os.environ.get('ANTHROPIC_API_KEY', '')
+        if not existing_key:
+            flash('Voer een API-key in om de hybride modus te gebruiken', 'error')
+            return redirect(url_for('settings'))
+
+    env_path = os.path.join(PROJECT_DIR, '.env')
+    update_env(env_path, 'AI_PROVIDER', provider)
+    if api_key:
+        update_env(env_path, 'ANTHROPIC_API_KEY', api_key)
+
+    # Herlaad in huidige process
+    os.environ['AI_PROVIDER'] = provider
+    if api_key:
+        os.environ['ANTHROPIC_API_KEY'] = api_key
+
+    # Update ai_service globals
+    import ai_service
+    ai_service.AI_PROVIDER = provider
+    if api_key:
+        ai_service.ANTHROPIC_API_KEY = api_key
+
+    label = 'Lokaal (Ollama)' if provider == 'local' else 'Hybride (Claude API)'
+    flash(f'AI-provider ingesteld op {label}', 'success')
     return redirect(url_for('settings'))
 
 
@@ -3741,12 +3810,15 @@ def ai_status():
     from flask import jsonify
     try:
         import ai_service
-        ollama = ai_service.check_ollama_status()
+        ai = ai_service.check_ai_status()
         index = ai_service.get_index_stats()
         missing = ai_service.get_missing_dependencies()
-        return jsonify({"ollama": ollama, "index": index, "missing_deps": missing})
+        return jsonify({"ollama": ai["ollama"], "index": index, "missing_deps": missing,
+                        "provider": ai["provider"], "claude_configured": ai["claude_configured"],
+                        "claude_model": ai["claude_model"]})
     except Exception as exc:
-        return jsonify({"ollama": {"running": False, "error": str(exc)}, "index": {"total_chunks": 0, "status": "error"}, "missing_deps": {}}), 500
+        return jsonify({"ollama": {"running": False, "error": str(exc)}, "index": {"total_chunks": 0, "status": "error"}, "missing_deps": {},
+                        "provider": "local", "claude_configured": False, "claude_model": None}), 500
 
 
 @app.errorhandler(500)
