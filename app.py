@@ -302,18 +302,32 @@ def get_pod_stats_filesystem():
                 'active_share_links': 0}
 
     for root, dirs, files in os.walk(pod_path):
-        # Skip verborgen mappen en systeemmappen
+        # Skip verborgen mappen en _trash
         dirs[:] = [d for d in dirs if not d.startswith('.') and d != '_trash']
-        total_folders += len(dirs)
+        # Bepaal of we in een systeemmap zitten
+        rel = os.path.relpath(root, pod_path)
+        top_folder = rel.split(os.sep)[0] if rel != '.' else None
+        in_system_folder = top_folder in SYSTEM_FOLDERS
+        # Tel systeemmappen zelf niet mee, en ook hun submappen niet
+        if in_system_folder:
+            pass  # skip counting for system folders
+        else:
+            # Exclude system folders from the count at top level
+            if rel == '.':
+                countable = [d for d in dirs if d not in SYSTEM_FOLDERS]
+            else:
+                countable = []
+            total_folders += len(countable)
         for f in files:
             if not f.startswith('.') and not f.endswith('.acl') and not f.endswith('.meta'):
-                total_files += 1
                 filepath = os.path.join(root, f)
                 size = os.path.getsize(filepath)
                 total_size += size
                 mtime = os.path.getmtime(filepath)
                 if latest_modified is None or mtime > latest_modified:
                     latest_modified = mtime
+                if not in_system_folder:
+                    total_files += 1
 
     active_links = len(get_active_share_links())
 
@@ -622,13 +636,16 @@ VIEWABLE_TYPES = {
     '.webm': 'video/webm',
 }
 
+# System folders — excluded from dashboard stats, recent uploads, and folder grid
+SYSTEM_FOLDERS = {'profiel', 'profile', 'intenties', 'verzoeken', 'toestemmingen', 'consent', '_trash'}
+
 # Default folders to create on init
 DEFAULT_FOLDERS = [
     'identiteit', 'medisch', 'financieel', 'wonen', 'zakelijk',
     'werk', 'voertuigen', 'juridisch', 'media', 'accounts',
     'gezin', 'abonnementen', 'inbox', 'verzekeringen',
     'huisdieren', 'opleiding', 'reizen', 'digitaal-testament',
-    'persoonlijk', 'projecten', 'toestemmingen',
+    'persoonlijk', 'projecten',
 ]
 
 # Folder icons with SVG and colors (matching mysolido.com landing page)
@@ -712,10 +729,6 @@ FOLDER_ICONS = {
     'projecten': {
         'color': '#9068a0',
         'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#9068a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>'
-    },
-    'toestemmingen': {
-        'color': '#2e8b57',
-        'svg': '<svg viewBox="0 0 24 24" fill="none" stroke="#2e8b57" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
     },
 }
 
@@ -1052,9 +1065,10 @@ def get_move_folders(folder_path, items):
 
 
 def get_recent_files(limit=5):
-    """Get recent file uploads from audit log"""
-    log = get_audit_log('upload', limit=limit)
-    return log
+    """Get recent file uploads from audit log, excluding system folders"""
+    log = get_audit_log('upload', limit=limit * 3)
+    filtered = [e for e in log if e.get('details', {}).get('folder', '').split('/')[0] not in SYSTEM_FOLDERS]
+    return filtered[:limit]
 
 
 def sort_items(items, sort_by):
