@@ -32,6 +32,10 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "local")  # "local" of "hybrid"
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
 
+# Mistral OCR (niveau 3: Cloud OCR EU)
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
+OCR_PROVIDER = os.getenv("OCR_PROVIDER", "local")  # "local" of "mistral"
+
 CHROMA_PERSIST_DIR = os.getenv(
     "CHROMA_PERSIST_DIR",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), ".chroma"),
@@ -183,7 +187,10 @@ def _extract_pdf(file_path):
             text += page_text + "\n"
     # Fall back to OCR for scanned PDFs
     if len(text.strip()) < 50:
-        ocr_text = _extract_ocr_from_pdf(file_path)
+        if OCR_PROVIDER == "mistral" and MISTRAL_API_KEY:
+            ocr_text = _extract_ocr_mistral_pdf(file_path)
+        else:
+            ocr_text = _extract_ocr_from_pdf(file_path)
         if ocr_text:
             text = ocr_text
     return text.strip()
@@ -213,6 +220,8 @@ def _extract_xlsx(file_path):
 
 
 def _extract_ocr(file_path):
+    if OCR_PROVIDER == "mistral" and MISTRAL_API_KEY:
+        return _extract_ocr_mistral_image(file_path)
     if _PILImage is None or pytesseract is None:
         logger.warning("pytesseract/Pillow not installed — skipping OCR: %s", file_path)
         return ""
@@ -235,6 +244,90 @@ def _extract_ocr_from_pdf(file_path):
         return text.strip()
     except Exception as exc:
         logger.warning("PDF OCR failed for %s: %s", file_path, exc)
+        return ""
+
+
+def _extract_ocr_mistral_pdf(file_path):
+    """Extract tekst uit PDF via Mistral OCR API (Cloud EU)."""
+    _require_requests()
+    if not MISTRAL_API_KEY:
+        logger.warning("Mistral API key niet geconfigureerd, fallback naar lokaal")
+        return ""
+    try:
+        import base64
+        with open(file_path, "rb") as f:
+            file_data = base64.b64encode(f.read()).decode("utf-8")
+
+        resp = _requests.post(
+            "https://api.mistral.ai/v1/ocr",
+            headers={
+                "Authorization": f"Bearer {MISTRAL_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "mistral-ocr-latest",
+                "document": {
+                    "type": "document_url",
+                    "document_url": f"data:application/pdf;base64,{file_data}"
+                }
+            },
+            timeout=120,
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            pages = result.get("pages", [])
+            text = "\n\n".join(page.get("markdown", "") for page in pages)
+            logger.info("Mistral OCR succesvol voor %s: %d tekens", file_path, len(text))
+            return text.strip()
+        else:
+            logger.warning("Mistral OCR fout (status %d) voor %s: %s", resp.status_code, file_path, resp.text[:200])
+            return ""
+    except Exception as exc:
+        logger.warning("Mistral OCR mislukt voor %s: %s", file_path, exc)
+        return ""
+
+
+def _extract_ocr_mistral_image(file_path):
+    """Extract tekst uit afbeelding via Mistral OCR API (Cloud EU)."""
+    _require_requests()
+    if not MISTRAL_API_KEY:
+        logger.warning("Mistral API key niet geconfigureerd, fallback naar lokaal")
+        return ""
+    try:
+        import base64
+        ext = os.path.splitext(file_path)[1].lower()
+        mime_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".tiff": "image/tiff", ".bmp": "image/bmp"}
+        mime = mime_types.get(ext, "image/png")
+
+        with open(file_path, "rb") as f:
+            file_data = base64.b64encode(f.read()).decode("utf-8")
+
+        resp = _requests.post(
+            "https://api.mistral.ai/v1/ocr",
+            headers={
+                "Authorization": f"Bearer {MISTRAL_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "mistral-ocr-latest",
+                "document": {
+                    "type": "image_url",
+                    "image_url": f"data:{mime};base64,{file_data}"
+                }
+            },
+            timeout=60,
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            pages = result.get("pages", [])
+            text = "\n\n".join(page.get("markdown", "") for page in pages)
+            logger.info("Mistral OCR (image) succesvol voor %s: %d tekens", file_path, len(text))
+            return text.strip()
+        else:
+            logger.warning("Mistral OCR fout (status %d) voor %s: %s", resp.status_code, file_path, resp.text[:200])
+            return ""
+    except Exception as exc:
+        logger.warning("Mistral OCR (image) mislukt voor %s: %s", file_path, exc)
         return ""
 
 
@@ -336,12 +429,14 @@ def check_ai_status():
     provider = AI_PROVIDER
     claude_configured = bool(ANTHROPIC_API_KEY)
 
+    mistral_configured = bool(MISTRAL_API_KEY)
     return {
         "provider": provider,
         "ollama": ollama,
         "claude_configured": claude_configured,
         "claude_model": ANTHROPIC_MODEL if claude_configured else None,
-        # Ollama is altijd nodig (voor embeddings), ook in hybrid-modus
+        "ocr_provider": OCR_PROVIDER,
+        "mistral_configured": mistral_configured,
         "ready": ollama.get("running", False) and ollama.get("has_embed", False),
     }
 
