@@ -357,7 +357,10 @@ def index_document(collection, file_path, pod_data_path):
         return False
 
     relative_path = os.path.relpath(file_path, pod_data_path).replace("\\", "/")
-    chunks = chunk_text(text, max_words=500, overlap_words=50)
+    # Voeg bestandspad toe als context voor betere embedding matching
+    filename_context = relative_path.replace('/', ' > ').replace('%20', ' ').replace('-', ' ').replace('_', ' ')
+    filename_context = os.path.splitext(filename_context)[0]
+    chunks = chunk_text(f"Bestand: {filename_context}\n\n{text}", max_words=500, overlap_words=50)
 
     for i, chunk_content in enumerate(chunks):
         doc_id = f"{relative_path}::chunk_{i}"
@@ -450,26 +453,38 @@ def query_documents(question, n_results=5):
         include=["documents", "metadatas", "distances"],
     )
 
-    return [
+    # Filter op relevantie — distance < 1.5 (lager = relevanter)
+    MAX_DISTANCE = 1.5
+    filtered = [
         {"text": doc, "file_path": meta["file_path"], "distance": dist}
         for doc, meta, dist in zip(
             results["documents"][0],
             results["metadatas"][0],
             results["distances"][0],
         )
+        if dist < MAX_DISTANCE
     ]
+    logger.info("Query '%s': %d/%d chunks binnen drempel (%.2f)",
+                question, len(filtered), len(results["documents"][0]),
+                MAX_DISTANCE)
+    return filtered
 
 
 _SYSTEM_PROMPT = (
     "Je bent de MySolido AI-assistent. Je helpt de gebruiker met vragen "
     "over documenten in zijn persoonlijke datakluis.\n\n"
-    "Regels:\n"
-    "- Beantwoord vragen alleen op basis van de aangeleverde context\n"
-    "- Als het antwoord niet in de context staat, zeg dat eerlijk\n"
-    "- Verwijs naar het bronbestand bij je antwoord\n"
-    "- Antwoord in het Nederlands tenzij de gebruiker Engels spreekt\n"
-    "- Wees beknopt en direct\n"
-    "- Geef nooit medisch, juridisch of financieel advies — verwijs naar professionals"
+    "STRIKTE REGELS:\n"
+    "1. Beantwoord ALLEEN op basis van de aangeleverde context hieronder.\n"
+    "2. Als de context geen informatie bevat die de vraag beantwoordt, "
+    "zeg dan: 'Ik kan dit niet vinden in je kluis. Controleer of het "
+    "betreffende document is geüpload en geïndexeerd.'\n"
+    "3. Verzin NOOIT informatie. Gebruik GEEN kennis buiten de context.\n"
+    "4. Verwijs naar het bronbestand bij elk antwoord.\n"
+    "5. Antwoord in het Nederlands tenzij de gebruiker Engels spreekt.\n"
+    "6. Wees beknopt en direct.\n"
+    "7. Geef nooit medisch, juridisch of financieel advies — verwijs naar professionals.\n"
+    "8. Als de context code, handleidingen of irrelevante documenten bevat "
+    "die niets met de vraag te maken hebben, negeer die dan volledig."
 )
 
 
@@ -559,13 +574,15 @@ def generate_answer_claude(question, context_docs):
 
 def ask(question):
     """Main entry point: ask a question and get an answer with sources."""
-    docs = query_documents(question, n_results=5)
+    docs = query_documents(question, n_results=10)
 
     if not docs:
         return {
             "answer": (
-                "Ik heb geen relevante documenten gevonden in je kluis. "
-                "Heb je de index al opgebouwd?"
+                "Ik kan hierover niets vinden in je kluis. Dit kan betekenen dat:\n"
+                "- Het document nog niet is geüpload\n"
+                "- Het bestand niet goed is geïndexeerd (klik 'Herindexeer')\n"
+                "- De tekst in het document niet leesbaar is (bijv. een scan zonder OCR)"
             ),
             "sources": [],
         }
