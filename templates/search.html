@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left, icon_search, icon_download, icon_file %}
 
-{% block title %}Zoeken - MySolido{% endblock %}
+{% block title %}{{ t.search_title }} - MySolido{% endblock %}
 
 {% block content %}
-    <a href="{{ url_for('index') }}" class="back-link">{{ icon_arrow_left() }} Terug naar kluis</a>
+    <a href="{{ url_for('index') }}" class="back-link">{{ icon_arrow_left() }} {{ t.back_to_vault }}</a>
 
     <div class="search-bar">
         <form action="{{ url_for('search') }}" method="get">
-            <input type="search" name="q" placeholder="Zoek in je kluis..." value="{{ query }}">
-            <button type="submit" class="btn">{{ icon_search() }} Zoeken</button>
+            <input type="search" name="q" placeholder="{{ t.search_placeholder }}" value="{{ query }}">
+            <button type="submit" class="btn">{{ icon_search() }} {{ t.search_button }}</button>
         </form>
     </div>
 
     <div class="results">
         {% if query %}
-            <h2>{{ results|length }} resultaat{% if results|length != 1 %}en{% endif %} voor "{{ query }}"</h2>
+            <h2>{{ results|length }} {{ t.search_results if results|length != 1 else t.search_result }} {{ t.search_for }} "{{ query }}"</h2>
             {% if results %}
                 <ul class="result-list">
                     {% for item in results %}
@@ -29,22 +29,22 @@
                                 {% if item.folder_path %}
                                     <a href="{{ url_for('browse', folder_path=item.folder_path) }}">{{ item.folder_path.replace('/', ' / ') }}</a>
                                 {% else %}
-                                    Pod root
+                                    {{ t.pod_root }}
                                 {% endif %}
                             </div>
                         </div>
                         <div class="result-actions">
-                            <a href="{{ url_for('download_file', file_path=item.path) }}" class="btn btn-download">{{ icon_download() }} Download</a>
+                            <a href="{{ url_for('download_file', file_path=item.path) }}" class="btn btn-download">{{ icon_download() }} {{ t.download }}</a>
                         </div>
                     </li>
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="empty">Geen resultaten gevonden voor "{{ query }}".</p>
+                <p class="empty">{{ t.search_no_results }} "{{ query }}".</p>
             {% endif %}
         {% else %}
-            <h2>Zoeken</h2>
-            <p class="empty">Typ een zoekterm om bestanden te vinden in je kluis.</p>
+            <h2>{{ t.search_title }}</h2>
+            <p class="empty">{{ t.search_prompt }}</p>
         {% endif %}
     </div>
 {% endblock %}

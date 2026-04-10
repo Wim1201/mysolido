@@ -150,6 +150,13 @@ TRANSLATIONS = {
         "ai_mode_local": "lokaal (privé)",
         "ai_mode_label": "Modus:",
         "ai_status_error": "Status: kon niet ophalen",
+        "search_title": "Zoeken",
+        "back_to_vault": "Terug naar kluis",
+        "search_result": "resultaat",
+        "search_results": "resultaten",
+        "search_for": "voor",
+        "search_no_results": "Geen resultaten gevonden voor",
+        "search_prompt": "Typ een zoekterm om bestanden te vinden in je kluis.",
     },
     "en": {
         "app_subtitle": "Your personal data vault",
@@ -302,6 +309,13 @@ TRANSLATIONS = {
         "ai_mode_local": "local (private)",
         "ai_mode_label": "Mode:",
         "ai_status_error": "Status: could not retrieve",
+        "search_title": "Search",
+        "back_to_vault": "Back to vault",
+        "search_result": "result",
+        "search_results": "results",
+        "search_for": "for",
+        "search_no_results": "No results found for",
+        "search_prompt": "Type a search term to find files in your vault.",
     }
 }
 
