@@ -113,6 +113,49 @@
     </div>
 
     <div class="settings-card">
+        <h2>&#128065; {{ t.settings_ocr }}</h2>
+        <form action="{{ url_for('change_ocr_provider') }}" method="post">
+            <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+                <div>
+                    <div class="setting-label">{{ t.ocr_provider_label }}</div>
+                    <div class="setting-desc">{{ t.ocr_provider_desc }}</div>
+                </div>
+
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="ocr_provider" value="local" {{ 'checked' if ocr_provider != 'mistral' }} style="margin-top: 3px;">
+                    <div>
+                        <strong>{{ t.ocr_local }}</strong><br>
+                        <span class="setting-desc">{{ t.ocr_local_desc }}</span>
+                    </div>
+                </label>
+
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="ocr_provider" value="mistral" {{ 'checked' if ocr_provider == 'mistral' }} style="margin-top: 3px;">
+                    <div>
+                        <strong>{{ t.ocr_mistral }}</strong><br>
+                        <span class="setting-desc">{{ t.ocr_mistral_desc }}</span>
+                    </div>
+                </label>
+
+                <div id="ocr-key-section" style="margin-left: 24px; {{ '' if ocr_provider == 'mistral' else 'display: none;' }}">
+                    <label class="setting-label" for="mistral_api_key">{{ t.mistral_api_key }}</label>
+                    {% if mistral_key_set %}
+                    <div class="setting-desc" style="margin-bottom: 4px;">{{ t.api_key_current }} {{ mistral_key_masked }}</div>
+                    {% endif %}
+                    <input type="password" name="mistral_api_key" id="mistral_api_key" placeholder="mistral-..." autocomplete="off"
+                           style="width: 100%; max-width: 400px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg); color: var(--color-text); font-size: 0.85rem;">
+                    <div class="setting-desc" style="margin-top: 4px;">{{ t.mistral_api_key_get }} <a href="https://console.mistral.ai" target="_blank" rel="noopener">console.mistral.ai</a>. {{ t.mistral_api_key_keep if mistral_key_set else '' }}</div>
+                    <div style="margin-top: 8px; padding: 8px 12px; background: var(--color-warning-bg, #fff3cd); border-radius: 6px; font-size: 0.8rem; color: var(--color-warning-text, #856404);">
+                        {{ t.ocr_warning }}
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" style="align-self: flex-start;">{{ t.save }}</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="settings-card">
         <h2>{{ icon_zip() }} {{ t.settings_backup }}</h2>
         <div class="setting-row">
             <div>
@@ -144,6 +187,18 @@
     radios.forEach(function(r) {
         r.addEventListener('change', function() {
             section.style.display = this.value === 'hybrid' ? '' : 'none';
+        });
+    });
+})();
+
+// Show/hide OCR key section
+(function() {
+    var radios = document.querySelectorAll('input[name="ocr_provider"]');
+    var section = document.getElementById('ocr-key-section');
+    if (!radios.length || !section) return;
+    radios.forEach(function(r) {
+        r.addEventListener('change', function() {
+            section.style.display = this.value === 'mistral' ? '' : 'none';
         });
     });
 })();

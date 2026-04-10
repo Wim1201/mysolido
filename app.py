@@ -1889,7 +1889,10 @@ def settings():
                            crash_reporting_enabled=is_crash_reporting_enabled(),
                            ai_provider=ai_provider,
                            api_key_masked=api_key_masked,
-                           api_key_set=bool(api_key_raw))
+                           api_key_set=bool(api_key_raw),
+                           ocr_provider=os.environ.get('OCR_PROVIDER', 'local'),
+                           mistral_key_set=bool(os.environ.get('MISTRAL_API_KEY', '')),
+                           mistral_key_masked='****' + os.environ.get('MISTRAL_API_KEY', '')[-4:] if os.environ.get('MISTRAL_API_KEY', '') else '')
 
 
 def update_env(env_path, key, value):
@@ -2022,6 +2025,44 @@ def change_ai_provider():
 
     label = 'Lokaal (Ollama)' if provider == 'local' else 'Hybride (Claude API)'
     flash(f'AI-provider ingesteld op {label}', 'success')
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/ocr-provider', methods=['POST'])
+def change_ocr_provider():
+    """Wijzig OCR-provider: lokaal (Tesseract) of Mistral (EU cloud)"""
+    if BRIDGE_MODE:
+        abort(403)
+
+    provider = request.form.get('ocr_provider', 'local')
+    api_key = request.form.get('mistral_api_key', '').strip()
+
+    if provider not in ('local', 'mistral'):
+        flash('Ongeldige keuze', 'error')
+        return redirect(url_for('settings'))
+
+    if provider == 'mistral' and not api_key:
+        existing_key = os.environ.get('MISTRAL_API_KEY', '')
+        if not existing_key:
+            flash('Voer een Mistral API-key in om Cloud OCR te gebruiken' if session.get('language', 'nl') == 'nl' else 'Enter a Mistral API key to use Cloud OCR', 'error')
+            return redirect(url_for('settings'))
+
+    env_path = os.path.join(PROJECT_DIR, '.env')
+    update_env(env_path, 'OCR_PROVIDER', provider)
+    if api_key:
+        update_env(env_path, 'MISTRAL_API_KEY', api_key)
+
+    os.environ['OCR_PROVIDER'] = provider
+    if api_key:
+        os.environ['MISTRAL_API_KEY'] = api_key
+
+    import ai_service
+    ai_service.OCR_PROVIDER = provider
+    if api_key:
+        ai_service.MISTRAL_API_KEY = api_key
+
+    label = 'Lokaal (Tesseract)' if provider == 'local' else 'Mistral OCR (EU)'
+    flash(f'OCR-provider ingesteld op {label}', 'success')
     return redirect(url_for('settings'))
 
 
