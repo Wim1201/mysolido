@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_globe, icon_user, icon_eye, icon_edit, icon_hourglass, icon_append, icon_link, icon_copy, icon_lock, icon_download %}
 
-{% block title %}Gedeeld - MySolido{% endblock %}
+{% block title %}{{ t.shared_title }} - MySolido{% endblock %}
 
 {% block content %}
     {# === DEELLINKS SECTIE === #}
     <div class="shares-card">
-        <h2>{{ icon_link() }} Deellinks</h2>
+        <h2>{{ icon_link() }} {{ t.sharelinks_title }}</h2>
         {% if share_links %}
             <ul class="share-list">
                 {% for link in share_links %}
@@ -14,36 +14,36 @@
                     <div class="share-info">
                         <div class="share-resource">{{ link.file_name }}</div>
                         <div class="share-details">
-                            <span>{{ icon_link() }} <button type="button" class="btn-copy-inline" onclick="copyText('{% if share_base_url %}{{ share_base_url }}/share/{{ link.token }}{% else %}{{ url_for('view_shared_file', token=link.token, _external=True) }}{% endif %}', this)">Kopieer link</button></span>
+                            <span>{{ icon_link() }} <button type="button" class="btn-copy-inline" onclick="copyText('{% if share_base_url %}{{ share_base_url }}/share/{{ link.token }}{% else %}{{ url_for('view_shared_file', token=link.token, _external=True) }}{% endif %}', this)">{{ t.copy_link }}</button></span>
                             {% if link.password_hash %}
-                                <span>{{ icon_lock() }} Met wachtwoord</span>
+                                <span>{{ icon_lock() }} {{ t.with_password }}</span>
                             {% endif %}
                             {% if link.expires_at %}
-                                <span>{{ icon_hourglass() }} Verloopt: {{ link.expires_at[:10] }}</span>
+                                <span>{{ icon_hourglass() }} {{ t.expires }} {{ link.expires_at[:10] }}</span>
                             {% else %}
-                                <span>{{ icon_hourglass() }} Geen verloopdatum</span>
+                                <span>{{ icon_hourglass() }} {{ t.no_expiry }}</span>
                             {% endif %}
-                            <span>{{ icon_download() }} {{ link.downloads }}x geopend</span>
+                            <span>{{ icon_download() }} {{ link.downloads }}{{ t.times_opened }}</span>
                             <span style="color: var(--color-text-muted);">{{ link.created_at[:10] }}</span>
                         </div>
                     </div>
                     {% if not bridge_mode %}
-                    <form action="{{ url_for('revoke_share_link') }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze deellink wilt intrekken?')">
+                    <form action="{{ url_for('revoke_share_link') }}" method="post" onsubmit="return confirm('{{ t.confirm_revoke_link }}')">
                         <input type="hidden" name="link_id" value="{{ link.id }}">
-                        <button type="submit" class="btn btn-danger btn-sm">Intrekken</button>
+                        <button type="submit" class="btn btn-danger btn-sm">{{ t.revoke }}</button>
                     </form>
                     {% endif %}
                 </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="empty">Geen actieve deellinks.</p>
+            <p class="empty">{{ t.no_sharelinks }}</p>
         {% endif %}
     </div>
 
     {# === SOLID SHARES SECTIE === #}
     <div class="shares-card">
-        <h2>Gedeelde bestanden en mappen</h2>
+        <h2>{{ t.shared_files_title }}</h2>
         {% if shares %}
             <ul class="share-list">
                 {% for share in shares %}
@@ -53,39 +53,39 @@
                         <div class="share-details">
                             <span>
                                 {% if share.webid == 'public' %}
-                                    {{ icon_globe() }} Openbaar
+                                    {{ icon_globe() }} {{ t.public_access }}
                                 {% else %}
                                     {{ icon_user() }} {{ share.webid }}
                                 {% endif %}
                             </span>
                             <span>
                                 {% if 'acl:Append' in share.modes %}
-                                    {{ icon_append() }} Alleen toevoegen
+                                    {{ icon_append() }} {{ t.append_access }}
                                 {% elif 'acl:Write' in share.modes %}
-                                    {{ icon_edit() }} Lezen + schrijven
+                                    {{ icon_edit() }} {{ t.readwrite_access }}
                                 {% else %}
-                                    {{ icon_eye() }} Alleen lezen
+                                    {{ icon_eye() }} {{ t.readonly_access }}
                                 {% endif %}
                             </span>
                             {% if share.expires %}
-                                <span>{{ icon_hourglass() }} Verloopt: {{ share.expires[:10] }}</span>
+                                <span>{{ icon_hourglass() }} {{ t.expires }} {{ share.expires[:10] }}</span>
                             {% endif %}
                             <span style="color: var(--color-text-muted);">{{ share.created[:10] }}</span>
                         </div>
                     </div>
                     {% if not bridge_mode %}
-                    <form action="{{ url_for('revoke') }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze toegang wilt intrekken?')">
+                    <form action="{{ url_for('revoke') }}" method="post" onsubmit="return confirm('{{ t.confirm_revoke_access }}')">
                         <input type="hidden" name="resource_url" value="{{ share.resource_url }}">
                         <input type="hidden" name="resource_path" value="{{ share.resource_path }}">
                         <input type="hidden" name="webid" value="{{ share.webid }}">
-                        <button type="submit" class="btn btn-danger btn-sm">Intrekken</button>
+                        <button type="submit" class="btn btn-danger btn-sm">{{ t.revoke }}</button>
                     </form>
                     {% endif %}
                 </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="empty">Je hebt nog niets gedeeld via Solid.</p>
+            <p class="empty">{{ t.no_solid_shares }}</p>
         {% endif %}
     </div>
 
@@ -93,11 +93,13 @@
 
 {% block scripts %}
 <script>
+const T_copied = {{ t.copied | tojson }};
+const T_copy_link = {{ t.copy_link | tojson }};
+
 function copyText(text, btn) {
     navigator.clipboard.writeText(text).then(function() {
-        var orig = btn.textContent;
-        btn.textContent = 'Gekopieerd!';
-        setTimeout(function() { btn.textContent = orig; }, 2000);
+        btn.textContent = T_copied;
+        setTimeout(function() { btn.textContent = T_copy_link; }, 2000);
     });
 }
 </script>
