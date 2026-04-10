@@ -1,55 +1,55 @@
 {% extends "base.html" %}
 
-{% block title %}AI-assistent - MySolido{% endblock %}
+{% block title %}{{ t.ai_title }} - MySolido{% endblock %}
 
 {% block content %}
 <div class="card" id="privacy-banner" style="margin-bottom: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
     <span>&#128274;</span>
-    <span id="privacy-text">Alles blijft lokaal. Je vragen en documenten verlaten nooit je computer. De AI draait volledig op je eigen pc via Ollama.</span>
+    <span id="privacy-text">{{ t.ai_privacy_local }}</span>
 </div>
 <div class="card" id="hybrid-warning" style="display: none; margin-bottom: 12px; padding: 10px 16px; font-size: 0.85rem; background: var(--color-warning-bg, #fff3cd); color: var(--color-warning-text, #856404);">
-    &#9888;&#65039; Hybride modus: bij elke vraag worden kleine tekstfragmenten naar de Claude API gestuurd.
+    &#9888;&#65039; {{ t.ai_hybrid_warning }}
 </div>
 
 <div class="card" id="status-bar" style="margin-bottom: 12px; padding: 10px 16px;">
     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.85rem;">
-            <span id="ollama-status">Ollama: controleren...</span>
-            <span id="index-status">Index: controleren...</span>
+            <span id="ollama-status">Ollama: {{ t.ai_checking }}</span>
+            <span id="index-status">Index: {{ t.ai_checking }}</span>
         </div>
-        <button class="btn btn-compact btn-primary" id="reindex-btn" onclick="startIndexing()">Herindexeer</button>
+        <button class="btn btn-compact btn-primary" id="reindex-btn" onclick="startIndexing()">{{ t.ai_reindex }}</button>
     </div>
 </div>
 
 <div class="card" id="setup-banner" style="display: none; margin-bottom: 12px;">
-    <h3>AI-assistent is nog niet geconfigureerd</h3>
+    <h3>{{ t.ai_setup_title }}</h3>
     <ol style="margin: 12px 0; padding-left: 20px; line-height: 1.8;">
-        <li>Installeer Ollama: <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a></li>
-        <li>Open een terminal en voer uit:<br>
+        <li>{{ t.ai_setup_step1 }} <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a></li>
+        <li>{{ t.ai_setup_step2 }}<br>
             <code style="display: block; margin: 6px 0; padding: 8px; background: var(--color-bg); border-radius: 4px;">ollama pull llama3.1:8b<br>ollama pull nomic-embed-text</code>
         </li>
-        <li>Ollama draait automatisch na installatie</li>
-        <li>Klik op <strong>Herindexeer</strong> om je documenten te indexeren</li>
+        <li>{{ t.ai_setup_step3 }}</li>
+        <li>{{ t.ai_setup_step4_pre }} <strong>{{ t.ai_reindex }}</strong> {{ t.ai_setup_step4_post }}</li>
     </ol>
 </div>
 
 <div class="card" id="missing-deps-banner" style="display: none; margin-bottom: 12px;">
-    <h3>Ontbrekende Python-pakketten</h3>
-    <p class="text-secondary" style="margin-bottom: 8px;">Installeer de volgende pakketten voor volledige ondersteuning:</p>
+    <h3>{{ t.ai_missing_deps_title }}</h3>
+    <p class="text-secondary" style="margin-bottom: 8px;">{{ t.ai_missing_deps_desc }}</p>
     <pre id="missing-deps-list" style="padding: 8px; background: var(--color-bg); border-radius: 4px; overflow-x: auto; font-size: 0.85rem;"></pre>
 </div>
 
 <div class="card" style="display: flex; flex-direction: column; height: 60vh; min-height: 300px; padding: 0; overflow: hidden;">
     <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
         <div class="ai-msg" style="align-self: flex-start; max-width: 85%; padding: 10px 14px; border-radius: 12px; background: var(--color-surface-alt, var(--color-bg)); font-size: 0.9rem;">
-            Hallo! Ik ben de MySolido AI-assistent. Stel me een vraag over je documenten.
+            {{ t.ai_greeting }}
         </div>
     </div>
     <div style="border-top: 1px solid var(--color-border); padding: 12px 16px; display: flex; gap: 8px;">
-        <input type="text" id="question-input" placeholder="Stel een vraag over je documenten..."
+        <input type="text" id="question-input" placeholder="{{ t.ai_placeholder }}"
                style="flex: 1; padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); color: var(--color-text); font-size: 0.9rem;"
                onkeydown="if(event.key==='Enter')sendQuestion()">
-        <button class="btn btn-primary" onclick="sendQuestion()" id="send-btn">Verstuur</button>
+        <button class="btn btn-primary" onclick="sendQuestion()" id="send-btn">{{ t.ai_send }}</button>
     </div>
 </div>
 {% endblock %}
@@ -98,6 +98,29 @@
     }
 </style>
 <script>
+const T = {
+    ai_privacy_local: {{ t.ai_privacy_local | tojson }},
+    ai_privacy_hybrid: {{ t.ai_privacy_hybrid | tojson }},
+    ai_thinking: {{ t.ai_thinking | tojson }},
+    ai_error: {{ t.ai_error | tojson }},
+    ai_sources: {{ t.ai_sources | tojson }},
+    ai_reindex: {{ t.ai_reindex | tojson }},
+    ai_reindexing: {{ t.ai_reindexing | tojson }},
+    ai_indexing: {{ t.ai_indexing | tojson }},
+    ai_index_error: {{ t.ai_index_error | tojson }},
+    ai_indexed: {{ t.ai_indexed | tojson }},
+    ai_index_errors: {{ t.ai_index_errors | tojson }},
+    ai_index_empty: {{ t.ai_index_empty | tojson }},
+    ai_ollama_active: {{ t.ai_ollama_active | tojson }},
+    ai_claude_active: {{ t.ai_claude_active | tojson }},
+    ai_ollama_inactive: {{ t.ai_ollama_inactive | tojson }},
+    ai_model_missing: {{ t.ai_model_missing | tojson }},
+    ai_mode_hybrid: {{ t.ai_mode_hybrid | tojson }},
+    ai_mode_local: {{ t.ai_mode_local | tojson }},
+    ai_mode_label: {{ t.ai_mode_label | tojson }},
+    ai_status_error: {{ t.ai_status_error | tojson }},
+};
+
 const chatMessages = document.getElementById('chat-messages');
 const questionInput = document.getElementById('question-input');
 const sendBtn = document.getElementById('send-btn');
@@ -120,7 +143,7 @@ async function sendQuestion() {
     sendBtn.disabled = true;
     questionInput.disabled = true;
 
-    const typing = addMessage('Even geduld, ik doorzoek je kluis...', 'ai-typing');
+    const typing = addMessage(T.ai_thinking, 'ai-typing');
 
     try {
         const resp = await fetch('/ai/ask', {
@@ -134,14 +157,14 @@ async function sendQuestion() {
 
         let html = escapeHtml(data.answer).replace(/\n/g, '<br>');
         if (data.sources && data.sources.length > 0) {
-            html += '<div class="ai-sources">Bronnen: ';
+            html += '<div class="ai-sources">' + T.ai_sources + ' ';
             html += data.sources.map(s => '<span>' + escapeHtml(s) + '</span>').join(' ');
             html += '</div>';
         }
         addMessage(html, 'ai-msg');
     } catch (err) {
         typing.remove();
-        addMessage('Er ging iets mis bij het versturen van je vraag.', 'ai-msg');
+        addMessage(T.ai_error, 'ai-msg');
     }
 
     sendBtn.disabled = false;
@@ -153,26 +176,26 @@ async function startIndexing() {
     const btn = document.getElementById('reindex-btn');
     const statusEl = document.getElementById('index-status');
     btn.disabled = true;
-    btn.textContent = 'Bezig...';
-    statusEl.textContent = 'Index: bezig met indexeren...';
+    btn.textContent = T.ai_reindexing;
+    statusEl.textContent = T.ai_indexing;
 
     try {
         const resp = await fetch('/ai/index', {method: 'POST'});
         const data = await resp.json();
         if (data.error) {
-            statusEl.textContent = 'Index: fout — ' + data.error;
+            statusEl.textContent = T.ai_index_error + ' — ' + data.error;
         } else {
-            statusEl.textContent = 'Index: ' + data.indexed + ' bestanden geindexeerd';
+            statusEl.textContent = 'Index: ' + data.indexed + ' ' + T.ai_indexed;
             if (data.errors > 0) {
-                statusEl.textContent += ' (' + data.errors + ' fouten)';
+                statusEl.textContent += ' (' + data.errors + ' ' + T.ai_index_errors + ')';
             }
         }
     } catch (err) {
-        statusEl.textContent = 'Index: fout bij indexeren';
+        statusEl.textContent = T.ai_index_error;
     }
 
     btn.disabled = false;
-    btn.textContent = 'Herindexeer';
+    btn.textContent = T.ai_reindex;
 }
 
 async function checkStatus() {
@@ -192,29 +215,29 @@ async function checkStatus() {
         var hybridWarn = document.getElementById('hybrid-warning');
 
         if (isHybrid) {
-            privacyText.textContent = 'Hybride modus: indexering en zoeken blijven lokaal. Antwoorden komen van de Claude API.';
+            privacyText.textContent = T.ai_privacy_hybrid;
             hybridWarn.style.display = '';
         } else {
-            privacyText.textContent = 'Alles blijft lokaal. Je vragen en documenten verlaten nooit je computer. De AI draait volledig op je eigen pc via Ollama.';
+            privacyText.textContent = T.ai_privacy_local;
             hybridWarn.style.display = 'none';
         }
 
         if (data.ollama && data.ollama.running) {
             let parts = [];
             if (isHybrid) {
-                parts.push('Claude API: actief');
+                parts.push(T.ai_claude_active);
             } else {
-                parts.push('Ollama: actief');
-                if (!data.ollama.has_llm) parts.push('(model ' + data.ollama.llm_model + ' ontbreekt)');
+                parts.push(T.ai_ollama_active);
+                if (!data.ollama.has_llm) parts.push('(model ' + data.ollama.llm_model + ' ' + T.ai_model_missing + ')');
             }
-            if (!data.ollama.has_embed) parts.push('(embed-model ' + data.ollama.embed_model + ' ontbreekt)');
-            var modus = isHybrid ? 'hybride' : 'lokaal (priv\u00e9)';
-            parts.push('| Modus: ' + modus);
+            if (!data.ollama.has_embed) parts.push('(embed-model ' + data.ollama.embed_model + ' ' + T.ai_model_missing + ')');
+            var modus = isHybrid ? T.ai_mode_hybrid : T.ai_mode_local;
+            parts.push('| ' + T.ai_mode_label + ' ' + modus);
             ollamaEl.textContent = parts.join(' ');
             ollamaEl.style.color = (data.ollama.has_embed && (isHybrid || data.ollama.has_llm)) ? 'var(--color-success)' : 'var(--color-warning, orange)';
             setupBanner.style.display = 'none';
         } else {
-            ollamaEl.textContent = 'Ollama: niet actief';
+            ollamaEl.textContent = T.ai_ollama_inactive;
             ollamaEl.style.color = 'var(--color-danger)';
             setupBanner.style.display = '';
         }
@@ -225,7 +248,7 @@ async function checkStatus() {
                 indexEl.textContent = 'Index: ' + data.index.total_chunks + ' chunks';
                 indexEl.style.color = 'var(--color-success)';
             } else {
-                indexEl.textContent = 'Index: leeg';
+                indexEl.textContent = T.ai_index_empty;
                 indexEl.style.color = 'var(--color-text-muted)';
             }
         }
@@ -236,7 +259,7 @@ async function checkStatus() {
             depsBanner.style.display = '';
         }
     } catch (err) {
-        ollamaEl.textContent = 'Status: kon niet ophalen';
+        ollamaEl.textContent = T.ai_status_error;
         ollamaEl.style.color = 'var(--color-danger)';
     }
 }
