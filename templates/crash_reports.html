@@ -10,12 +10,12 @@
         <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
             <thead>
                 <tr style="border-bottom: 2px solid var(--border-color); text-align: left;">
-                    <th style="padding: 0.5rem;">Datum</th>
-                    <th style="padding: 0.5rem;">Versie</th>
-                    <th style="padding: 0.5rem;">OS</th>
-                    <th style="padding: 0.5rem;">Fouttype</th>
-                    <th style="padding: 0.5rem;">Foutmelding</th>
-                    <th style="padding: 0.5rem;">Context</th>
+                    <th style="padding: 0.5rem;">{{ t.crash_date }}</th>
+                    <th style="padding: 0.5rem;">{{ t.crash_version }}</th>
+                    <th style="padding: 0.5rem;">{{ t.crash_os }}</th>
+                    <th style="padding: 0.5rem;">{{ t.crash_error_type }}</th>
+                    <th style="padding: 0.5rem;">{{ t.crash_error_msg }}</th>
+                    <th style="padding: 0.5rem;">{{ t.crash_context }}</th>
                     <th style="padding: 0.5rem;"></th>
                 </tr>
             </thead>
@@ -30,7 +30,7 @@
                     <td style="padding: 0.5rem;">{{ report.context }}</td>
                     <td style="padding: 0.5rem;">
                         <form action="{{ url_for('crash_report_delete', filename=report._filename) }}" method="post" style="display: inline;">
-                            <button type="submit" class="btn btn-sm" style="background: var(--danger-color, #c0392b); color: white; padding: 0.25rem 0.5rem; font-size: 0.8rem; border: none; border-radius: 4px; cursor: pointer;" onclick="return confirm('Rapport verwijderen?')">Verwijder</button>
+                            <button type="submit" class="btn btn-sm" style="background: var(--danger-color, #c0392b); color: white; padding: 0.25rem 0.5rem; font-size: 0.8rem; border: none; border-radius: 4px; cursor: pointer;" onclick="return confirm('{{ t.crash_confirm_delete }}')">{{ t.crash_delete }}</button>
                         </form>
                     </td>
                 </tr>
@@ -38,10 +38,10 @@
             </tbody>
         </table>
     </div>
-    <p style="color: var(--text-secondary); margin-top: 1rem;">{{ reports|length }} rapport(en) gevonden</p>
+    <p style="color: var(--text-secondary); margin-top: 1rem;">{{ reports|length }} {{ t.crash_count }}</p>
     {% else %}
     <div class="settings-card" style="text-align: center; padding: 2rem;">
-        <p style="color: var(--text-secondary);">Geen crash reports ontvangen.</p>
+        <p style="color: var(--text-secondary);">{{ t.crash_empty }}</p>
     </div>
     {% endif %}
 {% endblock %}

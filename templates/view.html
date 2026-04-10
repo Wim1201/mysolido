@@ -6,22 +6,22 @@
 {% block content %}
     <div class="toolbar">
         <div class="toolbar-left">
-            <a href="{% if folder_path %}{{ url_for('browse', folder_path=folder_path) }}{% else %}{{ url_for('index') }}{% endif %}" class="back-link">{{ icon_arrow_left() }} Terug</a>
+            <a href="{% if folder_path %}{{ url_for('browse', folder_path=folder_path) }}{% else %}{{ url_for('index') }}{% endif %}" class="back-link">{{ icon_arrow_left() }} {{ t.back }}</a>
             <span class="filename">{{ filename }}</span>
         </div>
-        <a href="{{ url_for('download_file', file_path=file_path) }}" class="btn">{{ icon_download() }} Downloaden</a>
+        <a href="{{ url_for('download_file', file_path=file_path) }}" class="btn">{{ icon_download() }} {{ t.view_download }}</a>
     </div>
     <div class="player-card">
         {% if media_type == 'audio' %}
             <p>{{ icon_music() }} {{ filename }}</p>
             <audio controls>
                 <source src="{{ url_for('view_file', file_path=file_path) }}?raw=1" type="{{ content_type }}">
-                Je browser ondersteunt dit audioformaat niet.
+                {{ t.view_audio_unsupported }}
             </audio>
         {% elif media_type == 'video' %}
             <video controls>
                 <source src="{{ url_for('view_file', file_path=file_path) }}?raw=1" type="{{ content_type }}">
-                Je browser ondersteunt dit videoformaat niet.
+                {{ t.view_video_unsupported }}
             </video>
         {% endif %}
     </div>

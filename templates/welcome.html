@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Welkom - MySolido{% endblock %}
+{% block title %}{{ t.welcome_title }} - MySolido{% endblock %}
 
 {% block content %}
 <div class="welcome">
@@ -9,37 +9,37 @@
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
         <h1>MySolido</h1>
-        <p class="welcome-subtitle">Welkom bij je persoonlijke datakluis</p>
+        <p class="welcome-subtitle">{{ t.welcome_subtitle }}</p>
     </div>
 
     <div class="welcome-steps">
         <div class="welcome-step">
             <div class="step-number">1</div>
             <div class="step-text">
-                <strong>Kluis inrichten</strong>
-                <span>We maken 20 beveiligde mappen voor je aan</span>
+                <strong>{{ t.welcome_step1_title }}</strong>
+                <span>{{ t.welcome_step1_desc }}</span>
             </div>
         </div>
         <div class="welcome-step">
             <div class="step-number">2</div>
             <div class="step-text">
-                <strong>Documenten uploaden</strong>
-                <span>Upload je eerste document</span>
+                <strong>{{ t.welcome_step2_title }}</strong>
+                <span>{{ t.welcome_step2_desc }}</span>
             </div>
         </div>
         <div class="welcome-step">
             <div class="step-number">3</div>
             <div class="step-text">
-                <strong>Toegang beheren</strong>
-                <span>Jij bepaalt wie erbij mag</span>
+                <strong>{{ t.welcome_step3_title }}</strong>
+                <span>{{ t.welcome_step3_desc }}</span>
             </div>
         </div>
     </div>
 
     {% if not bridge_mode %}
-    <a href="{{ url_for('init_folders_welcome') }}" class="btn btn-welcome" onclick="showSpinner()">Kluis inrichten</a>
+    <a href="{{ url_for('init_folders_welcome') }}" class="btn btn-welcome" onclick="showSpinner()">{{ t.welcome_setup_btn }}</a>
     {% else %}
-    <p style="text-align: center; color: var(--color-text-muted);">De kluis is nog niet ingericht. Doe dit op je lokale MySolido.</p>
+    <p style="text-align: center; color: var(--color-text-muted);">{{ t.welcome_bridge_msg }}</p>
     {% endif %}
 </div>
 {% endblock %}
