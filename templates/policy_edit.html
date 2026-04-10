@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left, icon_chevron_right %}
 
-{% block title %}Policy - {{ folder_name }} - MySolido{% endblock %}
+{% block title %}{{ t.policy_title }} - {{ folder_name }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="breadcrumbs">
-        <a href="{{ url_for('browse', folder_path=folder_path) }}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
+        <a href="{{ url_for('browse', folder_path=folder_path) }}" class="btn-back">{{ icon_arrow_left() }} {{ t.back }}</a>
         {% for crumb in breadcrumbs %}
             {% if not loop.last %}
                 <a href="{% if crumb.path %}{{ url_for('browse', folder_path=crumb.path) }}{% else %}{{ url_for('index') }}{% endif %}">{{ crumb.name }}</a>
@@ -15,38 +15,38 @@
             {% endif %}
         {% endfor %}
         <span class="separator">{{ icon_chevron_right() }}</span>
-        <span class="current">Policy</span>
+        <span class="current">{{ t.policy_title }}</span>
     </div>
 
     <div class="policy-card">
-        <h2>&#x1f6e1;&#xfe0f; Policy voor {{ folder_name }}</h2>
+        <h2>&#x1f6e1;&#xfe0f; {{ t.policy_for }} {{ folder_name }}</h2>
 
         <div class="policy-current">
-            <strong>Huidige instelling:</strong> {{ summary }}
+            <strong>{{ t.policy_current }}</strong> {{ summary }}
         </div>
 
         <form action="{{ url_for('edit_policy', folder_path=folder_path) }}" method="post" class="policy-form">
-            <label for="rule">Deelregels</label>
+            <label for="rule">{{ t.policy_rules }}</label>
             <select name="rule" id="rule" class="policy-select">
-                <option value="owner" {{ 'selected' if current_rule == 'owner' }}>Alleen eigenaar</option>
-                <option value="read" {{ 'selected' if current_rule == 'read' }}>Lezen toegestaan</option>
-                <option value="read-no-download" {{ 'selected' if current_rule == 'read-no-download' }}>Lezen, niet downloaden</option>
-                <option value="temporal" {{ 'selected' if current_rule == 'temporal' }}>Tijdelijk delen (30 dagen)</option>
+                <option value="owner" {{ 'selected' if current_rule == 'owner' }}>{{ t.policy_owner }}</option>
+                <option value="read" {{ 'selected' if current_rule == 'read' }}>{{ t.policy_read }}</option>
+                <option value="read-no-download" {{ 'selected' if current_rule == 'read-no-download' }}>{{ t.policy_read_no_dl }}</option>
+                <option value="temporal" {{ 'selected' if current_rule == 'temporal' }}>{{ t.policy_temporal }}</option>
             </select>
 
             <div class="policy-descriptions">
-                <p class="policy-desc" data-rule="owner"><strong>Alleen eigenaar</strong> &mdash; Alleen jij hebt toegang. Delen is niet toegestaan.</p>
-                <p class="policy-desc" data-rule="read"><strong>Lezen toegestaan</strong> &mdash; Iedereen met toegang mag de inhoud lezen.</p>
-                <p class="policy-desc" data-rule="read-no-download"><strong>Lezen, niet downloaden</strong> &mdash; Inhoud mag gelezen worden, maar niet gedownload of verspreid.</p>
-                <p class="policy-desc" data-rule="temporal"><strong>Tijdelijk delen</strong> &mdash; Leestoegang voor 30 dagen, daarna vervalt de toestemming.</p>
+                <p class="policy-desc" data-rule="owner"><strong>{{ t.policy_owner }}</strong> &mdash; {{ t.policy_owner_desc }}</p>
+                <p class="policy-desc" data-rule="read"><strong>{{ t.policy_read }}</strong> &mdash; {{ t.policy_read_desc }}</p>
+                <p class="policy-desc" data-rule="read-no-download"><strong>{{ t.policy_read_no_dl }}</strong> &mdash; {{ t.policy_read_no_dl_desc }}</p>
+                <p class="policy-desc" data-rule="temporal"><strong>{{ t.policy_temporal }}</strong> &mdash; {{ t.policy_temporal_desc }}</p>
             </div>
 
-            <button type="submit" class="btn">Policy opslaan</button>
+            <button type="submit" class="btn">{{ t.policy_save }}</button>
         </form>
 
         {% if policy %}
         <details class="policy-raw">
-            <summary>Bekijk ruwe ODRL policy (JSON-LD)</summary>
+            <summary>{{ t.policy_raw }}</summary>
             <pre><code>{{ policy | tojson(indent=2) }}</code></pre>
         </details>
         {% endif %}

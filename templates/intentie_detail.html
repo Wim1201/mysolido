@@ -5,7 +5,7 @@
 
 {% block content %}
     <div class="breadcrumbs">
-        <a href="{{ url_for('intenties_overview') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar intenties</a>
+        <a href="{{ url_for('intenties_overview') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.int_back }}</a>
         <span class="current">{{ intention._category_label }}</span>
     </div>
 
@@ -16,17 +16,17 @@
         </div>
 
         <div style="margin-top: 16px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Omschrijving</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_description }}</div>
             <p style="margin: 0;">{{ intention.get('schema:description', '') }}</p>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 16px;">
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Aangemaakt</div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_created }}</div>
                 <p style="margin: 0;">{{ intention.get('schema:dateCreated', '')[:10] }}</p>
             </div>
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Geldig tot</div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_valid_through }}</div>
                 <p style="margin: 0;">{{ intention.get('schema:validThrough', '')[:10] }}</p>
             </div>
         </div>
@@ -37,9 +37,9 @@
 
     {% if has_shared %}
     <div class="card" style="margin-bottom: 20px;">
-        <h3>Geselecteerde gegevens</h3>
+        <h3>{{ t.int_selected_data }}</h3>
         <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 12px;">
-            Deze profielgegevens horen bij deze intentie.
+            {{ t.int_selected_data_desc }}
         </p>
 
         {% for group_key, group_data in shared.items() %}
@@ -55,7 +55,7 @@
             </div>
             {% else %}
             <div style="font-size: 0.85rem; color: var(--color-text-muted); font-style: italic;">
-                Niet ingevuld
+                {{ t.int_not_filled }}
             </div>
             {% endif %}
         </div>
@@ -66,25 +66,25 @@
 
     {% if not read_only %}
     <div class="card" style="margin-bottom: 20px;">
-        <h3>Acties</h3>
+        <h3>{{ t.int_actions }}</h3>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
             {% if intention._status == 'concept' %}
             <form action="{{ url_for('intentie_activate', intention_id=intention._id) }}" method="post" style="display:inline;">
-                <button type="submit" class="btn btn-primary">Activeren</button>
+                <button type="submit" class="btn btn-primary">{{ t.int_activate }}</button>
             </form>
             <form action="{{ url_for('intentie_delete', intention_id=intention._id) }}" method="post" style="display:inline;"
-                  onsubmit="return confirm('Weet je zeker dat je deze intentie wilt verwijderen?')">
-                <button type="submit" class="btn btn-danger">Verwijderen</button>
+                  onsubmit="return confirm('{{ t.int_confirm_delete }}')">
+                <button type="submit" class="btn btn-danger">{{ t.consent_delete }}</button>
             </form>
             {% elif intention._status == 'actief' %}
             <form action="{{ url_for('intentie_withdraw', intention_id=intention._id) }}" method="post" style="display:inline;"
-                  onsubmit="return confirm('Weet je zeker dat je deze intentie wilt intrekken?')">
-                <button type="submit" class="btn" style="background: var(--color-secondary);">Intrekken</button>
+                  onsubmit="return confirm('{{ t.int_confirm_withdraw }}')">
+                <button type="submit" class="btn" style="background: var(--color-secondary);">{{ t.consent_withdraw }}</button>
             </form>
             {% elif intention._status in ['ingetrokken', 'verlopen'] %}
             <form action="{{ url_for('intentie_delete', intention_id=intention._id) }}" method="post" style="display:inline;"
-                  onsubmit="return confirm('Weet je zeker dat je deze intentie wilt verwijderen?')">
-                <button type="submit" class="btn btn-danger">Verwijderen</button>
+                  onsubmit="return confirm('{{ t.int_confirm_delete }}')">
+                <button type="submit" class="btn btn-danger">{{ t.consent_delete }}</button>
             </form>
             {% endif %}
         </div>

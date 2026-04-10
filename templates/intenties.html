@@ -1,32 +1,32 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left, icon_plus %}
 
-{% block title %}Mijn intenties - MySolido{% endblock %}
+{% block title %}{{ t.int_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="breadcrumbs">
-        <a href="{{ url_for('profile') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar profiel</a>
-        <span class="current">Mijn intenties</span>
+        <a href="{{ url_for('profile') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.back_to_profile }}</a>
+        <span class="current">{{ t.int_title }}</span>
     </div>
 
     <div class="consent-header">
-        <h2>Mijn intenties</h2>
+        <h2>{{ t.int_title }}</h2>
         {% if not bridge_mode %}
-        <a href="{{ url_for('intentie_new') }}" class="btn">{{ icon_plus() }} Nieuwe intentie</a>
+        <a href="{{ url_for('intentie_new') }}" class="btn">{{ icon_plus() }} {{ t.int_new }}</a>
         {% endif %}
     </div>
 
     <div class="intentie-filters" style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
         <a href="{{ url_for('intenties_overview', status='alle') }}"
-           class="btn btn-compact {% if status_filter == 'alle' %}btn-primary{% endif %}">Alle</a>
+           class="btn btn-compact {% if status_filter == 'alle' %}btn-primary{% endif %}">{{ t.int_all }}</a>
         <a href="{{ url_for('intenties_overview', status='concept') }}"
-           class="btn btn-compact {% if status_filter == 'concept' %}btn-primary{% endif %}">Concept</a>
+           class="btn btn-compact {% if status_filter == 'concept' %}btn-primary{% endif %}">{{ t.int_concept }}</a>
         <a href="{{ url_for('intenties_overview', status='actief') }}"
-           class="btn btn-compact {% if status_filter == 'actief' %}btn-primary{% endif %}">Actief</a>
+           class="btn btn-compact {% if status_filter == 'actief' %}btn-primary{% endif %}">{{ t.int_active }}</a>
         <a href="{{ url_for('intenties_overview', status='verlopen') }}"
-           class="btn btn-compact {% if status_filter == 'verlopen' %}btn-primary{% endif %}">Verlopen</a>
+           class="btn btn-compact {% if status_filter == 'verlopen' %}btn-primary{% endif %}">{{ t.int_expired }}</a>
         <a href="{{ url_for('intenties_overview', status='ingetrokken') }}"
-           class="btn btn-compact {% if status_filter == 'ingetrokken' %}btn-primary{% endif %}">Ingetrokken</a>
+           class="btn btn-compact {% if status_filter == 'ingetrokken' %}btn-primary{% endif %}">{{ t.int_withdrawn }}</a>
     </div>
 
     {% if intentions %}
@@ -43,7 +43,7 @@
                     <div class="consent-meta">
                         <span>{{ intent._description[:100] }}{% if intent._description|length > 100 %}...{% endif %}</span>
                         {% if intent.get('schema:validThrough') %}
-                        <span>Geldig tot: {{ intent['schema:validThrough'][:10] }}</span>
+                        <span>{{ t.int_valid_until }} {{ intent['schema:validThrough'][:10] }}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -54,14 +54,14 @@
     {% else %}
     <div class="empty-state">
         {% if status_filter == 'alle' %}
-        <p class="empty-state-title">Nog geen intenties aangemaakt</p>
-        <p class="empty-state-sub">Met intenties geef je aan wat je zoekt — zoals een nieuwe verzekering of energiecontract. Je kiest zelf welke profielgegevens je wilt delen. Er wordt niets automatisch verzonden.</p>
+        <p class="empty-state-title">{{ t.int_empty_title }}</p>
+        <p class="empty-state-sub">{{ t.int_empty_sub }}</p>
         {% if not bridge_mode %}
-        <a href="{{ url_for('intentie_new') }}" class="btn" style="margin-top: 12px;">{{ icon_plus() }} Eerste intentie aanmaken</a>
+        <a href="{{ url_for('intentie_new') }}" class="btn" style="margin-top: 12px;">{{ icon_plus() }} {{ t.int_first }}</a>
         {% endif %}
         {% else %}
-        <p class="empty-state-title">Geen intenties met status "{{ status_filter }}"</p>
-        <a href="{{ url_for('intenties_overview', status='alle') }}" class="btn btn-compact" style="margin-top: 8px;">Alle intenties tonen</a>
+        <p class="empty-state-title">{{ t.int_no_status }} "{{ status_filter }}"</p>
+        <a href="{{ url_for('intenties_overview', status='alle') }}" class="btn btn-compact" style="margin-top: 8px;">{{ t.int_show_all }}</a>
         {% endif %}
     </div>
     {% endif %}

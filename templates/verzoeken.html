@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left %}
 
-{% block title %}Inkomende verzoeken - MySolido{% endblock %}
+{% block title %}{{ t.req_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="breadcrumbs">
-        <a href="{{ url_for('profile') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar profiel</a>
-        <span class="current">Inkomende verzoeken</span>
+        <a href="{{ url_for('profile') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.req_back }}</a>
+        <span class="current">{{ t.req_title }}</span>
     </div>
 
     <div class="consent-header">
-        <h2>Inkomende verzoeken</h2>
+        <h2>{{ t.req_title }}</h2>
     </div>
 
     {% if requests %}
@@ -20,10 +20,10 @@
             <div class="consent-item">
                 <div class="consent-item-header">
                     <span class="badge badge-{{ req._status }}">
-                        {% if req._status == 'nieuw' %}Nieuw
-                        {% elif req._status == 'goedgekeurd' %}Goedgekeurd
-                        {% elif req._status == 'afgewezen' %}Afgewezen
-                        {% elif req._status == 'verlopen' %}Verlopen
+                        {% if req._status == 'nieuw' %}{{ t.req_new }}
+                        {% elif req._status == 'goedgekeurd' %}{{ t.req_approved }}
+                        {% elif req._status == 'afgewezen' %}{{ t.req_rejected }}
+                        {% elif req._status == 'verlopen' %}{{ t.req_expired }}
                         {% else %}{{ req._status|capitalize }}{% endif %}
                     </span>
                     <span class="consent-date">{{ req._date }}</span>
@@ -34,8 +34,8 @@
                         {% if req._organization %}<span style="font-weight: 400; color: var(--color-text-muted);"> &mdash; {{ req._organization }}</span>{% endif %}
                     </h3>
                     <div class="consent-meta">
-                        <span>Categorie: <strong>{{ req._category_label }}</strong></span>
-                        <span>Gevraagd: {{ req._requested_data|join(', ') }}</span>
+                        <span>{{ t.req_category }} <strong>{{ req._category_label }}</strong></span>
+                        <span>{{ t.req_requested }} {{ req._requested_data|join(', ') }}</span>
                     </div>
                 </div>
             </div>
@@ -44,8 +44,8 @@
     </div>
     {% else %}
     <div class="empty-state">
-        <p class="empty-state-title">Geen inkomende verzoeken</p>
-        <p class="empty-state-sub">Verzoeken van externe partijen verschijnen hier wanneer ze via de Bridge worden ingediend.</p>
+        <p class="empty-state-title">{{ t.req_empty_title }}</p>
+        <p class="empty-state-sub">{{ t.req_empty_sub }}</p>
     </div>
     {% endif %}
 {% endblock %}

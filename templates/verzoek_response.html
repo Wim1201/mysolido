@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 
-{% block title %}Gedeelde gegevens - MySolido{% endblock %}
+{% block title %}{{ t.req_resp_title }} - MySolido{% endblock %}
 
 {% block content %}
     {% if not found %}
     <div class="card" style="text-align: center; padding: 40px 20px;">
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#10067;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Gegevens niet gevonden</h2>
-        <p style="color: var(--color-text-muted);">Deze link is ongeldig of de gegevens zijn niet meer beschikbaar.</p>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_resp_not_found }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_resp_not_found_desc }}</p>
     </div>
 
     {% elif expired %}
     <div class="card" style="text-align: center; padding: 40px 20px;">
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9203;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Gegevens verlopen</h2>
-        <p style="color: var(--color-text-muted);">De geldigheidsduur van deze gedeelde gegevens is verstreken op {{ valid_until }}.</p>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_resp_expired }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_resp_expired_desc }} {{ valid_until }}.</p>
     </div>
 
     {% else %}
     <div class="card" style="margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <h2 style="font-size: 1.15rem;">Gedeelde gegevens</h2>
-            <span class="badge badge-goedgekeurd">Goedgekeurd</span>
+            <h2 style="font-size: 1.15rem;">{{ t.req_resp_title }}</h2>
+            <span class="badge badge-goedgekeurd">{{ t.req_approved }}</span>
         </div>
         <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 4px;">
-            Gedeeld via MySolido &mdash; geldig tot {{ valid_until }}
+            {{ t.req_resp_shared_via }} MySolido &mdash; {{ t.req_resp_valid_until }} {{ valid_until }}
         </p>
     </div>
 
@@ -88,7 +88,7 @@
 
     <div style="text-align: center; margin: 24px 0;">
         <p style="font-size: 0.8rem; color: var(--color-text-muted);">
-            Deze gegevens zijn gedeeld via <strong>MySolido</strong> &mdash; een persoonlijke datakluis.
+            {{ t.req_resp_shared_via }} <strong>MySolido</strong> &mdash; een persoonlijke datakluis.
         </p>
     </div>
     {% endif %}

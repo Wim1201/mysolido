@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left %}
 
-{% block title %}Verzoek bekijken - MySolido{% endblock %}
+{% block title %}{{ t.req_view_title }} - MySolido{% endblock %}
 
 {% block content %}
     <style>
@@ -26,18 +26,18 @@
     </style>
 
     <div class="breadcrumbs">
-        <a href="{{ url_for('verzoeken_overview') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar verzoeken</a>
-        <span class="current">Verzoek bekijken</span>
+        <a href="{{ url_for('verzoeken_overview') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.req_back_to_requests }}</a>
+        <span class="current">{{ t.req_view_title }}</span>
     </div>
 
     <div class="card" style="margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
-            <h3>Verzoek van {{ req.get('mysolido:requester', {}).get('schema:name', 'Onbekend') }}</h3>
+            <h3>{{ t.req_from }} {{ req.get('mysolido:requester', {}).get('schema:name', t.req_unknown) }}</h3>
             <span class="badge badge-{{ req._status }}">
-                {% if req._status == 'nieuw' %}Nieuw
-                {% elif req._status == 'goedgekeurd' %}Goedgekeurd
-                {% elif req._status == 'afgewezen' %}Afgewezen
-                {% elif req._status == 'verlopen' %}Verlopen
+                {% if req._status == 'nieuw' %}{{ t.req_new }}
+                {% elif req._status == 'goedgekeurd' %}{{ t.req_approved }}
+                {% elif req._status == 'afgewezen' %}{{ t.req_rejected }}
+                {% elif req._status == 'verlopen' %}{{ t.req_expired }}
                 {% else %}{{ req._status|capitalize }}{% endif %}
             </span>
         </div>
@@ -46,34 +46,34 @@
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 16px;">
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Naam</div>
-                <p style="margin: 0;">{{ requester.get('schema:name', 'Onbekend') }}</p>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_name }}</div>
+                <p style="margin: 0;">{{ requester.get('schema:name', t.req_unknown) }}</p>
             </div>
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Organisatie</div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_organization }}</div>
                 <p style="margin: 0;">{{ requester.get('schema:worksFor', '-') or '-' }}</p>
             </div>
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">E-mail</div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_email }}</div>
                 <p style="margin: 0;">{{ requester.get('schema:email', '-') }}</p>
             </div>
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Categorie</div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_category }}</div>
                 <p style="margin: 0;">{{ req.get('mysolido:categoryLabel', 'Anders') }}</p>
             </div>
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Datum</div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_date }}</div>
                 <p style="margin: 0;">{{ req.get('schema:dateCreated', '')[:10] }}</p>
             </div>
         </div>
 
         <div style="margin-top: 16px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Toelichting</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_explanation }}</div>
             <p style="margin: 0; white-space: pre-wrap;">{{ req.get('mysolido:purpose', '') }}</p>
         </div>
 
         <div style="margin-top: 16px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Gevraagde gegevens</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_requested_data }}</div>
             <p style="margin: 0;">
                 {% for group_key in req.get('mysolido:requestedData', []) %}
                     {% set g = profile_groups.get(group_key, {}) %}
@@ -87,9 +87,9 @@
     {# === APPROVAL FORM === #}
     <form action="{{ url_for('verzoek_approve', request_id=req._id) }}" method="post">
         <div class="card" style="margin-bottom: 20px;">
-            <h3>Welke gegevens wilt u delen?</h3>
+            <h3>{{ t.req_which_data }}</h3>
             <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 12px;">
-                Vink aan welke gegevens u met de aanvrager wilt delen. Alleen aangevinkte groepen worden gedeeld.
+                {{ t.req_which_data_desc }}
             </p>
 
             {% set requested = req.get('mysolido:requestedData', []) %}
@@ -104,7 +104,7 @@
                         <div class="approve-check-value">{{ group.summary }}</div>
                         {% else %}
                         <div class="approve-check-empty">
-                            Niet ingevuld &mdash; <a href="{{ url_for('profiel_data') }}">vul aan</a>
+                            {{ t.int_not_filled }} &mdash; <a href="{{ url_for('profiel_data') }}">{{ t.int_fill_profile }}</a>
                         </div>
                         {% endif %}
                     </div>
@@ -113,7 +113,7 @@
             {% endfor %}
 
             <div style="margin-top: 16px; display: flex; flex-direction: column;">
-                <label for="validity" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Geldigheidsduur</label>
+                <label for="validity" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_validity_label }}</label>
                 <select name="validity" id="validity" class="form-input" style="max-width: 250px;">
                     {% for key, opt in approval_validity.items() %}
                     <option value="{{ key }}" {% if key == '1w' %}selected{% endif %}>{{ opt.label }}</option>
@@ -123,29 +123,29 @@
         </div>
 
         <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
-            <button type="submit" class="btn btn-primary">Goedkeuren</button>
-            <button type="button" class="btn btn-danger" onclick="document.getElementById('reject-form').style.display='block'; this.style.display='none';">Afwijzen</button>
+            <button type="submit" class="btn btn-primary">{{ t.req_approve }}</button>
+            <button type="button" class="btn btn-danger" onclick="document.getElementById('reject-form').style.display='block'; this.style.display='none';">{{ t.req_reject_btn }}</button>
         </div>
     </form>
 
     <form id="reject-form" action="{{ url_for('verzoek_reject', request_id=req._id) }}" method="post" style="display: none;">
         <div class="card" style="margin-bottom: 20px;">
-            <h3>Verzoek afwijzen</h3>
+            <h3>{{ t.req_reject_title }}</h3>
             <div style="display: flex; flex-direction: column; margin-top: 8px;">
-                <label for="reason" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Reden (optioneel, alleen voor eigen administratie)</label>
+                <label for="reason" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_reject_reason }}</label>
                 <textarea name="reason" id="reason" class="form-input" rows="2"
-                          placeholder="Optioneel: waarom wijst u dit verzoek af?"
+                          placeholder="{{ t.req_reject_placeholder }}"
                           style="resize: vertical; font-family: inherit;"></textarea>
             </div>
-            <button type="submit" class="btn btn-danger" style="margin-top: 12px;">Verzoek afwijzen</button>
+            <button type="submit" class="btn btn-danger" style="margin-top: 12px;">{{ t.req_reject_submit }}</button>
         </div>
     </form>
 
     {% elif req._status == 'goedgekeurd' %}
     <div class="card" style="margin-bottom: 20px;">
-        <h3>Goedgekeurd</h3>
+        <h3>{{ t.req_approved_title }}</h3>
         <div style="margin-top: 8px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Gedeelde gegevens</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_shared_data }}</div>
             <p style="margin: 0;">
                 {% for group_key in req.get('mysolido:approvedData', []) %}
                     {% set g = profile_groups.get(group_key, {}) %}
@@ -155,13 +155,13 @@
         </div>
         {% if req.get('mysolido:validUntil') %}
         <div style="margin-top: 12px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Geldig tot</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_valid_through }}</div>
             <p style="margin: 0;">{{ req['mysolido:validUntil'][:10] }}</p>
         </div>
         {% endif %}
         {% if req.get('mysolido:responseLink') %}
         <div style="margin-top: 12px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Response-link</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_response_link }}</div>
             <a href="{{ req['mysolido:responseLink'] }}" style="word-break: break-all; font-size: 0.9rem;">{{ req['mysolido:responseLink'] }}</a>
         </div>
         {% endif %}
@@ -169,9 +169,9 @@
 
     {% elif req._status == 'afgewezen' %}
     <div class="card" style="margin-bottom: 20px;">
-        <h3>Afgewezen</h3>
+        <h3>{{ t.req_rejected_title }}</h3>
         {% if req.get('mysolido:rejectionReason') %}
-        <p style="margin-top: 8px;">Reden: {{ req['mysolido:rejectionReason'] }}</p>
+        <p style="margin-top: 8px;">{{ t.req_rejected_reason }} {{ req['mysolido:rejectionReason'] }}</p>
         {% endif %}
     </div>
     {% endif %}

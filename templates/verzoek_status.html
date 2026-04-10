@@ -1,50 +1,50 @@
 {% extends "base.html" %}
 
-{% block title %}Status verzoek - MySolido{% endblock %}
+{% block title %}{{ t.req_status_title }} - MySolido{% endblock %}
 
 {% block content %}
     {% if not found %}
     <div class="card" style="text-align: center; padding: 40px 20px;">
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#10067;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Verzoek niet gevonden</h2>
-        <p style="color: var(--color-text-muted);">Dit verzoek bestaat niet of is verwijderd.</p>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_status_not_found }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_status_not_found_desc }}</p>
     </div>
 
     {% else %}
     <div class="card" style="text-align: center; padding: 40px 20px;">
         {% if status == 'nieuw' %}
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#128172;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Verzoek ontvangen</h2>
-        <p style="color: var(--color-text-muted);">Uw verzoek is ontvangen en wacht op beoordeling door de eigenaar van de kluis.</p>
-        <span class="badge badge-nieuw" style="margin-top: 12px; display: inline-block;">In behandeling</span>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_status_received }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_status_received_desc }}</p>
+        <span class="badge badge-nieuw" style="margin-top: 12px; display: inline-block;">{{ t.req_status_pending }}</span>
 
         {% elif status == 'goedgekeurd' %}
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9989;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Verzoek goedgekeurd</h2>
-        <p style="color: var(--color-text-muted);">De eigenaar van de kluis heeft uw verzoek goedgekeurd.</p>
-        <span class="badge badge-goedgekeurd" style="margin-top: 12px; display: inline-block;">Goedgekeurd</span>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_approved }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_status_approved_desc }}</p>
+        <span class="badge badge-goedgekeurd" style="margin-top: 12px; display: inline-block;">{{ t.req_approved }}</span>
 
         {% if response_link %}
         <div style="background: var(--color-bg-hover); border: 1px solid var(--color-border); border-radius: 8px; padding: 16px; margin: 20px auto; max-width: 500px;">
-            <p style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px;">Gedeelde gegevens bekijken:</p>
-            <a href="{{ response_link }}" class="btn btn-primary">Gegevens bekijken</a>
+            <p style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px;">{{ t.req_status_view_data }}</p>
+            <a href="{{ response_link }}" class="btn btn-primary">{{ t.req_status_view_btn }}</a>
             {% if valid_until %}
-            <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 8px;">Geldig tot: {{ valid_until }}</p>
+            <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 8px;">{{ t.int_valid_through }}: {{ valid_until }}</p>
             {% endif %}
         </div>
         {% endif %}
 
         {% elif status == 'afgewezen' %}
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#10060;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Verzoek afgewezen</h2>
-        <p style="color: var(--color-text-muted);">De eigenaar van de kluis heeft uw verzoek afgewezen.</p>
-        <span class="badge badge-afgewezen" style="margin-top: 12px; display: inline-block;">Afgewezen</span>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_rejected }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_status_rejected_desc }}</p>
+        <span class="badge badge-afgewezen" style="margin-top: 12px; display: inline-block;">{{ t.req_rejected }}</span>
 
         {% elif status == 'verlopen' %}
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9203;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">Verzoek verlopen</h2>
-        <p style="color: var(--color-text-muted);">De gedeelde gegevens zijn niet meer beschikbaar. De geldigheidsduur is verstreken.</p>
-        <span class="badge badge-verlopen" style="margin-top: 12px; display: inline-block;">Verlopen</span>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_status_expired_title }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_status_expired_desc }}</p>
+        <span class="badge badge-verlopen" style="margin-top: 12px; display: inline-block;">{{ t.req_expired }}</span>
         {% endif %}
     </div>
     {% endif %}

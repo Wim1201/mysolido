@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left %}
 
-{% block title %}Mijn gegevens - MySolido{% endblock %}
+{% block title %}{{ t.profile_data_title }} - MySolido{% endblock %}
 
 {% block content %}
     <style>
@@ -29,37 +29,37 @@
     </style>
 
     <div class="breadcrumbs">
-        <a href="{{ url_for('profile') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar profiel</a>
-        <span class="current">Mijn gegevens</span>
+        <a href="{{ url_for('profile') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.back_to_profile }}</a>
+        <span class="current">{{ t.profile_data_title }}</span>
     </div>
 
     <form action="{{ url_for('profiel_data_save') }}" method="post" class="profiel-data-form">
 
     {# === WOONSITUATIE === #}
     <div class="card profiel-card">
-        <h3 class="profiel-section-title">🏠 Woonsituatie</h3>
+        <h3 class="profiel-section-title">🏠 {{ t.pd_housing }}</h3>
         <div class="form-grid">
             <div class="form-group">
-                <label for="housing_type">Eigendom</label>
+                <label for="housing_type">{{ t.pd_ownership }}</label>
                 <select name="housing_type" id="housing_type" class="form-input" {% if read_only %}disabled{% endif %}>
-                    <option value="">— kies —</option>
+                    <option value="">{{ t.pd_choose }}</option>
                     {% for val, label in [('huur','Huur'), ('koop','Koop'), ('anders','Anders')] %}
                     <option value="{{ val }}" {% if data.get('pd:HousingOwnership') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label for="housing_kind">Woningtype</label>
+                <label for="housing_kind">{{ t.pd_housing_type }}</label>
                 <select name="housing_kind" id="housing_kind" class="form-input" {% if read_only %}disabled{% endif %}>
-                    <option value="">— kies —</option>
+                    <option value="">{{ t.pd_choose }}</option>
                     {% for val, label in [('appartement','Appartement'), ('tussenwoning','Tussenwoning'), ('hoekwoning','Hoekwoning'), ('vrijstaand','Vrijstaand'), ('anders','Anders')] %}
                     <option value="{{ val }}" {% if data.get('mysolido:housingType') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label for="region">Regio / provincie</label>
-                <input type="text" name="region" id="region" class="form-input" placeholder="Bijv. Noord-Brabant"
+                <label for="region">{{ t.pd_region }}</label>
+                <input type="text" name="region" id="region" class="form-input" placeholder="{{ t.pd_region_placeholder }}"
                        value="{{ data.get('pd:Location', '') }}" {% if read_only %}readonly{% endif %}>
             </div>
         </div>
@@ -67,17 +67,17 @@
 
     {# === GEZIN === #}
     <div class="card profiel-card">
-        <h3 class="profiel-section-title">👨‍👩‍👧‍👦 Gezin</h3>
+        <h3 class="profiel-section-title">👨‍👩‍👧‍👦 {{ t.pd_family }}</h3>
         <div class="form-grid">
             <div class="form-group">
-                <label for="household_size">Aantal personen in huishouden</label>
+                <label for="household_size">{{ t.pd_household_size }}</label>
                 <input type="number" name="household_size" id="household_size" class="form-input" min="1" max="20"
                        value="{{ data.get('pd:HouseholdSize', '') }}" {% if read_only %}readonly{% endif %}>
             </div>
         </div>
 
         <div class="form-group" style="margin-top: 12px;">
-            <label>Kinderen (leeftijdscategorie)</label>
+            <label>{{ t.pd_children }}</label>
             <div id="children-container">
                 {% set children = data.get('pd:FamilyStructure', {}).get('children', []) %}
                 {% for child in children %}
@@ -88,44 +88,44 @@
                         {% endfor %}
                     </select>
                     {% if not read_only %}
-                    <button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="Verwijder">&times;</button>
+                    <button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="{{ t.pd_remove }}">&times;</button>
                     {% endif %}
                 </div>
                 {% endfor %}
             </div>
             {% if not read_only %}
-            <button type="button" class="btn btn-compact" onclick="addChild()">+ Kind toevoegen</button>
+            <button type="button" class="btn btn-compact" onclick="addChild()">{{ t.pd_add_child }}</button>
             {% endif %}
         </div>
     </div>
 
     {# === VOERTUIGEN === #}
     <div class="card profiel-card">
-        <h3 class="profiel-section-title">🚗 Voertuigen</h3>
+        <h3 class="profiel-section-title">🚗 {{ t.pd_vehicles }}</h3>
 
         {% set vehicle = (data.get('pd:Vehicle', [None])|first) or {} %}
 
         <div class="form-grid">
             <div class="form-group">
-                <label for="vehicle_type">Type</label>
+                <label for="vehicle_type">{{ t.pd_vehicle_type }}</label>
                 <select name="vehicle_type" id="vehicle_type" class="form-input" {% if read_only %}disabled{% endif %}>
-                    <option value="">— kies —</option>
+                    <option value="">{{ t.pd_choose }}</option>
                     {% for val, label in [('auto','Auto'), ('motor','Motor'), ('scooter','Scooter'), ('fiets','Fiets'), ('geen','Geen')] %}
                     <option value="{{ val }}" {% if vehicle.get('type') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label for="vehicle_fuel">Brandstof</label>
+                <label for="vehicle_fuel">{{ t.pd_vehicle_fuel }}</label>
                 <select name="vehicle_fuel" id="vehicle_fuel" class="form-input" {% if read_only %}disabled{% endif %}>
-                    <option value="">— kies —</option>
+                    <option value="">{{ t.pd_choose }}</option>
                     {% for val, label in [('benzine','Benzine'), ('diesel','Diesel'), ('elektrisch','Elektrisch'), ('hybride','Hybride'), ('nvt','N.v.t.')] %}
                     <option value="{{ val }}" {% if vehicle.get('fuel') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label for="vehicle_year">Bouwjaar</label>
+                <label for="vehicle_year">{{ t.pd_vehicle_year }}</label>
                 <input type="number" name="vehicle_year" id="vehicle_year" class="form-input" min="1950" max="2030"
                        value="{{ vehicle.get('yearBuilt', '') }}" {% if read_only %}readonly{% endif %}>
             </div>
@@ -134,54 +134,54 @@
 
     {# === VERZEKERINGEN === #}
     <div class="card profiel-card">
-        <h3 class="profiel-section-title">🛡️ Verzekeringen</h3>
+        <h3 class="profiel-section-title">🛡️ {{ t.pd_insurance }}</h3>
 
         <div id="insurance-container">
             {% for ins in data.get('pd:Insurance', []) %}
             <div class="dynamic-item insurance-item">
                 <div class="dynamic-item-fields">
                     <select name="ins_type[]" class="form-input" {% if read_only %}disabled{% endif %}>
-                        <option value="">— kies —</option>
+                        <option value="">{{ t.pd_choose }}</option>
                         {% for val, label in [('zorg','Zorgverzekering'), ('auto','Autoverzekering'), ('woning','Woonverzekering'), ('reis','Reisverzekering'), ('aansprakelijkheid','Aansprakelijkheid'), ('rechtsbijstand','Rechtsbijstand'), ('anders','Anders')] %}
                         <option value="{{ val }}" {% if ins.get('type') == val %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
-                    <input type="text" name="ins_provider[]" class="form-input" placeholder="Aanbieder"
+                    <input type="text" name="ins_provider[]" class="form-input" placeholder="{{ t.pd_provider }}"
                            value="{{ ins.get('provider', '') }}" {% if read_only %}readonly{% endif %}>
                     <input type="date" name="ins_enddate[]" class="form-input"
                            value="{{ ins.get('endDate', '') }}" {% if read_only %}readonly{% endif %}>
                 </div>
                 {% if not read_only %}
-                <button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="Verwijder">&times;</button>
+                <button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="{{ t.pd_remove }}">&times;</button>
                 {% endif %}
             </div>
             {% endfor %}
         </div>
         {% if not read_only %}
-        <button type="button" class="btn btn-compact" onclick="addInsurance()">+ Verzekering toevoegen</button>
+        <button type="button" class="btn btn-compact" onclick="addInsurance()">{{ t.pd_add_insurance }}</button>
         {% endif %}
     </div>
 
     {# === WERK === #}
     <div class="card profiel-card">
-        <h3 class="profiel-section-title">💼 Werk</h3>
+        <h3 class="profiel-section-title">💼 {{ t.pd_work }}</h3>
 
         {% set occupation = data.get('pd:Occupation', {}) %}
 
         <div class="form-grid">
             <div class="form-group">
-                <label for="work_sector">Sector</label>
+                <label for="work_sector">{{ t.pd_sector }}</label>
                 <select name="work_sector" id="work_sector" class="form-input" {% if read_only %}disabled{% endif %}>
-                    <option value="">— kies —</option>
+                    <option value="">{{ t.pd_choose }}</option>
                     {% for val, label in [('ict','ICT'), ('zorg','Zorg'), ('onderwijs','Onderwijs'), ('bouw','Bouw'), ('overheid','Overheid'), ('financieel','Financieel'), ('retail','Retail'), ('anders','Anders')] %}
                     <option value="{{ val }}" {% if occupation.get('sector') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label for="employment_type">Dienstverband</label>
+                <label for="employment_type">{{ t.pd_employment }}</label>
                 <select name="employment_type" id="employment_type" class="form-input" {% if read_only %}disabled{% endif %}>
-                    <option value="">— kies —</option>
+                    <option value="">{{ t.pd_choose }}</option>
                     {% for val, label in [('loondienst','Loondienst'), ('zzp','ZZP'), ('ondernemer','Ondernemer'), ('gepensioneerd','Gepensioneerd'), ('student','Student'), ('anders','Anders')] %}
                     <option value="{{ val }}" {% if occupation.get('employmentType') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
@@ -192,23 +192,23 @@
 
     {# === GEZONDHEID === #}
     <div class="card profiel-card">
-        <h3 class="profiel-section-title">❤️ Gezondheid</h3>
+        <h3 class="profiel-section-title">❤️ {{ t.pd_health }}</h3>
 
         {% set health = data.get('pd:HealthData', {}) %}
 
         <div class="form-grid">
             <div class="form-group">
-                <label for="smoking">Rookstatus</label>
+                <label for="smoking">{{ t.pd_smoking }}</label>
                 <select name="smoking" id="smoking" class="form-input" {% if read_only %}disabled{% endif %}>
-                    <option value="">— kies —</option>
+                    <option value="">{{ t.pd_choose }}</option>
                     {% for val, label in [('ja','Ja'), ('nee','Nee'), ('gestopt','Gestopt')] %}
                     <option value="{{ val }}" {% if health.get('smokingStatus') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group">
-                <label for="gp_practice">Huisarts (naam praktijk)</label>
-                <input type="text" name="gp_practice" id="gp_practice" class="form-input" placeholder="Bijv. Huisartsenpraktijk De Lind"
+                <label for="gp_practice">{{ t.pd_gp }}</label>
+                <input type="text" name="gp_practice" id="gp_practice" class="form-input" placeholder="{{ t.pd_gp_placeholder }}"
                        value="{{ health.get('gpPractice', '') }}" {% if read_only %}readonly{% endif %}>
             </div>
         </div>
@@ -216,8 +216,8 @@
 
     {% if not read_only %}
     <div class="profiel-save-section">
-        <button type="submit" class="btn btn-primary">Opslaan</button>
-        <p class="text-secondary">Alle velden zijn optioneel. Gegevens worden alleen lokaal opgeslagen.</p>
+        <button type="submit" class="btn btn-primary">{{ t.save }}</button>
+        <p class="text-secondary">{{ t.pd_save_note }}</p>
     </div>
     {% endif %}
 

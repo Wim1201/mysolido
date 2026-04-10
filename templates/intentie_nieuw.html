@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left %}
 
-{% block title %}Nieuwe intentie - MySolido{% endblock %}
+{% block title %}{{ t.int_new_title }} - MySolido{% endblock %}
 
 {% block content %}
     <style>
@@ -39,17 +39,17 @@
     </style>
 
     <div class="breadcrumbs">
-        <a href="{{ url_for('intenties_overview') }}" class="btn-back">{{ icon_arrow_left() }} Terug naar intenties</a>
-        <span class="current">Nieuwe intentie</span>
+        <a href="{{ url_for('intenties_overview') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.int_back }}</a>
+        <span class="current">{{ t.int_new_title }}</span>
     </div>
 
     <form action="{{ url_for('intentie_new') }}" method="post">
         <div class="card" style="margin-bottom: 20px;">
-            <h3>Nieuwe intentie</h3>
+            <h3>{{ t.int_new_title }}</h3>
 
             <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 12px;">
                 <div class="form-group" style="display: flex; flex-direction: column;">
-                    <label for="category" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Categorie</label>
+                    <label for="category" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_category }}</label>
                     <select name="category" id="category" class="form-input" required>
                         {% for key, cat in categories.items() %}
                         <option value="{{ key }}">{{ cat.icon }} {{ cat.label }}</option>
@@ -57,7 +57,7 @@
                     </select>
                 </div>
                 <div class="form-group" style="display: flex; flex-direction: column;">
-                    <label for="validity" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Geldigheidsduur</label>
+                    <label for="validity" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_validity }}</label>
                     <select name="validity" id="validity" class="form-input">
                         {% for key, opt in validity_options.items() %}
                         <option value="{{ key }}" {% if key == '1m' %}selected{% endif %}>{{ opt.label }}</option>
@@ -67,17 +67,17 @@
             </div>
 
             <div class="form-group" style="display: flex; flex-direction: column; margin-top: 12px;">
-                <label for="description" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">Omschrijving</label>
+                <label for="description" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_description_label }}</label>
                 <textarea name="description" id="description" class="form-input"
-                          rows="3" placeholder="Omschrijf wat je zoekt..." required
+                          rows="3" placeholder="{{ t.int_description_placeholder }}" required
                           style="resize: vertical; font-family: inherit;"></textarea>
             </div>
         </div>
 
         <div class="card" style="margin-bottom: 20px;">
-            <h3>Welke gegevens wil je delen?</h3>
+            <h3>{{ t.int_share_data_title }}</h3>
             <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 12px;">
-                Vink aan welke profielgegevens bij deze intentie horen. Relevante groepen zijn al voorgeselecteerd.
+                {{ t.int_share_data_desc }}
             </p>
 
             {% for group_key, group in profile_groups.items() %}
@@ -92,7 +92,7 @@
                         <div class="profile-check-value">{{ group.summary }}</div>
                         {% else %}
                         <div class="profile-check-empty">
-                            Niet ingevuld &mdash; <a href="{{ url_for('profiel_data') }}">vul aan</a>
+                            {{ t.int_not_filled }} &mdash; <a href="{{ url_for('profiel_data') }}">{{ t.int_fill_profile }}</a>
                         </div>
                         {% endif %}
                     </div>
@@ -102,9 +102,9 @@
         </div>
 
         <div style="text-align: center; margin: 24px 0;">
-            <button type="submit" class="btn btn-primary" style="padding: 10px 40px; font-size: 1rem;">Intentie opslaan (als concept)</button>
+            <button type="submit" class="btn btn-primary" style="padding: 10px 40px; font-size: 1rem;">{{ t.int_save_concept }}</button>
             <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 8px;">
-                Je intentie wordt alleen lokaal opgeslagen. Er wordt niets gedeeld of verzonden.
+                {{ t.int_save_note }}
             </p>
         </div>
     </form>
