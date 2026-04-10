@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl" data-theme="">
+<html lang="{{ current_lang }}" data-theme="">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,13 +16,13 @@
         <div class="header-top">
             <h1><a href="{{ url_for('index') }}"><svg class="logo-shield" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> MySolido</a></h1>
             <div class="header-actions">
-                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Thema wisselen">
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="{{ t.theme_toggle }}">
                     <span class="icon-sun">{{ icon_sun() }}</span>
                     <span class="icon-moon">{{ icon_moon() }}</span>
                 </button>
                 {% if not bridge_mode and bridge_sync_configured %}
                 <form action="{{ url_for('trigger_bridge_sync') }}" method="post" style="display:inline;">
-                    <button type="submit" class="nav-icon-btn" title="Synchroniseer naar Bridge" id="sync-btn">
+                    <button type="submit" class="nav-icon-btn" title="{{ t.sync_bridge }}" id="sync-btn">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 2v6h-6"/>
                             <path d="M3 12a9 9 0 0115.36-6.36L21 8"/>
@@ -37,7 +37,7 @@
                     {% if unread_count %}<span class="badge">{{ unread_count }}</span>{% endif %}
                 </a>
                 {% if bridge_mode %}
-                <a href="{{ url_for('bridge_logout') }}" class="bell-link" title="Uitloggen">
+                <a href="{{ url_for('bridge_logout') }}" class="bell-link" title="{{ t.logout }}">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
                         <polyline points="16 17 21 12 16 7"/>
@@ -47,20 +47,20 @@
                 {% endif %}
             </div>
         </div>
-        <p class="header-subtitle">{% if bridge_mode %}Bridge (alleen-lezen){% else %}Jouw persoonlijke datakluis{% endif %}</p>
+        <p class="header-subtitle">{% if bridge_mode %}{{ t.bridge_subtitle }}{% else %}{{ t.app_subtitle }}{% endif %}</p>
         <nav class="header-nav">
-            <a href="{{ url_for('index') }}" class="{{ 'active' if active_nav == 'kluis' }}">{{ icon_vault() }} Kluis</a>
-            <a href="{{ url_for('shares_overview') }}" class="{{ 'active' if active_nav == 'gedeeld' }}">{{ icon_share() }} Gedeeld</a>
-            <a href="{{ url_for('trash_overview') }}" class="{{ 'active' if active_nav == 'prullenbak' }}">{{ icon_trash() }} Prullenbak</a>
-            <a href="{{ url_for('audit') }}" class="{{ 'active' if active_nav == 'logboek' }}">{{ icon_file() }} Logboek</a>
-            <a href="{{ url_for('consent_list') }}" class="{{ 'active' if active_nav == 'toestemmingen' }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Toestemmingen</a>
-            <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }} Profiel</a>
+            <a href="{{ url_for('index') }}" class="{{ 'active' if active_nav == 'kluis' }}">{{ icon_vault() }} {{ t.nav_vault }}</a>
+            <a href="{{ url_for('shares_overview') }}" class="{{ 'active' if active_nav == 'gedeeld' }}">{{ icon_share() }} {{ t.nav_shared }}</a>
+            <a href="{{ url_for('trash_overview') }}" class="{{ 'active' if active_nav == 'prullenbak' }}">{{ icon_trash() }} {{ t.nav_trash }}</a>
+            <a href="{{ url_for('audit') }}" class="{{ 'active' if active_nav == 'logboek' }}">{{ icon_file() }} {{ t.nav_log }}</a>
+            <a href="{{ url_for('consent_list') }}" class="{{ 'active' if active_nav == 'toestemmingen' }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> {{ t.nav_consent }}</a>
+            <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }} {{ t.nav_profile }}</a>
         </nav>
     </header>
 
     {% if bridge_mode %}
     <div class="bridge-banner">
-        &#127760; Je bekijkt deze kluis via de Bridge (alleen-lezen). Uploaden en bewerken doe je op je lokale MySolido.
+        &#127760; {{ t.bridge_banner }}
     </div>
     {% endif %}
 
@@ -74,17 +74,17 @@
     </main>
 
     <nav class="bottom-nav">
-        <a href="{{ url_for('index') }}" class="{{ 'active' if active_nav == 'kluis' }}">{{ icon_vault() }}<span>Kluis</span></a>
-        <a href="{{ url_for('search') }}" class="{{ 'active' if active_nav == 'zoeken' }}">{{ icon_search() }}<span>Zoeken</span></a>
-        <a href="{{ url_for('trash_overview') }}" class="{{ 'active' if active_nav == 'prullenbak' }}">{{ icon_trash() }}<span>Prullen</span></a>
-        <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }}<span>Profiel</span></a>
+        <a href="{{ url_for('index') }}" class="{{ 'active' if active_nav == 'kluis' }}">{{ icon_vault() }}<span>{{ t.nav_vault }}</span></a>
+        <a href="{{ url_for('search') }}" class="{{ 'active' if active_nav == 'zoeken' }}">{{ icon_search() }}<span>{{ t.nav_search }}</span></a>
+        <a href="{{ url_for('trash_overview') }}" class="{{ 'active' if active_nav == 'prullenbak' }}">{{ icon_trash() }}<span>{{ t.nav_trash_short }}</span></a>
+        <a href="{{ url_for('profile') }}" class="{{ 'active' if active_nav == 'profiel' }}">{{ icon_user() }}<span>{{ t.nav_profile }}</span></a>
     </nav>
 
     <!-- Loading Spinner Overlay -->
     <div class="spinner-overlay" id="spinner-overlay">
         <div class="spinner-content">
             <div class="spinner"></div>
-            <p>Laden...</p>
+            <p>{{ t.loading }}</p>
         </div>
     </div>
 

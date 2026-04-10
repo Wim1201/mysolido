@@ -25,6 +25,7 @@ from share_links import (
     get_active_share_links, increment_download_count,
     check_password as check_share_password
 )
+from translations import get_translations
 from sync_bridge import (
     is_configured as bridge_sync_configured,
     get_status as get_bridge_sync_status,
@@ -811,6 +812,7 @@ def inject_globals():
         'verzoek_reject': 'profiel',
     }
     active = nav_map.get(request.endpoint, '')
+    lang = session.get('language', 'nl')
     return {
         'folder_icons': FOLDER_ICONS,
         'unread_count': get_unread_count(),
@@ -819,7 +821,17 @@ def inject_globals():
         'bridge_mode': BRIDGE_MODE,
         'bridge_sync_configured': bridge_sync_configured(),
         'bridge_sync_status': get_bridge_sync_status(),
+        't': get_translations(lang),
+        'current_lang': lang,
     }
+
+
+@app.route('/settings/language', methods=['POST'])
+def change_language():
+    lang = request.form.get('language', 'nl')
+    if lang in ('nl', 'en'):
+        session['language'] = lang
+    return redirect(request.referrer or url_for('index'))
 
 
 @app.route('/bridge-login', methods=['GET', 'POST'])
