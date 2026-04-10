@@ -6,9 +6,9 @@
 {% block content %}
     {% if share_link_url %}
     <div class="share-link-banner">
-        <span>{{ icon_link() }} Deellink aangemaakt:</span>
+        <span>{{ icon_link() }} {{ t.share_link_created }}</span>
         <input type="text" value="{{ share_link_url }}" readonly id="share-link-url" class="share-link-input">
-        <button type="button" class="btn btn-sm btn-sharelink-copy" onclick="copyShareLink()">{{ icon_copy() }} Kopieer</button>
+        <button type="button" class="btn btn-sm btn-sharelink-copy" onclick="copyShareLink()">{{ icon_copy() }} {{ t.copy }}</button>
     </div>
     {% endif %}
 
@@ -20,19 +20,19 @@
     <div class="stats-bar">
         <div class="stat-item">
             <div class="stat-value">{{ stats.file_count }}</div>
-            <div class="stat-label">Bestanden</div>
+            <div class="stat-label">{{ t.stat_files }}</div>
         </div>
         <div class="stat-item">
             <div class="stat-value">{{ stats.total_size_formatted }}</div>
-            <div class="stat-label">Opslag</div>
+            <div class="stat-label">{{ t.stat_storage }}</div>
         </div>
         <div class="stat-item">
             <div class="stat-value">{{ stats.folder_count }}</div>
-            <div class="stat-label">Mappen</div>
+            <div class="stat-label">{{ t.stat_folders }}</div>
         </div>
         <div class="stat-item">
             <div class="stat-value">{{ stats.active_share_links }}</div>
-            <div class="stat-label">Deellinks</div>
+            <div class="stat-label">{{ t.stat_sharelinks }}</div>
         </div>
     </div>
     {% endif %}
@@ -40,8 +40,8 @@
     <!-- Search bar -->
     <div class="search-bar">
         <form action="{{ url_for('search') }}" method="get">
-            <input type="search" name="q" placeholder="Zoek in je kluis...">
-            <button type="submit" class="btn">{{ icon_search() }} Zoeken</button>
+            <input type="search" name="q" placeholder="{{ t.search_placeholder }}">
+            <button type="submit" class="btn">{{ icon_search() }} {{ t.search_button }}</button>
         </form>
     </div>
 
@@ -49,22 +49,22 @@
     <!-- Init banner (only when no items) -->
     {% if not items %}
     <div class="init-banner">
-        <p>Welkom! Maak de standaardmappen aan om te beginnen.</p>
-        <a href="{{ url_for('init_folders') }}" class="btn btn-init">Standaardmappen aanmaken</a>
+        <p>{{ t.welcome_init }}</p>
+        <a href="{{ url_for('init_folders') }}" class="btn btn-init">{{ t.init_folders_btn }}</a>
     </div>
     {% endif %}
 
     <!-- Upload Zone -->
     <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
         <select name="upload_folder" class="upload-folder-select">
-            <option value="">{{ icon_package() }} Pod root</option>
+            <option value="">{{ icon_package() }} {{ t.pod_root }}</option>
             {% for folder in all_folders %}
             <option value="{{ folder.name }}">{{ folder.label }}</option>
             {% endfor %}
         </select>
         <div class="upload-zone">
             {{ icon_upload() }}
-            <p>Sleep een bestand hierheen of klik om te uploaden</p>
+            <p>{{ t.upload_dropzone }}</p>
             <input type="file" name="file" required>
         </div>
     </form>
@@ -74,17 +74,17 @@
     {% if consent_stats and consent_stats.total > 0 %}
     <div class="consent-stats-bar">
         <a href="{{ url_for('consent_list') }}" class="consent-stats-link">
-            <span class="consent-stat"><span class="consent-stat-icon">&#x2705;</span> {{ consent_stats.active }} actief</span>
-            {% if consent_stats.expired > 0 %}<span class="consent-stat"><span class="consent-stat-icon">&#x23f0;</span> {{ consent_stats.expired }} verlopen</span>{% endif %}
-            {% if consent_stats.withdrawn > 0 %}<span class="consent-stat"><span class="consent-stat-icon">&#x274c;</span> {{ consent_stats.withdrawn }} ingetrokken</span>{% endif %}
-            <span class="consent-stat-label">Toestemmingen &rarr;</span>
+            <span class="consent-stat"><span class="consent-stat-icon">&#x2705;</span> {{ consent_stats.active }} {{ t.consent_active }}</span>
+            {% if consent_stats.expired > 0 %}<span class="consent-stat"><span class="consent-stat-icon">&#x23f0;</span> {{ consent_stats.expired }} {{ t.consent_expired }}</span>{% endif %}
+            {% if consent_stats.withdrawn > 0 %}<span class="consent-stat"><span class="consent-stat-icon">&#x274c;</span> {{ consent_stats.withdrawn }} {{ t.consent_withdrawn }}</span>{% endif %}
+            <span class="consent-stat-label">{{ t.consent_link }} &rarr;</span>
         </a>
     </div>
     {% endif %}
 
     <!-- Folder Grid -->
     {% if items %}
-    <h2 style="font-size: 1rem; color: var(--color-primary); margin-bottom: 12px;">Mappen</h2>
+    <h2 style="font-size: 1rem; color: var(--color-primary); margin-bottom: 12px;">{{ t.folders_title }}</h2>
     <div class="folder-grid">
         {% for name in default_folders %}
         <a href="{{ url_for('browse', folder_path=name) }}" class="folder-card" style="--folder-color: {{ folder_icons[name].color }}">
@@ -100,7 +100,7 @@
     <!-- Recent files from audit log -->
     {% if recent_files %}
     <div class="files recent-section">
-        <h2>Recente uploads</h2>
+        <h2>{{ t.recent_uploads }}</h2>
         <div class="file-list">
             {% for entry in recent_files %}
             <div class="file-item">
@@ -120,13 +120,13 @@
     {% if root_files %}
     <div class="files" style="margin-top: 16px;">
         <div class="files-header">
-            <h2>Bestanden in root</h2>
+            <h2>{{ t.files_in_root }}</h2>
             <form action="{{ url_for('index') }}" method="get" class="sort-form">
                 <select name="sort" onchange="this.form.submit()">
-                    <option value="name-asc" {{ 'selected' if current_sort == 'name-asc' }}>Naam (A-Z)</option>
-                    <option value="name-desc" {{ 'selected' if current_sort == 'name-desc' }}>Naam (Z-A)</option>
-                    <option value="date-desc" {{ 'selected' if current_sort == 'date-desc' }}>Nieuwste eerst</option>
-                    <option value="date-asc" {{ 'selected' if current_sort == 'date-asc' }}>Oudste eerst</option>
+                    <option value="name-asc" {{ 'selected' if current_sort == 'name-asc' }}>{{ t.sort_name_asc }}</option>
+                    <option value="name-desc" {{ 'selected' if current_sort == 'name-desc' }}>{{ t.sort_name_desc }}</option>
+                    <option value="date-desc" {{ 'selected' if current_sort == 'date-desc' }}>{{ t.sort_date_desc }}</option>
+                    <option value="date-asc" {{ 'selected' if current_sort == 'date-asc' }}>{{ t.sort_date_asc }}</option>
                 </select>
             </form>
         </div>
@@ -139,48 +139,48 @@
                     <span class="file-meta">{{ item.size }}&nbsp;&nbsp;{{ item.modified }}</span>
                 </div>
                 <div class="file-actions">
-                    <a href="{{ url_for('download_file', file_path=item.name) }}" class="btn btn-compact btn-download">{{ icon_download() }} Download</a>
+                    <a href="{{ url_for('download_file', file_path=item.name) }}" class="btn btn-compact btn-download">{{ icon_download() }} {{ t.download }}</a>
                     {% if not bridge_mode %}
                     <div class="move-wrapper">
-                        <button type="button" class="btn btn-compact btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaats</button>
+                        <button type="button" class="btn btn-compact btn-move" onclick="toggleMove(this)">{{ icon_move() }} {{ t.move }}</button>
                         <div class="move-dropdown">
                             <form action="{{ url_for('move') }}" method="post">
                                 <input type="hidden" name="resource_url" value="{{ item.url }}">
                                 <input type="hidden" name="folder_path" value="">
                                 <select name="target_folder">
-                                    <option value="">Pod root</option>
+                                    <option value="">{{ t.pod_root }}</option>
                                     {% for folder in all_folders %}
                                     <option value="{{ folder.name }}">{{ folder.label }}</option>
                                     {% endfor %}
                                 </select>
                                 <div class="move-actions">
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">Annuleren</button>
-                                    <button type="submit" class="btn btn-sm">Verplaats</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">{{ t.cancel }}</button>
+                                    <button type="submit" class="btn btn-sm">{{ t.move }}</button>
                                 </div>
                             </form>
                         </div>
                     </div>
                     <div class="share-wrapper">
-                        <button type="button" class="btn btn-compact btn-share" onclick="toggleShare(this)">{{ icon_share() }} Delen</button>
+                        <button type="button" class="btn btn-compact btn-share" onclick="toggleShare(this)">{{ icon_share() }} {{ t.share }}</button>
                         <div class="share-dropdown">
                             <form action="{{ url_for('share') }}" method="post">
                                 <input type="hidden" name="resource_url" value="{{ item.url }}">
                                 <input type="hidden" name="resource_path" value="{{ item.name }}">
                                 <input type="hidden" name="folder_path" value="">
-                                <label>Rechtenniveau</label>
+                                <label>{{ t.access_level }}</label>
                                 <select name="access_level" onchange="toggleWebidField(this)">
-                                    <option value="read">{{ icon_eye() }} Alleen lezen</option>
-                                    <option value="readwrite">{{ icon_edit() }} Lezen en schrijven</option>
-                                    <option value="append">{{ icon_append() }} Alleen toevoegen</option>
-                                    <option value="public">{{ icon_globe() }} Openbaar (iedereen)</option>
+                                    <option value="read">{{ icon_eye() }} {{ t.read_only }}</option>
+                                    <option value="readwrite">{{ icon_edit() }} {{ t.read_write }}</option>
+                                    <option value="append">{{ icon_append() }} {{ t.append_only }}</option>
+                                    <option value="public">{{ icon_globe() }} {{ t.public }}</option>
                                 </select>
-                                <label class="webid-label">WebID</label>
+                                <label class="webid-label">{{ t.webid_label }}</label>
                                 <input type="url" name="webid" class="webid-input" placeholder="http://example.com/jan/profile/card#me">
-                                <label>Verloopt op (optioneel)</label>
+                                <label>{{ t.expires_on }}</label>
                                 <input type="date" name="expires">
                                 <div class="share-actions">
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">Annuleren</button>
-                                    <button type="submit" class="btn btn-sm" style="background: var(--color-purple);">Delen</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">{{ t.cancel }}</button>
+                                    <button type="submit" class="btn btn-sm" style="background: var(--color-purple);">{{ t.share }}</button>
                                 </div>
                             </form>
                         </div>
@@ -191,7 +191,7 @@
                         <input type="hidden" name="expires_days" value="7">
                         <button type="submit" class="btn btn-compact btn-link">{{ icon_link() }} Link</button>
                     </form>
-                    <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
+                    <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('{{ t.confirm_delete }}')">
                         <input type="hidden" name="resource_url" value="{{ item.url }}">
                         <input type="hidden" name="folder_path" value="">
                         <button type="submit" class="btn btn-compact btn-danger">{{ icon_delete() }}</button>
@@ -213,7 +213,7 @@
     <!-- Breadcrumbs -->
     <div class="breadcrumbs">
         {% if parent_path is not none %}
-            <a href="{% if parent_path %}{{ url_for('browse', folder_path=parent_path) }}{% else %}{{ url_for('index') }}{% endif %}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
+            <a href="{% if parent_path %}{{ url_for('browse', folder_path=parent_path) }}{% else %}{{ url_for('index') }}{% endif %}" class="btn-back">{{ icon_arrow_left() }} {{ t.back }}</a>
         {% endif %}
         {% for crumb in breadcrumbs %}
             {% if not loop.last %}
@@ -233,8 +233,8 @@
     <!-- Search bar -->
     <div class="search-bar">
         <form action="{{ url_for('search') }}" method="get">
-            <input type="search" name="q" placeholder="Zoek in je kluis...">
-            <button type="submit" class="btn">{{ icon_search() }} Zoeken</button>
+            <input type="search" name="q" placeholder="{{ t.search_placeholder }}">
+            <button type="submit" class="btn">{{ icon_search() }} {{ t.search_button }}</button>
         </form>
     </div>
 
@@ -242,24 +242,24 @@
     <!-- Actions: upload + create folder -->
     <div class="actions-bar">
         <div class="action-card">
-            <h2>{{ icon_upload() }} Bestand uploaden</h2>
+            <h2>{{ icon_upload() }} {{ t.upload_to }}</h2>
             <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
                 <select name="upload_folder" class="upload-folder-select">
-                    <option value="">Pod root</option>
+                    <option value="">{{ t.pod_root }}</option>
                     {% for folder in all_folders %}
                     <option value="{{ folder.name }}" {% if folder_path == folder.name or folder_path.startswith(folder.name + '/') %}selected{% endif %}>{{ folder.label }}</option>
                     {% endfor %}
                 </select>
                 <input type="file" name="file" required>
-                <button type="submit" class="btn">Uploaden</button>
+                <button type="submit" class="btn">{{ t.upload_btn }}</button>
             </form>
         </div>
         <div class="action-card">
-            <h2>{{ icon_plus() }} Nieuwe map</h2>
+            <h2>{{ icon_plus() }} {{ t.new_folder }}</h2>
             <form action="{{ url_for('create_folder_route') }}" method="post">
                 <input type="hidden" name="folder_path" value="{{ folder_path }}">
-                <input type="text" name="folder_name" placeholder="Mapnaam..." required>
-                <button type="submit" class="btn btn-secondary">Map aanmaken</button>
+                <input type="text" name="folder_name" placeholder="{{ t.folder_name_placeholder }}" required>
+                <button type="submit" class="btn btn-secondary">{{ t.create_folder }}</button>
             </form>
         </div>
     </div>
@@ -268,13 +268,13 @@
     <!-- File/folder listing -->
     <div class="files">
         <div class="files-header">
-            <h2>Inhoud van {{ folder_path.split('/')[-1] }}</h2>
+            <h2>{{ t.contents_of }} {{ folder_path.split('/')[-1] }}</h2>
             <form action="{{ url_for('browse', folder_path=folder_path) }}" method="get" class="sort-form">
                 <select name="sort" onchange="this.form.submit()">
-                    <option value="name-asc" {{ 'selected' if current_sort == 'name-asc' }}>Naam (A-Z)</option>
-                    <option value="name-desc" {{ 'selected' if current_sort == 'name-desc' }}>Naam (Z-A)</option>
-                    <option value="date-desc" {{ 'selected' if current_sort == 'date-desc' }}>Nieuwste eerst</option>
-                    <option value="date-asc" {{ 'selected' if current_sort == 'date-asc' }}>Oudste eerst</option>
+                    <option value="name-asc" {{ 'selected' if current_sort == 'name-asc' }}>{{ t.sort_name_asc }}</option>
+                    <option value="name-desc" {{ 'selected' if current_sort == 'name-desc' }}>{{ t.sort_name_desc }}</option>
+                    <option value="date-desc" {{ 'selected' if current_sort == 'date-desc' }}>{{ t.sort_date_desc }}</option>
+                    <option value="date-asc" {{ 'selected' if current_sort == 'date-asc' }}>{{ t.sort_date_asc }}</option>
                 </select>
             </form>
         </div>
@@ -304,23 +304,23 @@
                     </div>
                     <div class="file-actions">
                         {% if not is_dir %}
-                        <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-compact btn-download">{{ icon_download() }} Download</a>
+                        <a href="{{ url_for('download_file', file_path=(folder_path + '/' + item.name if folder_path else item.name)) }}" class="btn btn-compact btn-download">{{ icon_download() }} {{ t.download }}</a>
                         {% if not bridge_mode %}
                         <div class="move-wrapper">
-                            <button type="button" class="btn btn-compact btn-move" onclick="toggleMove(this)">{{ icon_move() }} Verplaats</button>
+                            <button type="button" class="btn btn-compact btn-move" onclick="toggleMove(this)">{{ icon_move() }} {{ t.move }}</button>
                             <div class="move-dropdown">
                                 <form action="{{ url_for('move') }}" method="post">
                                     <input type="hidden" name="resource_url" value="{{ item.url }}">
                                     <input type="hidden" name="folder_path" value="{{ folder_path }}">
                                     <select name="target_folder">
-                                        <option value="">Pod root</option>
+                                        <option value="">{{ t.pod_root }}</option>
                                         {% for folder in move_folders %}
                                         <option value="{{ folder.value }}">{% if folder.indent %}&nbsp;&nbsp;&nbsp;&nbsp;&#x21B3; {% endif %}{{ folder.label }}</option>
                                         {% endfor %}
                                     </select>
                                     <div class="move-actions">
-                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">Annuleren</button>
-                                        <button type="submit" class="btn btn-sm">Verplaats</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleMove(this)">{{ t.cancel }}</button>
+                                        <button type="submit" class="btn btn-sm">{{ t.move }}</button>
                                     </div>
                                 </form>
                             </div>
@@ -329,26 +329,26 @@
                         {% endif %}
                         {% if not bridge_mode %}
                         <div class="share-wrapper">
-                            <button type="button" class="btn btn-compact btn-share" onclick="toggleShare(this)">{{ icon_share() }} Delen</button>
+                            <button type="button" class="btn btn-compact btn-share" onclick="toggleShare(this)">{{ icon_share() }} {{ t.share }}</button>
                             <div class="share-dropdown">
                                 <form action="{{ url_for('share') }}" method="post">
                                     <input type="hidden" name="resource_url" value="{{ item.url }}">
                                     <input type="hidden" name="resource_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
                                     <input type="hidden" name="folder_path" value="{{ folder_path }}">
-                                    <label>Rechtenniveau</label>
+                                    <label>{{ t.access_level }}</label>
                                     <select name="access_level" onchange="toggleWebidField(this)">
-                                        <option value="read">{{ icon_eye() }} Alleen lezen</option>
-                                        <option value="readwrite">{{ icon_edit() }} Lezen en schrijven</option>
-                                        <option value="append">{{ icon_append() }} Alleen toevoegen</option>
-                                        <option value="public">{{ icon_globe() }} Openbaar (iedereen)</option>
+                                        <option value="read">{{ icon_eye() }} {{ t.read_only }}</option>
+                                        <option value="readwrite">{{ icon_edit() }} {{ t.read_write }}</option>
+                                        <option value="append">{{ icon_append() }} {{ t.append_only }}</option>
+                                        <option value="public">{{ icon_globe() }} {{ t.public }}</option>
                                     </select>
-                                    <label class="webid-label">WebID</label>
+                                    <label class="webid-label">{{ t.webid_label }}</label>
                                     <input type="url" name="webid" class="webid-input" placeholder="http://example.com/jan/profile/card#me">
-                                    <label>Verloopt op (optioneel)</label>
+                                    <label>{{ t.expires_on }}</label>
                                     <input type="date" name="expires">
                                     <div class="share-actions">
-                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">Annuleren</button>
-                                        <button type="submit" class="btn btn-sm" style="background: var(--color-purple);">Delen</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="toggleShare(this)">{{ t.cancel }}</button>
+                                        <button type="submit" class="btn btn-sm" style="background: var(--color-purple);">{{ t.share }}</button>
                                     </div>
                                 </form>
                             </div>
@@ -361,7 +361,7 @@
                             <button type="submit" class="btn btn-compact btn-link">{{ icon_link() }} Link</button>
                         </form>
                         {% endif %}
-                        <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('Weet je zeker dat je {{ item.name }} wilt verwijderen?')">
+                        <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('{{ t.confirm_delete }}')">
                             <input type="hidden" name="resource_url" value="{{ item.url }}">
                             <input type="hidden" name="folder_path" value="{{ folder_path }}">
                             <button type="submit" class="btn btn-compact btn-danger">{{ icon_delete() }}</button>
@@ -379,8 +379,8 @@
                     <line x1="32" y1="28" x2="32" y2="44" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     <line x1="24" y1="36" x2="40" y2="36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                <p class="empty-state-title">Deze map is nog leeg</p>
-                <p class="empty-state-sub">Upload een bestand of maak een submap aan</p>
+                <p class="empty-state-title">{{ t.empty_folder }}</p>
+                <p class="empty-state-sub">{{ t.empty_folder_sub }}</p>
             </div>
         {% endif %}
     </div>
