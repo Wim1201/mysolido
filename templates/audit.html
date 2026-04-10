@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_upload, icon_delete, icon_folder, icon_share, icon_lock, icon_hourglass, icon_refresh, icon_search, icon_trash, icon_restore, icon_info, icon_zip %}
 
-{% block title %}Logboek - MySolido{% endblock %}
+{% block title %}{{ t.audit_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="filter-bar">
-        <label>Filter:</label>
+        <label>{{ t.audit_filter }}</label>
         <select onchange="window.location.href='{{ url_for('audit') }}?filter=' + this.value">
-            <option value="" {% if not current_filter %}selected{% endif %}>Alle acties</option>
-            <option value="upload" {% if current_filter == 'upload' %}selected{% endif %}>Upload</option>
-            <option value="trash" {% if current_filter == 'trash' %}selected{% endif %}>Prullenbak</option>
-            <option value="delete" {% if current_filter == 'delete' %}selected{% endif %}>Verwijderd</option>
-            <option value="create_folder" {% if current_filter == 'create_folder' %}selected{% endif %}>Map aangemaakt</option>
-            <option value="share" {% if current_filter == 'share' %}selected{% endif %}>Gedeeld</option>
-            <option value="revoke" {% if current_filter == 'revoke' %}selected{% endif %}>Ingetrokken</option>
-            <option value="revoke_expired" {% if current_filter == 'revoke_expired' %}selected{% endif %}>Verlopen</option>
-            <option value="move" {% if current_filter == 'move' %}selected{% endif %}>Verplaatst</option>
-            <option value="search" {% if current_filter == 'search' %}selected{% endif %}>Gezocht</option>
-            <option value="restore" {% if current_filter == 'restore' %}selected{% endif %}>Hersteld</option>
-            <option value="permanent_delete" {% if current_filter == 'permanent_delete' %}selected{% endif %}>Definitief verwijderd</option>
-            <option value="export" {% if current_filter == 'export' %}selected{% endif %}>Backup</option>
+            <option value="" {% if not current_filter %}selected{% endif %}>{{ t.audit_all }}</option>
+            <option value="upload" {% if current_filter == 'upload' %}selected{% endif %}>{{ t.audit_upload }}</option>
+            <option value="trash" {% if current_filter == 'trash' %}selected{% endif %}>{{ t.audit_trash }}</option>
+            <option value="delete" {% if current_filter == 'delete' %}selected{% endif %}>{{ t.audit_deleted }}</option>
+            <option value="create_folder" {% if current_filter == 'create_folder' %}selected{% endif %}>{{ t.audit_folder_created }}</option>
+            <option value="share" {% if current_filter == 'share' %}selected{% endif %}>{{ t.audit_shared }}</option>
+            <option value="revoke" {% if current_filter == 'revoke' %}selected{% endif %}>{{ t.audit_revoked }}</option>
+            <option value="revoke_expired" {% if current_filter == 'revoke_expired' %}selected{% endif %}>{{ t.audit_expired }}</option>
+            <option value="move" {% if current_filter == 'move' %}selected{% endif %}>{{ t.audit_moved }}</option>
+            <option value="search" {% if current_filter == 'search' %}selected{% endif %}>{{ t.audit_searched }}</option>
+            <option value="restore" {% if current_filter == 'restore' %}selected{% endif %}>{{ t.audit_restored }}</option>
+            <option value="permanent_delete" {% if current_filter == 'permanent_delete' %}selected{% endif %}>{{ t.audit_permanent_deleted }}</option>
+            <option value="export" {% if current_filter == 'export' %}selected{% endif %}>{{ t.audit_backup }}</option>
         </select>
     </div>
 
     <div class="audit-card">
-        <h2>Logboek{% if current_filter %} ({{ current_filter }}){% endif %}</h2>
+        <h2>{{ t.audit_title }}{% if current_filter %} ({{ current_filter }}){% endif %}</h2>
         {% if log %}
             <ul class="log-list">
                 {% for entry in log %}
@@ -47,19 +47,19 @@
                     </span>
                     <div class="log-content">
                         <div class="log-action">
-                            {% if entry.action == 'upload' %}Geupload
-                            {% elif entry.action == 'trash' %}Naar prullenbak
-                            {% elif entry.action == 'delete' %}Verwijderd
-                            {% elif entry.action == 'create_folder' %}Map aangemaakt
-                            {% elif entry.action == 'share' %}Gedeeld
-                            {% elif entry.action == 'revoke' %}Toegang ingetrokken
-                            {% elif entry.action == 'revoke_expired' %}Toegang verlopen
-                            {% elif entry.action == 'move' %}Verplaatst
-                            {% elif entry.action == 'search' %}Gezocht
-                            {% elif entry.action == 'restore' %}Hersteld uit prullenbak
-                            {% elif entry.action == 'permanent_delete' %}Definitief verwijderd
-                            {% elif entry.action == 'trash_auto_deleted' %}Auto-verwijderd (30 dagen)
-                            {% elif entry.action == 'export' %}Backup geexporteerd
+                            {% if entry.action == 'upload' %}{{ t.audit_action_upload }}
+                            {% elif entry.action == 'trash' %}{{ t.audit_action_trash }}
+                            {% elif entry.action == 'delete' %}{{ t.audit_action_delete }}
+                            {% elif entry.action == 'create_folder' %}{{ t.audit_action_folder }}
+                            {% elif entry.action == 'share' %}{{ t.audit_action_share }}
+                            {% elif entry.action == 'revoke' %}{{ t.audit_action_revoke }}
+                            {% elif entry.action == 'revoke_expired' %}{{ t.audit_action_revoke_expired }}
+                            {% elif entry.action == 'move' %}{{ t.audit_action_move }}
+                            {% elif entry.action == 'search' %}{{ t.audit_action_search }}
+                            {% elif entry.action == 'restore' %}{{ t.audit_action_restore }}
+                            {% elif entry.action == 'permanent_delete' %}{{ t.audit_action_permanent }}
+                            {% elif entry.action == 'trash_auto_deleted' %}{{ t.audit_action_auto_delete }}
+                            {% elif entry.action == 'export' %}{{ t.audit_action_export }}
                             {% else %}{{ entry.action }}
                             {% endif %}
                         </div>
@@ -76,7 +76,7 @@
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="empty">Geen logboek entries{% if current_filter %} voor dit filter{% endif %}.</p>
+            <p class="empty">{{ t.audit_empty }}{% if current_filter %} {{ t.audit_empty_filter }}{% endif %}.</p>
         {% endif %}
     </div>
 {% endblock %}

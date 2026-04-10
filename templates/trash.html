@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_restore, icon_delete, icon_file, icon_trash %}
 
-{% block title %}Prullenbak - MySolido{% endblock %}
+{% block title %}{{ t.trash_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="trash-card">
-        <h2>{{ icon_trash() }} Prullenbak</h2>
+        <h2>{{ icon_trash() }} {{ t.trash_title }}</h2>
         <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 16px;">
-            Items worden na 30 dagen automatisch definitief verwijderd.
+            {{ t.trash_auto_delete }}
         </p>
         {% if trash_items %}
             <ul class="trash-list">
@@ -18,19 +18,19 @@
                             {{ icon_file() }} {{ item.filename }}
                         </div>
                         <div class="trash-details">
-                            Oorspronkelijk: {{ item.original_folder or item.original_path }}
-                            &middot; Verwijderd: {{ item.deleted_at[:10] }}
+                            {{ t.trash_original }} {{ item.original_folder or item.original_path }}
+                            &middot; {{ t.trash_deleted }} {{ item.deleted_at[:10] }}
                         </div>
                     </div>
                     {% if not bridge_mode %}
                     <div class="trash-actions">
                         <form action="{{ url_for('trash_restore') }}" method="post">
                             <input type="hidden" name="trash_id" value="{{ item.trash_id }}">
-                            <button type="submit" class="btn btn-sm" title="Herstellen">{{ icon_restore() }} Herstel</button>
+                            <button type="submit" class="btn btn-sm" title="{{ t.trash_restore_title }}">{{ icon_restore() }} {{ t.trash_restore }}</button>
                         </form>
-                        <form action="{{ url_for('trash_permanent_delete') }}" method="post" onsubmit="return confirm('Weet je zeker? Dit kan niet ongedaan worden.')">
+                        <form action="{{ url_for('trash_permanent_delete') }}" method="post" onsubmit="return confirm('{{ t.trash_confirm_permanent }}')">
                             <input type="hidden" name="trash_id" value="{{ item.trash_id }}">
-                            <button type="submit" class="btn btn-danger btn-sm" title="Definitief verwijderen">{{ icon_delete() }}</button>
+                            <button type="submit" class="btn btn-danger btn-sm" title="{{ t.trash_permanent_title }}">{{ icon_delete() }}</button>
                         </form>
                     </div>
                     {% endif %}
@@ -38,7 +38,7 @@
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="empty">De prullenbak is leeg.</p>
+            <p class="empty">{{ t.trash_empty }}</p>
         {% endif %}
     </div>
 {% endblock %}
