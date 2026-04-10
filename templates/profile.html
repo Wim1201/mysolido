@@ -1,56 +1,56 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_user, icon_settings, icon_file, icon_folder %}
 
-{% block title %}Profiel - MySolido{% endblock %}
+{% block title %}{{ t.profile_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="profile-card">
         <svg class="profile-avatar" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <h2 style="font-size: 1.2rem;">MySolido Gebruiker</h2>
+        <h2 style="font-size: 1.2rem;">{{ t.profile_user }}</h2>
         <p class="profile-webid">{{ webid }}</p>
         <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px;">Pod: {{ pod_url }}</p>
 
         <div class="profile-stats">
             <div class="stat-item">
                 <div class="stat-value">{{ stats.file_count }}</div>
-                <div class="stat-label">Bestanden</div>
+                <div class="stat-label">{{ t.stat_files }}</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">{{ stats.folder_count }}</div>
-                <div class="stat-label">Mappen</div>
+                <div class="stat-label">{{ t.stat_folders }}</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value">{{ stats.total_size_formatted }}</div>
-                <div class="stat-label">Totale grootte</div>
+                <div class="stat-label">{{ t.stat_total_size }}</div>
             </div>
         </div>
     </div>
 
     <div style="text-align: center; margin-top: 16px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-        <a href="{{ url_for('profiel_data') }}" class="btn btn-primary">{{ icon_user() }} Mijn gegevens</a>
-        <a href="{{ url_for('intenties_overview') }}" class="btn">Mijn intenties</a>
+        <a href="{{ url_for('profiel_data') }}" class="btn btn-primary">{{ icon_user() }} {{ t.my_data }}</a>
+        <a href="{{ url_for('intenties_overview') }}" class="btn">{{ t.my_intentions }}</a>
         <a href="{{ url_for('verzoeken_overview') }}" class="btn">
-            Inkomende verzoeken
+            {{ t.incoming_requests }}
             {% if new_requests_count > 0 %}
             <span class="badge badge-nieuw" style="margin-left: 4px;">{{ new_requests_count }}</span>
             {% endif %}
         </a>
-        <a href="{{ url_for('settings') }}" class="btn">{{ icon_settings() }} Instellingen</a>
+        <a href="{{ url_for('settings') }}" class="btn">{{ icon_settings() }} {{ t.settings }}</a>
         {% if not bridge_mode %}
-        <a href="{{ url_for('ai_chat') }}" class="btn btn-primary">&#129302; AI-assistent</a>
+        <a href="{{ url_for('ai_chat') }}" class="btn btn-primary">&#129302; {{ t.ai_assistant }}</a>
         {% endif %}
     </div>
 
     {% if not bridge_mode %}
     <div class="card" style="margin-top: 20px;">
-        <h3>&#127760; Bridge</h3>
-        <p class="text-secondary">De Bridge maakt je kluis bereikbaar via internet — ook als je pc uit staat.</p>
+        <h3>&#127760; {{ t.bridge_title }}</h3>
+        <p class="text-secondary">{{ t.bridge_desc }}</p>
 
         {% if bridge_configured %}
         <div class="bridge-info">
             {% if bridge_url %}
             <div class="info-row">
-                <span class="info-label">Bridge URL</span>
+                <span class="info-label">{{ t.bridge_url_label }}</span>
                 <span class="info-value">
                     <a href="{{ bridge_url }}" target="_blank">{{ bridge_url }}</a>
                 </span>
@@ -58,75 +58,74 @@
             {% endif %}
 
             <div class="info-row">
-                <span class="info-label">Wachtwoord</span>
+                <span class="info-label">{{ t.bridge_password_label }}</span>
                 <span class="info-value">
                     <span>&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</span>
-                    <span class="text-secondary" style="font-size: 0.8rem;">(beveiligd met bcrypt)</span>
+                    <span class="text-secondary" style="font-size: 0.8rem;">({{ t.bridge_password_secured }})</span>
                 </span>
             </div>
         </div>
 
         <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--color-border);">
 
-        <h4>Wachtwoord wijzigen</h4>
+        <h4>{{ t.bridge_change_password }}</h4>
         <form action="{{ url_for('change_bridge_password') }}" method="post" class="bridge-password-form">
             <div class="form-row">
-                <input type="password" name="new_password" placeholder="Nieuw wachtwoord (min. 8 tekens)"
+                <input type="password" name="new_password" placeholder="{{ t.bridge_new_password_placeholder }}"
                         minlength="8" required class="form-input">
-                <button type="submit" class="btn btn-compact btn-primary">Opslaan</button>
+                <button type="submit" class="btn btn-compact btn-primary">{{ t.save }}</button>
             </div>
         </form>
 
         {% else %}
         <p class="text-secondary">
-            De Bridge is nog niet geconfigureerd. Stel een <code>BRIDGE_PASSWORD</code> in je <code>.env</code> bestand in
-            om de Bridge te activeren.
+            {{ t.bridge_not_configured }}
         </p>
         {% endif %}
 
         {% if bridge_sync_configured %}
         <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--color-border);">
-        <h4>Synchronisatie</h4>
+        <h4>{{ t.bridge_sync_title }}</h4>
         <div class="bridge-info">
             <div class="info-row">
-                <span class="info-label">Status</span>
+                <span class="info-label">{{ t.bridge_sync_status }}</span>
                 <span class="info-value">
                     {% if bridge_sync_status.running %}
-                        <span class="sync-badge sync-running">Bezig...</span>
+                        <span class="sync-badge sync-running">{{ t.bridge_sync_running }}</span>
                     {% elif bridge_sync_status.last_result == 'success' %}
-                        <span class="sync-badge sync-success">Gesynchroniseerd</span>
+                        <span class="sync-badge sync-success">{{ t.bridge_sync_success }}</span>
                     {% elif bridge_sync_status.last_result == 'error' %}
-                        <span class="sync-badge sync-error">Fout</span>
+                        <span class="sync-badge sync-error">{{ t.bridge_sync_error }}</span>
                     {% else %}
-                        <span class="sync-badge">Nog niet gesynchroniseerd</span>
+                        <span class="sync-badge">{{ t.bridge_sync_never }}</span>
                     {% endif %}
                 </span>
             </div>
             {% if bridge_sync_status.last_sync %}
             <div class="info-row">
-                <span class="info-label">Laatste sync</span>
+                <span class="info-label">{{ t.bridge_last_sync }}</span>
                 <span class="info-value">{{ bridge_sync_status.last_sync[:19] }}</span>
             </div>
             {% endif %}
             {% if bridge_sync_status.error %}
             <div class="info-row">
-                <span class="info-label">Fout</span>
+                <span class="info-label">{{ t.bridge_error_label }}</span>
                 <span class="info-value" style="color: var(--color-danger);">{{ bridge_sync_status.error }}</span>
             </div>
             {% endif %}
             <div class="info-row">
-                <span class="info-label">Auto-sync</span>
+                <span class="info-label">{{ t.bridge_auto_sync }}</span>
                 <span class="info-value">
                     {% if bridge_sync_status.running is not none %}
-                        Aan — synchroniseert na elke wijziging
+                        {{ t.bridge_auto_sync_on }}
                     {% else %}
-                        Uit — stel BRIDGE_AUTO_SYNC=true in je .env
+                        {{ t.bridge_auto_sync_off }}
                     {% endif %}
                 </span>
             </div>
         </div>
         <form action="{{ url_for('trigger_bridge_sync') }}" method="post" style="margin-top: 12px;">
-            <button type="submit" class="btn btn-primary">Nu synchroniseren</button>
+            <button type="submit" class="btn btn-primary">{{ t.bridge_sync_now }}</button>
         </form>
         {% endif %}
     </div>
