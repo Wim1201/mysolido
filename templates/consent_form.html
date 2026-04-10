@@ -1,50 +1,50 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left %}
 
-{% block title %}Nieuwe toestemming - MySolido{% endblock %}
+{% block title %}{{ t.consent_form_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="breadcrumbs">
-        <a href="{{ url_for('consent_list') }}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
-        <span class="current">Nieuwe toestemming</span>
+        <a href="{{ url_for('consent_list') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.back }}</a>
+        <span class="current">{{ t.consent_new }}</span>
     </div>
 
     <div class="consent-form-card">
-        <h2>&#x2705; Nieuwe toestemming vastleggen</h2>
+        <h2>&#x2705; {{ t.consent_form_title }}</h2>
 
         <form action="{{ url_for('consent_new') }}" method="post" class="consent-form">
-            <label for="title">Titel <span class="required">*</span></label>
-            <input type="text" name="title" id="title" placeholder="Bijv. Huisarts — inzage medisch dossier" required>
+            <label for="title">{{ t.consent_form_name }} <span class="required">*</span></label>
+            <input type="text" name="title" id="title" placeholder="{{ t.consent_form_name_placeholder }}" required>
 
-            <label for="description">Omschrijving</label>
-            <textarea name="description" id="description" rows="3" placeholder="Wat wordt er precies gedeeld?"></textarea>
+            <label for="description">{{ t.consent_form_description }}</label>
+            <textarea name="description" id="description" rows="3" placeholder="{{ t.consent_form_description_placeholder }}"></textarea>
 
-            <label for="receiver">Ontvanger <span class="required">*</span></label>
-            <input type="text" name="receiver" id="receiver" placeholder="Naam van de partij die toegang krijgt" required>
+            <label for="receiver">{{ t.consent_form_receiver }} <span class="required">*</span></label>
+            <input type="text" name="receiver" id="receiver" placeholder="{{ t.consent_form_receiver_placeholder }}" required>
 
-            <label for="purpose">Doel <span class="required">*</span></label>
+            <label for="purpose">{{ t.consent_form_purpose }} <span class="required">*</span></label>
             <select name="purpose" id="purpose">
                 {% for key, val in purposes.items() %}
                 <option value="{{ key }}">{{ val.label }}</option>
                 {% endfor %}
             </select>
 
-            <label for="category">Datacategorie <span class="required">*</span></label>
+            <label for="category">{{ t.consent_form_category }} <span class="required">*</span></label>
             <select name="category" id="category">
                 {% for key, val in categories.items() %}
                 <option value="{{ key }}">{{ val.label }}</option>
                 {% endfor %}
             </select>
 
-            <label for="expires">Geldig tot (optioneel)</label>
+            <label for="expires">{{ t.consent_form_expires }}</label>
             <input type="date" name="expires" id="expires">
 
-            <label for="note">Opmerking (optioneel)</label>
-            <textarea name="note" id="note" rows="2" placeholder="Extra opmerkingen..."></textarea>
+            <label for="note">{{ t.consent_form_note }}</label>
+            <textarea name="note" id="note" rows="2" placeholder="{{ t.consent_form_note_placeholder }}"></textarea>
 
             <div class="consent-form-actions">
-                <a href="{{ url_for('consent_list') }}" class="btn btn-secondary">Annuleren</a>
-                <button type="submit" class="btn">Toestemming vastleggen</button>
+                <a href="{{ url_for('consent_list') }}" class="btn btn-secondary">{{ t.cancel }}</a>
+                <button type="submit" class="btn">{{ t.consent_form_submit }}</button>
             </div>
         </form>
     </div>

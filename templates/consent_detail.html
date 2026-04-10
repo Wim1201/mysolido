@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left %}
 
-{% block title %}Toestemming - MySolido{% endblock %}
+{% block title %}{{ t.consent_detail_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="breadcrumbs">
-        <a href="{{ url_for('consent_list') }}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
-        <span class="current">{{ consent.get('dct:title', 'Toestemming') }}</span>
+        <a href="{{ url_for('consent_list') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.back }}</a>
+        <span class="current">{{ consent.get('dct:title', t.consent_detail_title) }}</span>
     </div>
 
     <div class="consent-detail-card">
         <div class="consent-detail-header">
-            <h2>{{ consent.get('dct:title', 'Zonder titel') }}</h2>
+            <h2>{{ consent.get('dct:title', t.consent_no_title) }}</h2>
             <span class="consent-status-badge {{ consent._status.class }}">{{ consent._status.icon }} {{ consent._status.label }}</span>
         </div>
 
@@ -21,57 +21,57 @@
 
         <table class="consent-detail-table">
             <tr>
-                <th>ID</th>
+                <th>{{ t.consent_detail_id }}</th>
                 <td>{{ consent.get('@id', '') }}</td>
             </tr>
             <tr>
-                <th>Ontvanger</th>
+                <th>{{ t.consent_detail_receiver }}</th>
                 <td>
                     {% set controller = consent.get('dpv:hasDataController', {}) %}
-                    {{ controller.get('dct:title', 'Onbekend') if controller is mapping else controller }}
+                    {{ controller.get('dct:title', t.consent_detail_unknown) if controller is mapping else controller }}
                 </td>
             </tr>
             <tr>
-                <th>Doel</th>
+                <th>{{ t.consent_detail_purpose }}</th>
                 <td>
                     {% set purpose = consent.get('dpv:hasPurpose', {}) %}
-                    {{ purpose.get('dct:description', purpose.get('@type', 'Onbekend')) if purpose is mapping else purpose }}
+                    {{ purpose.get('dct:description', purpose.get('@type', t.consent_detail_unknown)) if purpose is mapping else purpose }}
                 </td>
             </tr>
             <tr>
-                <th>Datacategorie</th>
-                <td>{{ consent.get('dpv:hasPersonalDataCategory', 'Onbekend') }}</td>
+                <th>{{ t.consent_detail_category }}</th>
+                <td>{{ consent.get('dpv:hasPersonalDataCategory', t.consent_detail_unknown) }}</td>
             </tr>
             <tr>
-                <th>Aangemaakt</th>
+                <th>{{ t.consent_detail_created }}</th>
                 <td>{{ consent.get('dct:created', '')[:19].replace('T', ' ') }}</td>
             </tr>
             <tr>
-                <th>Laatst gewijzigd</th>
+                <th>{{ t.consent_detail_modified }}</th>
                 <td>{{ consent.get('dct:modified', '')[:19].replace('T', ' ') }}</td>
             </tr>
             {% set expiry = consent.get('dpv:hasExpiry', {}) %}
             {% if expiry and expiry is mapping and expiry.get('dpv:hasExpiryTime') %}
             <tr>
-                <th>Geldig tot</th>
+                <th>{{ t.consent_detail_valid_until }}</th>
                 <td>{{ expiry.get('dpv:hasExpiryTime', '')[:10] }}</td>
             </tr>
             {% endif %}
             <tr>
-                <th>Status</th>
+                <th>{{ t.consent_detail_status }}</th>
                 <td>{{ consent.get('dpv:hasConsentStatus', '').replace('dpv:', '') }}</td>
             </tr>
             <tr>
-                <th>Juridische basis</th>
+                <th>{{ t.consent_detail_legal_basis }}</th>
                 <td>{{ consent.get('dpv:hasLegalBasis', '').replace('dpv:', '') }}</td>
             </tr>
             <tr>
-                <th>Recht</th>
+                <th>{{ t.consent_detail_right }}</th>
                 <td>{{ consent.get('dpv:hasRight', '').replace('dpv:', '') }}</td>
             </tr>
             {% if consent.get('dpv:note') %}
             <tr>
-                <th>Opmerking</th>
+                <th>{{ t.consent_detail_note }}</th>
                 <td>{{ consent.get('dpv:note') }}</td>
             </tr>
             {% endif %}
@@ -80,18 +80,18 @@
         {% if not bridge_mode %}
         <div class="consent-detail-actions">
             {% if consent._status.class == 'status-active' %}
-            <form action="{{ url_for('consent_withdraw', consent_id=consent._id) }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt intrekken?')">
-                <button type="submit" class="btn" style="background: var(--color-secondary);">Intrekken</button>
+            <form action="{{ url_for('consent_withdraw', consent_id=consent._id) }}" method="post" onsubmit="return confirm('{{ t.consent_confirm_withdraw }}')">
+                <button type="submit" class="btn" style="background: var(--color-secondary);">{{ t.consent_withdraw }}</button>
             </form>
             {% endif %}
-            <form action="{{ url_for('consent_delete', consent_id=consent._id) }}" method="post" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt verwijderen?')">
-                <button type="submit" class="btn btn-danger">Verwijderen</button>
+            <form action="{{ url_for('consent_delete', consent_id=consent._id) }}" method="post" onsubmit="return confirm('{{ t.consent_confirm_delete_detail }}')">
+                <button type="submit" class="btn btn-danger">{{ t.consent_delete }}</button>
             </form>
         </div>
         {% endif %}
 
         <details class="policy-raw">
-            <summary>Bekijk ruwe consent record (JSON-LD)</summary>
+            <summary>{{ t.consent_detail_raw }}</summary>
             <pre><code>{{ consent | tojson(indent=2) }}</code></pre>
         </details>
     </div>

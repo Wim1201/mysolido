@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% from "macros/icons.html" import icon_arrow_left, icon_plus %}
 
-{% block title %}Toestemmingen - MySolido{% endblock %}
+{% block title %}{{ t.consent_title }} - MySolido{% endblock %}
 
 {% block content %}
     <div class="breadcrumbs">
-        <a href="{{ url_for('index') }}" class="btn-back">{{ icon_arrow_left() }} Terug</a>
-        <span class="current">Toestemmingen</span>
+        <a href="{{ url_for('index') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.back }}</a>
+        <span class="current">{{ t.consent_title }}</span>
     </div>
 
     <div class="consent-header">
-        <h2>&#x2705; Toestemmingen</h2>
+        <h2>&#x2705; {{ t.consent_title }}</h2>
         {% if not bridge_mode %}
-        <a href="{{ url_for('consent_new') }}" class="btn">{{ icon_plus() }} Nieuwe toestemming</a>
+        <a href="{{ url_for('consent_new') }}" class="btn">{{ icon_plus() }} {{ t.consent_new }}</a>
         {% endif %}
     </div>
 
@@ -25,25 +25,25 @@
                 <span class="consent-date">{{ c.get('dct:created', '')[:10] }}</span>
             </div>
             <div class="consent-item-body">
-                <h3 class="consent-title">{{ c.get('dct:title', 'Zonder titel') }}</h3>
+                <h3 class="consent-title">{{ c.get('dct:title', t.consent_no_title) }}</h3>
                 <div class="consent-meta">
-                    <span>Ontvanger: <strong>{{ c._receiver }}</strong></span>
-                    <span>Doel: {{ c._purpose }}</span>
+                    <span>{{ t.consent_receiver }} <strong>{{ c._receiver }}</strong></span>
+                    <span>{{ t.consent_purpose }} {{ c._purpose }}</span>
                     {% if c._expiry_date %}
-                    <span>Geldig tot: {{ c._expiry_date }}</span>
+                    <span>{{ t.consent_valid_until }} {{ c._expiry_date }}</span>
                     {% endif %}
                 </div>
             </div>
             <div class="consent-item-actions">
-                <a href="{{ url_for('consent_detail', consent_id=c._id) }}" class="btn btn-sm btn-secondary">Bekijken</a>
+                <a href="{{ url_for('consent_detail', consent_id=c._id) }}" class="btn btn-sm btn-secondary">{{ t.consent_view }}</a>
                 {% if not bridge_mode and c._status.class == 'status-active' %}
-                <form action="{{ url_for('consent_withdraw', consent_id=c._id) }}" method="post" style="display:inline;" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt intrekken?')">
-                    <button type="submit" class="btn btn-sm" style="background: var(--color-secondary);">Intrekken</button>
+                <form action="{{ url_for('consent_withdraw', consent_id=c._id) }}" method="post" style="display:inline;" onsubmit="return confirm('{{ t.consent_confirm_withdraw }}')">
+                    <button type="submit" class="btn btn-sm" style="background: var(--color-secondary);">{{ t.consent_withdraw }}</button>
                 </form>
                 {% endif %}
                 {% if not bridge_mode %}
-                <form action="{{ url_for('consent_delete', consent_id=c._id) }}" method="post" style="display:inline;" onsubmit="return confirm('Weet je zeker dat je deze toestemming wilt verwijderen? Dit kan niet ongedaan worden gemaakt.')">
-                    <button type="submit" class="btn btn-sm btn-danger">Verwijderen</button>
+                <form action="{{ url_for('consent_delete', consent_id=c._id) }}" method="post" style="display:inline;" onsubmit="return confirm('{{ t.consent_confirm_delete }}')">
+                    <button type="submit" class="btn btn-sm btn-danger">{{ t.consent_delete }}</button>
                 </form>
                 {% endif %}
             </div>
@@ -52,10 +52,10 @@
     </div>
     {% else %}
     <div class="empty-state">
-        <p class="empty-state-title">Nog geen toestemmingen vastgelegd</p>
-        <p class="empty-state-sub">Leg vast wie toegang heeft tot jouw gegevens en waarom.</p>
+        <p class="empty-state-title">{{ t.consent_empty_title }}</p>
+        <p class="empty-state-sub">{{ t.consent_empty_sub }}</p>
         {% if not bridge_mode %}
-        <a href="{{ url_for('consent_new') }}" class="btn" style="margin-top: 12px;">{{ icon_plus() }} Eerste toestemming vastleggen</a>
+        <a href="{{ url_for('consent_new') }}" class="btn" style="margin-top: 12px;">{{ icon_plus() }} {{ t.consent_first }}</a>
         {% endif %}
     </div>
     {% endif %}
