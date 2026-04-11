@@ -33,6 +33,9 @@ MySolido is open source software that runs a personal data vault (Solid Pod) on 
 - **Intention module** — Create anonymous intentions ("I'm looking for car insurance") linked to your profile data. Foundation for the Intention Economy
 - **Consent requests** — External parties can request access to your data via the Bridge. You review, approve or reject — and choose exactly which data to share
 - **Crash reporting** — Optional, anonymous error reporting to help improve MySolido. No personal data is ever sent
+- **AI assistant** — Local RAG pipeline (Ollama + ChromaDB) that searches your documents. Hybrid mode available: local indexing + cloud API for answers. Your files never leave your PC during indexing
+- **Bilingual** — Full Dutch/English support, switchable in settings
+- **OCR** — Text recognition for scanned documents. Local (Tesseract) or cloud (Mistral OCR, EU)
 - **macOS support** — `.dmg` installer available, or manual installation via Terminal
 
 ---
@@ -111,6 +114,8 @@ python app.py
 Open <http://localhost:5000> in your browser.
 
 On first launch, MySolido automatically creates an account and pod.
+
+No login required — MySolido runs on your own PC. The Solid server on port 3000 is managed automatically; you only interact with port 5000.
 
 ### macOS
 
@@ -193,13 +198,15 @@ The data cannot be resold (enforced via ODRL policy). Watermarks make any leak t
 * Intention module — anonymous intentions linked to profile data
 * Consent requests — external parties can request data via the Bridge
 * Anonymous crash reporting — opt-in, no personal data sent
+* AI assistant — Local RAG pipeline (Ollama + ChromaDB) with optional hybrid mode (Claude API). Your files stay local
+* Bilingual interface — Full Dutch/English, switchable in settings
+* OCR — Local (Tesseract) or cloud (Mistral, EU) text recognition for scanned documents
+* Trust & Transparency page — mysolido.com/trust
 
 ### Planned
 
-* **AI assistant** — A local LLM that searches your vault, summarises documents, and reminds you of expiring policies — without cloud
 * **Marketplace** — Anonymous matching of intentions and offers (Intention Economy)
 * Per-folder encryption
-* OCR / document scanning
 * A4DS/UMA authorisation (role-based access)
 * EUDI Wallet / Jouw.id integration
 * API connections (government services, insurers, banks)

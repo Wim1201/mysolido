@@ -33,6 +33,9 @@ MySolido is open source software die een persoonlijke datakluis (Solid Pod) op j
 - **Intentiemodule** — Maak anonieme intenties aan ("Ik zoek een autoverzekering") gekoppeld aan je profieldata. Basis voor de Intention Economy
 - **Consent-verzoeken** — Externe partijen kunnen via de Bridge gegevens opvragen. Jij beoordeelt, keurt goed of wijst af — en kiest precies welke data je deelt
 - **Foutmeldingen** — Optionele, anonieme foutrapportage om MySolido te verbeteren. Er worden nooit persoonsgegevens verstuurd
+- **AI-assistent** — Lokale RAG-pipeline (Ollama + ChromaDB) die je documenten doorzoekt. Hybride modus beschikbaar: lokale indexering + cloud API voor antwoorden. Je bestanden verlaten nooit je pc tijdens indexering
+- **Tweetalig** — Volledige Nederlandse en Engelse interface, instelbaar via instellingen
+- **OCR** — Tekstherkenning voor gescande documenten. Lokaal (Tesseract) of cloud (Mistral OCR, EU)
 - **macOS ondersteuning** — `.dmg` installer beschikbaar, of handmatige installatie via Terminal
 
 ---
@@ -111,6 +114,8 @@ python app.py
 Open [http://localhost:5000](http://localhost:5000) in je browser.
 
 Bij eerste opstart maakt MySolido automatisch een account en pod aan.
+
+Er is geen login nodig — MySolido draait op je eigen pc. De Solid server op poort 3000 wordt automatisch beheerd; je werkt alleen via poort 5000.
 
 ### macOS
 
@@ -193,13 +198,15 @@ De gegevens mogen niet worden doorverkocht (afgedwongen via ODRL policy). Waterm
 * Intentiemodule — anonieme intenties gekoppeld aan profieldata
 * Consent-verzoeken — externe partijen kunnen via de Bridge gegevens opvragen
 * Anonieme foutmeldingen — opt-in, geen persoonsgegevens
+* AI-assistent — Lokale RAG-pipeline (Ollama + ChromaDB) met optionele hybride modus (Claude API). Je bestanden blijven lokaal
+* Tweetalige interface — Volledig Nederlands/Engels, instelbaar via instellingen
+* OCR — Lokaal (Tesseract) of cloud (Mistral, EU) tekstherkenning voor gescande documenten
+* Trust & Transparantie pagina — mysolido.com/trust
 
 ### Gepland
 
-* **AI-assistent** — Een lokale LLM die je kluis doorzoekt, documenten samenvat en je herinnert aan verlopende polissen — zonder cloud
 * **Marktplaats** — Anoniem matchen van intenties en aanbiedingen (Intention Economy)
 * Encryptie per map
-* OCR / documenten scannen
 * A4DS/UMA autorisatie (rolgebaseerde toegang)
 * EUDI Wallet / Jouw.id koppeling
 * API-koppelingen (MijnOverheid, verzekeraars, banken)

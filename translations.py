@@ -591,6 +591,9 @@ TRANSLATIONS = {
         "pd_smoking_yes": "Ja",
         "pd_smoking_no": "Nee",
         "pd_smoking_quit": "Gestopt",
+        "welcome_url_hint": "Bewaar dit adres als bladwijzer:",
+        "welcome_url": "http://localhost:5000",
+        "welcome_no_login": "Er is geen login nodig — MySolido draait op je eigen pc.",
     },
     "en": {
         "app_subtitle": "Your personal data vault",
@@ -1184,6 +1187,9 @@ TRANSLATIONS = {
         "pd_smoking_yes": "Yes",
         "pd_smoking_no": "No",
         "pd_smoking_quit": "Quit",
+        "welcome_url_hint": "Bookmark this address:",
+        "welcome_url": "http://localhost:5000",
+        "welcome_no_login": "No login required — MySolido runs on your own PC.",
     }
 }
 
