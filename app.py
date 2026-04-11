@@ -25,7 +25,7 @@ from share_links import (
     get_active_share_links, increment_download_count,
     check_password as check_share_password
 )
-from translations import get_translations
+from translations import get_translations, t as translate
 from sync_bridge import (
     is_configured as bridge_sync_configured,
     get_status as get_bridge_sync_status,
@@ -56,6 +56,16 @@ TEMP_DIR = os.path.join(PROJECT_DIR, 'temp')
 
 # Ensure temp directory exists
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+
+def flash_t(key, category='success', **kwargs):
+    """Flash een vertaalde melding"""
+    lang = session.get('language', 'nl')
+    translations = get_translations(lang)
+    text = translations.get(key, key)
+    if kwargs:
+        text = text.format(**kwargs)
+    flash(text, category)
 
 
 def is_watermark_enabled():
@@ -777,7 +787,7 @@ def check_bridge_mode():
     ]
 
     if request.endpoint in blocked_endpoints:
-        flash('Deze actie is niet beschikbaar via de Bridge. Gebruik je lokale MySolido.', 'error')
+        flash_t('flash_bridge_readonly', 'error')
         return redirect(request.referrer or url_for('index'))
 
 
@@ -848,7 +858,7 @@ def bridge_login():
             session['bridge_authenticated'] = True
             return redirect(url_for('index'))
         else:
-            flash('Onjuist wachtwoord', 'error')
+            flash_t('flash_wrong_password', 'error')
 
     return render_template('bridge_login.html')
 
@@ -865,11 +875,11 @@ def trigger_bridge_sync():
         abort(403)
 
     if not bridge_sync_configured():
-        flash('Bridge sync is niet geconfigureerd. Stel BRIDGE_HOST in je .env in.', 'error')
+        flash_t('flash_sync_not_configured', 'error')
         return redirect(url_for('profile'))
 
     sync_in_background()
-    flash('Synchronisatie gestart...', 'success')
+    flash_t('flash_sync_started')
     log_action('bridge_sync_triggered', {})
     return redirect(request.referrer or url_for('index'))
 
@@ -1113,7 +1123,7 @@ def browse_folder(folder_path):
         write_acl(s['resource_url'])
         display_webid = 'iedereen (openbaar)' if s['webid'] == 'public' else s['webid']
         resource_name = s['resource_url'].rstrip('/').split('/')[-1]
-        flash(f'Toegang van {display_webid} tot "{resource_name}" is verlopen en ingetrokken', 'success')
+        flash_t('flash_access_expired', 'success', webid=display_webid, name=resource_name)
         log_action('revoke_expired', {'resource': s.get('resource_path', ''), 'webid': s['webid']})
         add_notification('share_expired', f'Toegang van {display_webid} tot "{resource_name}" is verlopen')
 
@@ -1185,12 +1195,12 @@ def upload():
     folder_path = request.form.get('upload_folder', '').strip('/')
 
     if 'file' not in request.files:
-        flash('Geen bestand geselecteerd', 'error')
+        flash_t('flash_no_file_selected', 'error')
         return redirect_to_folder(folder_path)
 
     file = request.files['file']
     if file.filename == '':
-        flash('Geen bestand geselecteerd', 'error')
+        flash_t('flash_no_file_selected', 'error')
         return redirect_to_folder(folder_path)
 
     if folder_path:
@@ -1200,14 +1210,14 @@ def upload():
 
     try:
         if pod_write(relative_path, file.read()):
-            flash(f'"{file.filename}" succesvol geupload!', 'success')
+            flash_t('flash_upload_success', 'success', filename=file.filename)
             log_action('upload', {'file': file.filename, 'folder': folder_path or 'root'})
             auto_sync_after_change()
         else:
-            flash('Upload mislukt: kon bestand niet opslaan', 'error')
+            flash_t('flash_upload_failed_save', 'error')
     except Exception as e:
         send_crash_report("upload_failed", str(e), "bestand uploaden")
-        flash('Upload mislukt', 'error')
+        flash_t('flash_upload_failed', 'error')
 
     return redirect_to_folder(folder_path)
 
@@ -1219,7 +1229,7 @@ def delete():
     folder_path = request.form.get('folder_path', '').strip('/')
 
     if not resource_url:
-        flash('Geen resource opgegeven', 'error')
+        flash_t('flash_no_resource', 'error')
         return redirect_to_folder(folder_path)
 
     name = resource_url.rstrip('/').split('/')[-1]
@@ -1229,11 +1239,11 @@ def delete():
         # Folders: direct verwijderen (niet naar prullenbak)
         rel_path = url_to_relative_path(resource_url)
         if rel_path and pod_delete(rel_path):
-            flash(f'Map "{name}" verwijderd', 'success')
+            flash_t('flash_folder_deleted', 'success', name=name)
             log_action('delete', {'resource': name, 'folder': folder_path or 'root'})
             auto_sync_after_change()
         else:
-            flash('Verwijderen mislukt', 'error')
+            flash_t('flash_delete_failed', 'error')
         return redirect_to_folder(folder_path)
 
     # Files: verplaats naar prullenbak via filesystem
@@ -1243,12 +1253,12 @@ def delete():
     # Step 2: Read the file from filesystem
     rel_path = url_to_relative_path(resource_url)
     if not rel_path:
-        flash('Verwijderen mislukt: ongeldig pad', 'error')
+        flash_t('flash_delete_invalid_path', 'error')
         return redirect_to_folder(folder_path)
 
     src_path = safe_pod_path(rel_path)
     if not src_path or not os.path.isfile(src_path):
-        flash('Verwijderen mislukt: bestand niet gevonden', 'error')
+        flash_t('flash_delete_not_found', 'error')
         return redirect_to_folder(folder_path)
 
     # Step 3: Generate trash entry
@@ -1261,7 +1271,7 @@ def delete():
     # Step 4: Copy to _trash/
     dst_path = safe_pod_path(trash_rel_path)
     if not dst_path:
-        flash('Verplaatsen naar prullenbak mislukt', 'error')
+        flash_t('flash_trash_failed', 'error')
         return redirect_to_folder(folder_path)
 
     shutil.copy2(src_path, dst_path)
@@ -1273,7 +1283,7 @@ def delete():
     resource_path = folder_path + '/' + name if folder_path else name
     move_to_trash(resource_url, resource_path, name, folder_path or 'root', trash_url)
 
-    flash(f'"{name}" naar prullenbak verplaatst', 'success')
+    flash_t('flash_trash_success', 'success', name=name)
     log_action('trash', {'resource': name, 'folder': folder_path or 'root'})
     auto_sync_after_change()
     return redirect_to_folder(folder_path)
@@ -1287,7 +1297,7 @@ def create_folder_route():
 
     normalized = normalize_folder_name(folder_name)
     if not normalized:
-        flash('Ongeldige mapnaam', 'error')
+        flash_t('flash_invalid_folder_name', 'error')
         return redirect_to_folder(folder_path)
 
     if folder_path:
@@ -1296,15 +1306,15 @@ def create_folder_route():
         relative_path = normalized
 
     if pod_exists(relative_path):
-        flash(f'Map "{normalized}" bestaat al', 'error')
+        flash_t('flash_folder_exists', 'error', name=normalized)
         return redirect_to_folder(folder_path)
 
     if pod_mkdir(relative_path):
-        flash(f'Map "{normalized}" aangemaakt!', 'success')
+        flash_t('flash_folder_created', 'success', name=normalized)
         log_action('create_folder', {'name': normalized, 'path': folder_path or 'root'})
         auto_sync_after_change()
     else:
-        flash('Map aanmaken mislukt', 'error')
+        flash_t('flash_folder_create_failed', 'error')
 
     return redirect_to_folder(folder_path)
 
@@ -1318,7 +1328,7 @@ def move():
     filename = resource_url.rstrip('/').split('/')[-1]
 
     if not resource_url or not filename:
-        flash('Geen bestand opgegeven', 'error')
+        flash_t('flash_no_file_specified', 'error')
         return redirect_to_folder(folder_path)
 
     src_rel = url_to_relative_path(resource_url)
@@ -1328,25 +1338,25 @@ def move():
         dst_rel = filename
 
     if src_rel == dst_rel:
-        flash('Bestand staat al in deze map', 'error')
+        flash_t('flash_already_in_folder', 'error')
         return redirect_to_folder(folder_path)
 
     src_path = safe_pod_path(src_rel) if src_rel else None
     dst_path = safe_pod_path(dst_rel)
 
     if not src_path or not os.path.isfile(src_path):
-        flash('Verplaatsen mislukt: bestand niet gevonden', 'error')
+        flash_t('flash_move_not_found', 'error')
         return redirect_to_folder(folder_path)
 
     if not dst_path:
-        flash('Verplaatsen mislukt: ongeldig doelpad', 'error')
+        flash_t('flash_move_invalid_target', 'error')
         return redirect_to_folder(folder_path)
 
     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
     shutil.move(src_path, dst_path)
 
     target_label = target_folder if target_folder else 'Pod root'
-    flash(f'"{filename}" verplaatst naar {target_label}', 'success')
+    flash_t('flash_move_success', 'success', filename=filename, target=target_label)
     log_action('move', {'file': filename, 'from': folder_path or 'root', 'to': target_folder or 'root'})
     auto_sync_after_change()
     return redirect_to_folder(folder_path)
@@ -1404,7 +1414,7 @@ def view_file(file_path):
     """View a file inline in the browser via filesystem"""
     full_path = safe_pod_path(file_path)
     if not full_path or not os.path.isfile(full_path):
-        flash('Bestand kon niet worden geopend', 'error')
+        flash_t('flash_file_open_failed', 'error')
         return redirect(url_for('index'))
 
     filename = file_path.split('/')[-1]
@@ -1434,7 +1444,7 @@ def download_file(file_path):
     """Force download a file from the pod via filesystem"""
     full_path = safe_pod_path(file_path)
     if not full_path or not os.path.isfile(full_path):
-        flash('Bestand kon niet worden gedownload', 'error')
+        flash_t('flash_file_download_failed', 'error')
         return redirect(url_for('index'))
 
     filename = file_path.split('/')[-1]
@@ -1499,7 +1509,7 @@ def share():
     expires = request.form.get('expires', '').strip() or None
 
     if not resource_url:
-        flash('Geen resource opgegeven', 'error')
+        flash_t('flash_no_resource', 'error')
         return redirect_to_folder(folder_path)
 
     if access_level == 'public':
@@ -1513,7 +1523,7 @@ def share():
         modes = ['acl:Read']
 
     if not webid:
-        flash('Vul een WebID in of kies openbaar', 'error')
+        flash_t('flash_fill_webid', 'error')
         return redirect_to_folder(folder_path)
 
     try:
@@ -1522,11 +1532,11 @@ def share():
 
         resource_name = resource_url.rstrip('/').split('/')[-1]
         display_webid = 'iedereen (openbaar)' if webid == 'public' else webid
-        flash(f'"{resource_name}" gedeeld met {display_webid}', 'success')
+        flash_t('flash_share_success', 'success', name=resource_name, webid=display_webid)
         log_action('share', {'resource': resource_path, 'webid': webid, 'modes': modes})
     except Exception as e:
         send_crash_report("share_failed", str(e), "deellink aanmaken")
-        flash('Delen mislukt', 'error')
+        flash_t('flash_share_failed', 'error')
 
     return redirect_to_folder(folder_path)
 
@@ -1550,7 +1560,7 @@ def create_share_link_route():
 
     full_path = safe_pod_path(file_path)
     if not full_path or not os.path.isfile(full_path):
-        flash('Bestand niet gevonden', 'error')
+        flash_t('flash_file_not_found', 'error')
         return redirect(request.referrer or url_for('index'))
 
     link = create_share_link(file_path, file_name, expires_days, password)
@@ -1586,7 +1596,7 @@ def view_shared_file(token):
 
         password = request.form.get('password', '')
         if not check_share_password(password, link['password_hash']):
-            flash('Onjuist wachtwoord', 'error')
+            flash_t('flash_wrong_password', 'error')
             return render_template('share_password.html', token=token)
 
     full_path = safe_pod_path(link['file_path'])
@@ -1634,11 +1644,11 @@ def revoke_share_link():
     """Trek een deellink in"""
     link_id = request.form.get('link_id', '')
     if deactivate_share_link(link_id):
-        flash('Deellink ingetrokken', 'success')
+        flash_t('flash_link_revoked')
         log_action('share_link_revoked', {'link_id': link_id})
         auto_sync_after_change()
     else:
-        flash('Deellink niet gevonden', 'error')
+        flash_t('flash_link_not_found', 'error')
     return redirect(url_for('shares_overview'))
 
 
@@ -1650,7 +1660,7 @@ def revoke():
     resource_path = request.form.get('resource_path', '')
 
     if not resource_url or not webid:
-        flash('Ongeldige verzoek', 'error')
+        flash_t('flash_invalid_request', 'error')
         return redirect(url_for('shares_overview'))
 
     remove_share(resource_url, webid)
@@ -1658,7 +1668,7 @@ def revoke():
 
     resource_name = resource_url.rstrip('/').split('/')[-1]
     display_webid = 'iedereen (openbaar)' if webid == 'public' else webid
-    flash(f'Toegang van {display_webid} tot "{resource_name}" ingetrokken', 'success')
+    flash_t('flash_access_revoked', 'success', webid=display_webid, name=resource_name)
     log_action('revoke', {'resource': resource_path, 'webid': webid})
 
     return redirect(url_for('shares_overview'))
@@ -1697,7 +1707,7 @@ def trash_restore():
 
     entry = restore_from_trash(trash_id)
     if not entry:
-        flash('Item niet gevonden in prullenbak', 'error')
+        flash_t('flash_trash_item_not_found', 'error')
         return redirect(url_for('trash_overview'))
 
     # Move from _trash/ back to original location via filesystem
@@ -1705,24 +1715,24 @@ def trash_restore():
     orig_rel = url_to_relative_path(entry['resource_url'])
 
     if not trash_rel or not orig_rel:
-        flash('Herstellen mislukt: ongeldig pad', 'error')
+        flash_t('flash_restore_invalid_path', 'error')
         return redirect(url_for('trash_overview'))
 
     trash_path = safe_pod_path(trash_rel)
     orig_path = safe_pod_path(orig_rel)
 
     if not trash_path or not os.path.isfile(trash_path):
-        flash('Herstellen mislukt: bestand niet gevonden in prullenbak', 'error')
+        flash_t('flash_restore_not_found', 'error')
         return redirect(url_for('trash_overview'))
 
     if not orig_path:
-        flash('Herstellen mislukt: ongeldig doelpad', 'error')
+        flash_t('flash_restore_invalid_target', 'error')
         return redirect(url_for('trash_overview'))
 
     os.makedirs(os.path.dirname(orig_path), exist_ok=True)
     shutil.move(trash_path, orig_path)
 
-    flash(f'"{entry["filename"]}" hersteld naar {entry.get("original_folder", "originele locatie")}', 'success')
+    flash_t('flash_restore_success', 'success', filename=entry["filename"], folder=entry.get("original_folder", translate("flash_original_location")))
     log_action('restore', {'file': entry['filename'], 'to': entry.get('original_folder', '')})
     return redirect(url_for('trash_overview'))
 
@@ -1734,7 +1744,7 @@ def trash_permanent_delete():
 
     entry = permanent_delete(trash_id)
     if not entry:
-        flash('Item niet gevonden in prullenbak', 'error')
+        flash_t('flash_trash_item_not_found', 'error')
         return redirect(url_for('trash_overview'))
 
     # Delete from pod _trash/ via filesystem
@@ -1742,7 +1752,7 @@ def trash_permanent_delete():
     if rel_path:
         pod_delete(rel_path)
 
-    flash(f'"{entry["filename"]}" definitief verwijderd', 'success')
+    flash_t('flash_permanent_delete', 'success', filename=entry["filename"])
     log_action('permanent_delete', {'file': entry['filename']})
     return redirect(url_for('trash_overview'))
 
@@ -1847,7 +1857,7 @@ def change_bridge_password():
     new_password = request.form.get('new_password', '').strip()
 
     if len(new_password) < 8:
-        flash('Wachtwoord moet minimaal 8 tekens zijn', 'error')
+        flash_t('flash_password_too_short', 'error')
         return redirect(url_for('profile'))
 
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
@@ -1872,7 +1882,7 @@ def change_bridge_password():
         load_dotenv(env_path, override=True)
         os.environ['BRIDGE_PASSWORD'] = hashed
 
-    flash('Bridge-wachtwoord gewijzigd', 'success')
+    flash_t('flash_password_changed')
     log_action('bridge_password_changed', {})
     return redirect(url_for('profile'))
 
@@ -1920,7 +1930,7 @@ def update_env(env_path, key, value):
 def toggle_watermark():
     """Toggle watermark setting in .env"""
     if BRIDGE_MODE:
-        flash('Niet beschikbaar in Bridge-modus', 'error')
+        flash_t('flash_not_available_bridge', 'error')
         return redirect(url_for('settings'))
 
     enabled = 'true' if request.form.get('enabled') == 'true' else 'false'
@@ -1947,8 +1957,7 @@ def toggle_watermark():
     # Reload env so the change takes effect immediately
     os.environ['WATERMARK_ENABLED'] = enabled
 
-    status = 'ingeschakeld' if enabled == 'true' else 'uitgeschakeld'
-    flash(f'Watermerken {status}', 'success')
+    flash_t('flash_watermark_status', 'success', status=translate('flash_watermark_on') if enabled == 'true' else translate('flash_watermark_off'))
     return redirect(url_for('settings'))
 
 
@@ -1956,7 +1965,7 @@ def toggle_watermark():
 def toggle_crash_reporting():
     """Toggle anonymous crash reporting setting in .env"""
     if BRIDGE_MODE:
-        flash('Niet beschikbaar in Bridge-modus', 'error')
+        flash_t('flash_not_available_bridge', 'error')
         return redirect(url_for('settings'))
 
     enabled = 'true' if request.form.get('enabled') == 'true' else 'false'
@@ -1982,8 +1991,7 @@ def toggle_crash_reporting():
 
     os.environ['CRASH_REPORTING'] = enabled
 
-    status = 'ingeschakeld' if enabled == 'true' else 'uitgeschakeld'
-    flash(f'Foutmeldingen {status}', 'success')
+    flash_t('flash_crash_status', 'success', status=translate('flash_watermark_on') if enabled == 'true' else translate('flash_watermark_off'))
     return redirect(url_for('settings'))
 
 
@@ -1997,14 +2005,14 @@ def change_ai_provider():
     api_key = request.form.get('anthropic_api_key', '').strip()
 
     if provider not in ('local', 'hybrid'):
-        flash('Ongeldige keuze', 'error')
+        flash_t('flash_invalid_choice', 'error')
         return redirect(url_for('settings'))
 
     if provider == 'hybrid' and not api_key:
         # Check of er al een key in env staat
         existing_key = os.environ.get('ANTHROPIC_API_KEY', '')
         if not existing_key:
-            flash('Voer een API-key in om de hybride modus te gebruiken', 'error')
+            flash_t('flash_api_key_required', 'error')
             return redirect(url_for('settings'))
 
     env_path = os.path.join(PROJECT_DIR, '.env')
@@ -2024,7 +2032,7 @@ def change_ai_provider():
         ai_service.ANTHROPIC_API_KEY = api_key
 
     label = 'Lokaal (Ollama)' if provider == 'local' else 'Hybride (Claude API)'
-    flash(f'AI-provider ingesteld op {label}', 'success')
+    flash_t('flash_ai_provider_set', 'success', label=label)
     return redirect(url_for('settings'))
 
 
@@ -2038,13 +2046,13 @@ def change_ocr_provider():
     api_key = request.form.get('mistral_api_key', '').strip()
 
     if provider not in ('local', 'mistral'):
-        flash('Ongeldige keuze', 'error')
+        flash_t('flash_invalid_choice', 'error')
         return redirect(url_for('settings'))
 
     if provider == 'mistral' and not api_key:
         existing_key = os.environ.get('MISTRAL_API_KEY', '')
         if not existing_key:
-            flash('Voer een Mistral API-key in om Cloud OCR te gebruiken' if session.get('language', 'nl') == 'nl' else 'Enter a Mistral API key to use Cloud OCR', 'error')
+            flash_t('flash_mistral_key_required', 'error')
             return redirect(url_for('settings'))
 
     env_path = os.path.join(PROJECT_DIR, '.env')
@@ -2062,7 +2070,7 @@ def change_ocr_provider():
         ai_service.MISTRAL_API_KEY = api_key
 
     label = 'Lokaal (Tesseract)' if provider == 'local' else 'Mistral OCR (EU)'
-    flash(f'OCR-provider ingesteld op {label}', 'success')
+    flash_t('flash_ocr_provider_set', 'success', label=label)
     return redirect(url_for('settings'))
 
 
@@ -2084,7 +2092,7 @@ def export_backup():
                     arcname = os.path.relpath(full_path, pod_path).replace('\\', '/')
                     zf.write(full_path, arcname)
     except Exception as e:
-        flash(f'Backup mislukt: {e}', 'error')
+        flash_t('flash_backup_failed', 'error', error=str(e))
         return redirect(url_for('settings'))
 
     buffer.seek(0)
@@ -2136,17 +2144,17 @@ def _do_init_folders(welcome=False):
         if pod_mkdir(folder):
             created.append(folder)
         else:
-            flash(f'Map "{folder}" aanmaken mislukt', 'error')
+            flash_t('flash_folder_init_failed', 'error', folder=folder)
 
     if welcome and created:
-        flash('Je kluis is ingericht! Upload je eerste document.', 'success')
+        flash_t('flash_vault_ready')
     else:
         if created:
             flash(f'{len(created)} mappen aangemaakt: {", ".join(created)}', 'success')
         if skipped:
             flash(f'{len(skipped)} mappen bestonden al: {", ".join(skipped)}', 'success')
         if not created and not skipped:
-            flash('Geen mappen aangemaakt', 'error')
+            flash_t('flash_no_folders_created', 'error')
 
     return redirect(url_for('index'))
 
@@ -2328,13 +2336,13 @@ def init_default_policies():
 def edit_policy(folder_path):
     """View and edit the ODRL policy for a container"""
     if BRIDGE_MODE:
-        flash('Niet beschikbaar in Bridge-modus', 'error')
+        flash_t('flash_not_available_bridge', 'error')
         return redirect(url_for('index'))
 
     folder_path = folder_path.strip('/')
     full_path = safe_pod_path(folder_path)
     if not full_path or not os.path.isdir(full_path):
-        flash('Map niet gevonden', 'error')
+        flash_t('flash_folder_not_found', 'error')
         return redirect(url_for('index'))
 
     folder_name = folder_path.split('/')[-1] if '/' in folder_path else folder_path
@@ -2345,7 +2353,7 @@ def edit_policy(folder_path):
         policy_file = os.path.join(full_path, '.policy.jsonld')
         with open(policy_file, 'w', encoding='utf-8') as f:
             _json.dump(policy, f, indent=4, ensure_ascii=False)
-        flash(f'Policy bijgewerkt voor {folder_name}', 'success')
+        flash_t('flash_policy_updated', 'success', name=folder_name)
         log_action('policy_update', {'folder': folder_path, 'rule': rule})
         return redirect(url_for('edit_policy', folder_path=folder_path))
 
@@ -2493,7 +2501,7 @@ def consent_list():
 def consent_new():
     """Create a new consent record"""
     if BRIDGE_MODE:
-        flash('Niet beschikbaar in Bridge-modus', 'error')
+        flash_t('flash_not_available_bridge', 'error')
         return redirect(url_for('index'))
 
     if request.method == 'POST':
@@ -2506,7 +2514,7 @@ def consent_new():
         note = request.form.get('note', '').strip()
 
         if not title or not receiver:
-            flash('Titel en ontvanger zijn verplicht', 'error')
+            flash_t('flash_title_receiver_required', 'error')
             return redirect(url_for('consent_new'))
 
         consent_id = generate_consent_id()
@@ -2559,10 +2567,10 @@ def consent_new():
             fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
             with open(fpath, 'w', encoding='utf-8') as f:
                 _json.dump(record, f, indent=4, ensure_ascii=False)
-            flash(f'Toestemming "{title}" vastgelegd', 'success')
+            flash_t('flash_consent_saved', 'success', title=title)
             log_action('consent_create', {'title': title, 'receiver': receiver})
         else:
-            flash('Toestemmingen-map niet gevonden', 'error')
+            flash_t('flash_consent_folder_not_found', 'error')
 
         return redirect(url_for('consent_list'))
 
@@ -2577,12 +2585,12 @@ def consent_detail(consent_id):
     """View a single consent record"""
     consent_dir = get_consent_dir()
     if not consent_dir:
-        flash('Toestemmingen-map niet gevonden', 'error')
+        flash_t('flash_consent_folder_not_found', 'error')
         return redirect(url_for('consent_list'))
 
     fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Toestemming niet gevonden', 'error')
+        flash_t('flash_consent_not_found', 'error')
         return redirect(url_for('consent_list'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
@@ -2598,17 +2606,17 @@ def consent_detail(consent_id):
 def consent_withdraw(consent_id):
     """Withdraw a consent record"""
     if BRIDGE_MODE:
-        flash('Niet beschikbaar in Bridge-modus', 'error')
+        flash_t('flash_not_available_bridge', 'error')
         return redirect(url_for('consent_list'))
 
     consent_dir = get_consent_dir()
     if not consent_dir:
-        flash('Toestemmingen-map niet gevonden', 'error')
+        flash_t('flash_consent_folder_not_found', 'error')
         return redirect(url_for('consent_list'))
 
     fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Toestemming niet gevonden', 'error')
+        flash_t('flash_consent_not_found', 'error')
         return redirect(url_for('consent_list'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
@@ -2621,7 +2629,7 @@ def consent_withdraw(consent_id):
         _json.dump(record, f, indent=4, ensure_ascii=False)
 
     title = record.get('dct:title', consent_id)
-    flash(f'Toestemming "{title}" ingetrokken', 'success')
+    flash_t('flash_consent_withdrawn', 'success', title=title)
     log_action('consent_withdraw', {'id': consent_id, 'title': title})
     return redirect(url_for('consent_list'))
 
@@ -2630,21 +2638,21 @@ def consent_withdraw(consent_id):
 def consent_delete(consent_id):
     """Delete a consent record"""
     if BRIDGE_MODE:
-        flash('Niet beschikbaar in Bridge-modus', 'error')
+        flash_t('flash_not_available_bridge', 'error')
         return redirect(url_for('consent_list'))
 
     consent_dir = get_consent_dir()
     if not consent_dir:
-        flash('Toestemmingen-map niet gevonden', 'error')
+        flash_t('flash_consent_folder_not_found', 'error')
         return redirect(url_for('consent_list'))
 
     fpath = os.path.join(consent_dir, f"{consent_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Toestemming niet gevonden', 'error')
+        flash_t('flash_consent_not_found', 'error')
         return redirect(url_for('consent_list'))
 
     os.remove(fpath)
-    flash('Toestemming verwijderd', 'success')
+    flash_t('flash_consent_deleted')
     log_action('consent_delete', {'id': consent_id})
     return redirect(url_for('consent_list'))
 
@@ -2786,7 +2794,7 @@ def profiel_data_save():
         pod_write('profiel/.policy.jsonld',
                   _json.dumps(policy, indent=2, ensure_ascii=False))
 
-    flash('Profielgegevens opgeslagen', 'success')
+    flash_t('flash_profile_saved')
     return redirect(url_for('profiel_data'))
 
 
@@ -3053,7 +3061,7 @@ def intenties_overview():
 def intentie_new():
     """Create a new intention"""
     if BRIDGE_MODE:
-        flash('Niet beschikbaar in Bridge-modus', 'error')
+        flash_t('flash_not_available_bridge', 'error')
         return redirect(url_for('intenties_overview'))
 
     if request.method == 'POST':
@@ -3062,7 +3070,7 @@ def intentie_new():
         validity = request.form.get('validity', '1m')
 
         if not description:
-            flash('Omschrijving is verplicht', 'error')
+            flash_t('flash_description_required', 'error')
             return redirect(url_for('intentie_new'))
 
         cat_info = INTENTION_CATEGORIES.get(category, INTENTION_CATEGORIES['anders'])
@@ -3108,7 +3116,7 @@ def intentie_new():
                   _json.dumps(record, indent=2, ensure_ascii=False))
         ensure_intenties_policy()
 
-        flash(f'Intentie "{cat_info["label"]}" opgeslagen als concept', 'success')
+        flash_t('flash_intention_saved', 'success', label=cat_info["label"])
         log_action('intention_create', {'id': intention_id, 'category': category})
         return redirect(url_for('intenties_overview'))
 
@@ -3128,12 +3136,12 @@ def intentie_detail(intention_id):
     """View a single intention"""
     intenties_dir = get_intenties_dir()
     if not intenties_dir:
-        flash('Intenties-map niet gevonden', 'error')
+        flash_t('flash_intentions_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Intentie niet gevonden', 'error')
+        flash_t('flash_intention_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
@@ -3165,12 +3173,12 @@ def intentie_activate(intention_id):
 
     intenties_dir = get_intenties_dir()
     if not intenties_dir:
-        flash('Intenties-map niet gevonden', 'error')
+        flash_t('flash_intentions_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Intentie niet gevonden', 'error')
+        flash_t('flash_intention_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
@@ -3180,7 +3188,7 @@ def intentie_activate(intention_id):
     with open(fpath, 'w', encoding='utf-8') as f:
         _json.dump(record, f, indent=2, ensure_ascii=False)
 
-    flash('Intentie geactiveerd', 'success')
+    flash_t('flash_intention_activated')
     log_action('intention_activate', {'id': intention_id})
     return redirect(url_for('intentie_detail', intention_id=intention_id))
 
@@ -3193,12 +3201,12 @@ def intentie_withdraw(intention_id):
 
     intenties_dir = get_intenties_dir()
     if not intenties_dir:
-        flash('Intenties-map niet gevonden', 'error')
+        flash_t('flash_intentions_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Intentie niet gevonden', 'error')
+        flash_t('flash_intention_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
@@ -3208,7 +3216,7 @@ def intentie_withdraw(intention_id):
     with open(fpath, 'w', encoding='utf-8') as f:
         _json.dump(record, f, indent=2, ensure_ascii=False)
 
-    flash('Intentie ingetrokken', 'success')
+    flash_t('flash_intention_withdrawn')
     log_action('intention_withdraw', {'id': intention_id})
     return redirect(url_for('intentie_detail', intention_id=intention_id))
 
@@ -3221,16 +3229,16 @@ def intentie_delete(intention_id):
 
     intenties_dir = get_intenties_dir()
     if not intenties_dir:
-        flash('Intenties-map niet gevonden', 'error')
+        flash_t('flash_intentions_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Intentie niet gevonden', 'error')
+        flash_t('flash_intention_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
     os.remove(fpath)
-    flash('Intentie verwijderd', 'success')
+    flash_t('flash_intention_deleted')
     log_action('intention_delete', {'id': intention_id})
     return redirect(url_for('intenties_overview'))
 
@@ -3377,7 +3385,7 @@ def verzoek_submit():
     # Rate limiting
     client_ip = request.remote_addr or 'unknown'
     if is_rate_limited(client_ip):
-        flash('Te veel verzoeken. Probeer het later opnieuw.', 'error')
+        flash_t('flash_rate_limit', 'error')
         return redirect(url_for('verzoek_formulier'))
 
     name = sanitize_input(request.form.get('name', ''))
@@ -3390,20 +3398,20 @@ def verzoek_submit():
 
     # Validation
     if not name or not email or not purpose:
-        flash('Naam, e-mailadres en toelichting zijn verplicht.', 'error')
+        flash_t('flash_required_fields', 'error')
         return redirect(url_for('verzoek_formulier'))
 
     if not agreed:
-        flash('U moet akkoord gaan met de voorwaarden.', 'error')
+        flash_t('flash_agree_terms', 'error')
         return redirect(url_for('verzoek_formulier'))
 
     if not requested_data:
-        flash('Selecteer ten minste één gegevensgroep.', 'error')
+        flash_t('flash_select_data', 'error')
         return redirect(url_for('verzoek_formulier'))
 
     # Basic email validation
     if '@' not in email or '.' not in email:
-        flash('Voer een geldig e-mailadres in.', 'error')
+        flash_t('flash_invalid_email', 'error')
         return redirect(url_for('verzoek_formulier'))
 
     cat_info = REQUEST_CATEGORIES.get(category, REQUEST_CATEGORIES['anders'])
@@ -3553,12 +3561,12 @@ def verzoek_detail_owner(request_id):
 
     verzoeken_dir = get_verzoeken_dir()
     if not verzoeken_dir:
-        flash('Verzoeken-map niet gevonden', 'error')
+        flash_t('flash_requests_not_found', 'error')
         return redirect(url_for('verzoeken_overview'))
 
     fpath = os.path.join(verzoeken_dir, f"{request_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Verzoek niet gevonden', 'error')
+        flash_t('flash_request_not_found', 'error')
         return redirect(url_for('verzoeken_overview'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
@@ -3586,12 +3594,12 @@ def verzoek_approve(request_id):
 
     verzoeken_dir = get_verzoeken_dir()
     if not verzoeken_dir:
-        flash('Verzoeken-map niet gevonden', 'error')
+        flash_t('flash_requests_not_found', 'error')
         return redirect(url_for('verzoeken_overview'))
 
     fpath = os.path.join(verzoeken_dir, f"{request_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Verzoek niet gevonden', 'error')
+        flash_t('flash_request_not_found', 'error')
         return redirect(url_for('verzoeken_overview'))
 
     try:
@@ -3604,7 +3612,7 @@ def verzoek_approve(request_id):
         val_info = APPROVAL_VALIDITY.get(validity_key, APPROVAL_VALIDITY['1w'])
 
         if not approved_groups:
-            flash('Selecteer ten minste één gegevensgroep om te delen.', 'error')
+            flash_t('flash_select_data_share', 'error')
             return redirect(url_for('verzoek_detail_owner', request_id=request_id))
 
         # Build response data with only approved profile groups
@@ -3643,7 +3651,7 @@ def verzoek_approve(request_id):
         requester_org = requester.get('schema:worksFor', '')
         receiver_label = f"{requester_name} ({requester_org})" if requester_org else requester_name
 
-        flash(f'Verzoek van {receiver_label} goedgekeurd.', 'success')
+        flash_t('flash_request_approved', 'success', name=receiver_label)
         log_action('request_approve', {
             'id': request_id,
             'requester': requester_name,
@@ -3654,7 +3662,7 @@ def verzoek_approve(request_id):
 
     except Exception as e:
         send_crash_report("approval_failed", str(e), "verzoek goedkeuren")
-        flash('Goedkeuren mislukt', 'error')
+        flash_t('flash_approve_failed', 'error')
         return redirect(url_for('verzoeken_overview'))
 
 
@@ -3666,12 +3674,12 @@ def verzoek_reject(request_id):
 
     verzoeken_dir = get_verzoeken_dir()
     if not verzoeken_dir:
-        flash('Verzoeken-map niet gevonden', 'error')
+        flash_t('flash_requests_not_found', 'error')
         return redirect(url_for('verzoeken_overview'))
 
     fpath = os.path.join(verzoeken_dir, f"{request_id}.jsonld")
     if not os.path.exists(fpath):
-        flash('Verzoek niet gevonden', 'error')
+        flash_t('flash_request_not_found', 'error')
         return redirect(url_for('verzoeken_overview'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
@@ -3687,7 +3695,7 @@ def verzoek_reject(request_id):
 
     requester = record.get('mysolido:requester', {})
     requester_name = requester.get('schema:name', 'Onbekend')
-    flash(f'Verzoek van {requester_name} afgewezen.', 'success')
+    flash_t('flash_request_rejected', 'success', name=requester_name)
     log_action('request_reject', {'id': request_id, 'requester': requester_name})
     return redirect(url_for('verzoeken_overview'))
 
@@ -3799,9 +3807,9 @@ def crash_report_delete(filename):
 
     if os.path.exists(fpath) and os.path.dirname(os.path.abspath(fpath)) == os.path.abspath(crash_dir):
         os.remove(fpath)
-        flash('Rapport verwijderd', 'success')
+        flash_t('flash_report_deleted')
     else:
-        flash('Rapport niet gevonden', 'error')
+        flash_t('flash_report_not_found', 'error')
 
     return redirect(url_for('crash_reports_overview'))
 
