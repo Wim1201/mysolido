@@ -111,6 +111,13 @@ goto :wait_flask
 echo   [OK] MySolido draait
 echo.
 
+:: Eerste-keer setup: standaardmappen aanmaken als pod nog leeg is
+if not exist ".data\mysolido" (
+    echo   [SETUP] Eerste keer — standaardmappen aanmaken...
+    powershell -command "try { Invoke-WebRequest -Uri 'http://127.0.0.1:5000/init-folders' -UseBasicParsing -TimeoutSec 15 | Out-Null } catch {}" >nul 2>nul
+    timeout /t 3 /nobreak >nul
+)
+
 :: Open browser
 echo   Browser wordt geopend...
 start http://localhost:5000

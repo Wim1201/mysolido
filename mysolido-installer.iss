@@ -4,8 +4,8 @@
 
 [Setup]
 AppName=MySolido
-AppVersion=1.2.0
-AppVerName=MySolido 1.2.0
+AppVersion=1.3.0
+AppVerName=MySolido 1.3.0
 AppPublisher=MySolido
 AppPublisherURL=https://mysolido.com
 AppSupportURL=https://github.com/Wim1201/mysolido/issues
@@ -42,6 +42,7 @@ Source: "trash.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "notifications.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "sync_bridge.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "watermark.py"; DestDir: "{app}"; Flags: ignoreversion
+Source: "translations.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "ai_service.py"; DestDir: "{app}"; Flags: ignoreversion
 Source: "requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "package.json"; DestDir: "{app}"; Flags: ignoreversion
