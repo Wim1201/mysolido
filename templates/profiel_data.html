@@ -43,7 +43,7 @@
                 <label for="housing_type">{{ t.pd_ownership }}</label>
                 <select name="housing_type" id="housing_type" class="form-input" {% if read_only %}disabled{% endif %}>
                     <option value="">{{ t.pd_choose }}</option>
-                    {% for val, label in [('huur','Huur'), ('koop','Koop'), ('anders','Anders')] %}
+                    {% for val, label in [('huur', t.pd_rent), ('koop', t.pd_buy), ('anders', t.pd_other)] %}
                     <option value="{{ val }}" {% if data.get('pd:HousingOwnership') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -52,7 +52,7 @@
                 <label for="housing_kind">{{ t.pd_housing_type }}</label>
                 <select name="housing_kind" id="housing_kind" class="form-input" {% if read_only %}disabled{% endif %}>
                     <option value="">{{ t.pd_choose }}</option>
-                    {% for val, label in [('appartement','Appartement'), ('tussenwoning','Tussenwoning'), ('hoekwoning','Hoekwoning'), ('vrijstaand','Vrijstaand'), ('anders','Anders')] %}
+                    {% for val, label in [('appartement', t.pd_apartment), ('tussenwoning', t.pd_terraced), ('hoekwoning', t.pd_corner), ('vrijstaand', t.pd_detached), ('anders', t.pd_other)] %}
                     <option value="{{ val }}" {% if data.get('mysolido:housingType') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -83,7 +83,7 @@
                 {% for child in children %}
                 <div class="dynamic-item">
                     <select name="child_age[]" class="form-input" {% if read_only %}disabled{% endif %}>
-                        {% for val, label in [('0-4','0 – 4 jaar'), ('5-12','5 – 12 jaar'), ('13-17','13 – 17 jaar'), ('18+','18+ jaar')] %}
+                        {% for val, label in [('0-4', t.pd_age_0_4), ('5-12', t.pd_age_5_12), ('13-17', t.pd_age_13_17), ('18+', t.pd_age_18plus)] %}
                         <option value="{{ val }}" {% if child.get('ageCategory') == val %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
@@ -110,7 +110,7 @@
                 <label for="vehicle_type">{{ t.pd_vehicle_type }}</label>
                 <select name="vehicle_type" id="vehicle_type" class="form-input" {% if read_only %}disabled{% endif %}>
                     <option value="">{{ t.pd_choose }}</option>
-                    {% for val, label in [('auto','Auto'), ('motor','Motor'), ('scooter','Scooter'), ('fiets','Fiets'), ('geen','Geen')] %}
+                    {% for val, label in [('auto', t.pd_car), ('motor', t.pd_motorcycle), ('scooter', t.pd_scooter), ('fiets', t.pd_bicycle), ('geen', t.pd_none)] %}
                     <option value="{{ val }}" {% if vehicle.get('type') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -119,7 +119,7 @@
                 <label for="vehicle_fuel">{{ t.pd_vehicle_fuel }}</label>
                 <select name="vehicle_fuel" id="vehicle_fuel" class="form-input" {% if read_only %}disabled{% endif %}>
                     <option value="">{{ t.pd_choose }}</option>
-                    {% for val, label in [('benzine','Benzine'), ('diesel','Diesel'), ('elektrisch','Elektrisch'), ('hybride','Hybride'), ('nvt','N.v.t.')] %}
+                    {% for val, label in [('benzine', t.pd_petrol), ('diesel', t.pd_diesel), ('elektrisch', t.pd_electric), ('hybride', t.pd_hybrid_fuel), ('nvt', t.pd_na)] %}
                     <option value="{{ val }}" {% if vehicle.get('fuel') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -142,7 +142,7 @@
                 <div class="dynamic-item-fields">
                     <select name="ins_type[]" class="form-input" {% if read_only %}disabled{% endif %}>
                         <option value="">{{ t.pd_choose }}</option>
-                        {% for val, label in [('zorg','Zorgverzekering'), ('auto','Autoverzekering'), ('woning','Woonverzekering'), ('reis','Reisverzekering'), ('aansprakelijkheid','Aansprakelijkheid'), ('rechtsbijstand','Rechtsbijstand'), ('anders','Anders')] %}
+                        {% for val, label in [('zorg', t.pd_ins_health), ('auto', t.pd_ins_car), ('woning', t.pd_ins_home), ('reis', t.pd_ins_travel), ('aansprakelijkheid', t.pd_ins_liability), ('rechtsbijstand', t.pd_ins_legal), ('anders', t.pd_other)] %}
                         <option value="{{ val }}" {% if ins.get('type') == val %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
@@ -173,7 +173,7 @@
                 <label for="work_sector">{{ t.pd_sector }}</label>
                 <select name="work_sector" id="work_sector" class="form-input" {% if read_only %}disabled{% endif %}>
                     <option value="">{{ t.pd_choose }}</option>
-                    {% for val, label in [('ict','ICT'), ('zorg','Zorg'), ('onderwijs','Onderwijs'), ('bouw','Bouw'), ('overheid','Overheid'), ('financieel','Financieel'), ('retail','Retail'), ('anders','Anders')] %}
+                    {% for val, label in [('ict', t.pd_sector_ict), ('zorg', t.pd_sector_healthcare), ('onderwijs', t.pd_sector_education), ('bouw', t.pd_sector_construction), ('overheid', t.pd_sector_government), ('financieel', t.pd_sector_finance), ('retail', t.pd_sector_retail), ('anders', t.pd_other)] %}
                     <option value="{{ val }}" {% if occupation.get('sector') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -182,7 +182,7 @@
                 <label for="employment_type">{{ t.pd_employment }}</label>
                 <select name="employment_type" id="employment_type" class="form-input" {% if read_only %}disabled{% endif %}>
                     <option value="">{{ t.pd_choose }}</option>
-                    {% for val, label in [('loondienst','Loondienst'), ('zzp','ZZP'), ('ondernemer','Ondernemer'), ('gepensioneerd','Gepensioneerd'), ('student','Student'), ('anders','Anders')] %}
+                    {% for val, label in [('loondienst', t.pd_employed), ('zzp', t.pd_freelance), ('ondernemer', t.pd_entrepreneur), ('gepensioneerd', t.pd_retired), ('student', t.pd_student), ('anders', t.pd_other)] %}
                     <option value="{{ val }}" {% if occupation.get('employmentType') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -201,7 +201,7 @@
                 <label for="smoking">{{ t.pd_smoking }}</label>
                 <select name="smoking" id="smoking" class="form-input" {% if read_only %}disabled{% endif %}>
                     <option value="">{{ t.pd_choose }}</option>
-                    {% for val, label in [('ja','Ja'), ('nee','Nee'), ('gestopt','Gestopt')] %}
+                    {% for val, label in [('ja', t.pd_smoking_yes), ('nee', t.pd_smoking_no), ('gestopt', t.pd_smoking_quit)] %}
                     <option value="{{ val }}" {% if health.get('smokingStatus') == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -226,15 +226,32 @@
 
 {% block scripts %}
 <script>
+const T = {
+    pd_choose: {{ t.pd_choose | tojson }},
+    pd_remove: {{ t.pd_remove | tojson }},
+    pd_provider: {{ t.pd_provider | tojson }},
+    pd_age_0_4: {{ t.pd_age_0_4 | tojson }},
+    pd_age_5_12: {{ t.pd_age_5_12 | tojson }},
+    pd_age_13_17: {{ t.pd_age_13_17 | tojson }},
+    pd_age_18plus: {{ t.pd_age_18plus | tojson }},
+    pd_ins_health: {{ t.pd_ins_health | tojson }},
+    pd_ins_car: {{ t.pd_ins_car | tojson }},
+    pd_ins_home: {{ t.pd_ins_home | tojson }},
+    pd_ins_travel: {{ t.pd_ins_travel | tojson }},
+    pd_ins_liability: {{ t.pd_ins_liability | tojson }},
+    pd_ins_legal: {{ t.pd_ins_legal | tojson }},
+    pd_other: {{ t.pd_other | tojson }},
+};
+
 function addChild() {
     var html = '<div class="dynamic-item">' +
         '<select name="child_age[]" class="form-input">' +
-        '<option value="0-4">0 – 4 jaar</option>' +
-        '<option value="5-12">5 – 12 jaar</option>' +
-        '<option value="13-17">13 – 17 jaar</option>' +
-        '<option value="18+">18+ jaar</option>' +
+        '<option value="0-4">' + T.pd_age_0_4 + '</option>' +
+        '<option value="5-12">' + T.pd_age_5_12 + '</option>' +
+        '<option value="13-17">' + T.pd_age_13_17 + '</option>' +
+        '<option value="18+">' + T.pd_age_18plus + '</option>' +
         '</select>' +
-        '<button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="Verwijder">&times;</button>' +
+        '<button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="' + T.pd_remove + '">&times;</button>' +
         '</div>';
     document.getElementById('children-container').insertAdjacentHTML('beforeend', html);
 }
@@ -243,19 +260,19 @@ function addInsurance() {
     var html = '<div class="dynamic-item insurance-item">' +
         '<div class="dynamic-item-fields">' +
         '<select name="ins_type[]" class="form-input">' +
-        '<option value="">— kies —</option>' +
-        '<option value="zorg">Zorgverzekering</option>' +
-        '<option value="auto">Autoverzekering</option>' +
-        '<option value="woning">Woonverzekering</option>' +
-        '<option value="reis">Reisverzekering</option>' +
-        '<option value="aansprakelijkheid">Aansprakelijkheid</option>' +
-        '<option value="rechtsbijstand">Rechtsbijstand</option>' +
-        '<option value="anders">Anders</option>' +
+        '<option value="">' + T.pd_choose + '</option>' +
+        '<option value="zorg">' + T.pd_ins_health + '</option>' +
+        '<option value="auto">' + T.pd_ins_car + '</option>' +
+        '<option value="woning">' + T.pd_ins_home + '</option>' +
+        '<option value="reis">' + T.pd_ins_travel + '</option>' +
+        '<option value="aansprakelijkheid">' + T.pd_ins_liability + '</option>' +
+        '<option value="rechtsbijstand">' + T.pd_ins_legal + '</option>' +
+        '<option value="anders">' + T.pd_other + '</option>' +
         '</select>' +
-        '<input type="text" name="ins_provider[]" class="form-input" placeholder="Aanbieder">' +
+        '<input type="text" name="ins_provider[]" class="form-input" placeholder="' + T.pd_provider + '">' +
         '<input type="date" name="ins_enddate[]" class="form-input">' +
         '</div>' +
-        '<button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="Verwijder">&times;</button>' +
+        '<button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="' + T.pd_remove + '">&times;</button>' +
         '</div>';
     document.getElementById('insurance-container').insertAdjacentHTML('beforeend', html);
 }
