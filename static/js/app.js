@@ -54,6 +54,18 @@ function toggleShareLinkForm(btn) {
     }
 }
 
+function toggleShareLinkPassword(btn) {
+    var parent = btn.parentElement;
+    var form = parent.querySelector('.share-link-form');
+    if (form) {
+        var isHidden = form.style.display === 'none';
+        form.style.display = isHidden ? 'inline-flex' : 'none';
+        if (isHidden) {
+            form.querySelector('.share-password-input').focus();
+        }
+    }
+}
+
 function closeAllDropdowns(except) {
     document.querySelectorAll('.move-dropdown.show, .share-dropdown.show').forEach(function(d) {
         if (d !== except) d.classList.remove('show');

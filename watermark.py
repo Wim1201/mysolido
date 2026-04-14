@@ -36,7 +36,7 @@ def _create_watermark_overlay(width, height, text):
     c.saveState()
 
     # Semi-transparent light grey diagonal text
-    c.setFillColor(Color(0.5, 0.5, 0.5, alpha=0.08))
+    c.setFillColor(Color(0.5, 0.5, 0.5, alpha=0.15))
 
     # Calculate font size relative to page diagonal
     diagonal = math.sqrt(width ** 2 + height ** 2)

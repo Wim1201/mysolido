@@ -8,7 +8,7 @@
     <div class="share-link-banner">
         <span>{{ icon_link() }} {{ t.share_link_created }}</span>
         <input type="text" value="{{ share_link_url }}" readonly id="share-link-url" class="share-link-input">
-        <button type="button" class="btn btn-sm btn-sharelink-copy" onclick="copyShareLink()">{{ icon_copy() }} {{ t.copy }}</button>
+        <button type="button" class="btn btn-sm btn-sharelink-copy" onclick="copyShareLink()">{{ icon_copy() }} {{ t['copy'] }}</button>
     </div>
     {% endif %}
 
@@ -185,11 +185,13 @@
                             </form>
                         </div>
                     </div>
-                    <form action="{{ url_for('create_share_link_route') }}" method="post" style="display:inline;">
+                    <button type="button" class="btn btn-compact btn-link" onclick="toggleShareLinkPassword(this)">{{ icon_link() }} Link</button>
+                    <form action="{{ url_for('create_share_link_route') }}" method="post" class="share-link-form" style="display:none;">
                         <input type="hidden" name="file_path" value="{{ item.name }}">
                         <input type="hidden" name="file_name" value="{{ item.name }}">
                         <input type="hidden" name="expires_days" value="7">
-                        <button type="submit" class="btn btn-compact btn-link">{{ icon_link() }} Link</button>
+                        <input type="password" name="password" placeholder="{{ t.share_password_placeholder }}" class="share-password-input" autocomplete="off">
+                        <button type="submit" class="btn btn-compact btn-link">{{ t.create_share_link }}</button>
                     </form>
                     <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('{{ t.confirm_delete }}')">
                         <input type="hidden" name="resource_url" value="{{ item.url }}">
@@ -354,11 +356,13 @@
                             </div>
                         </div>
                         {% if not is_dir %}
-                        <form action="{{ url_for('create_share_link_route') }}" method="post" style="display:inline;">
+                        <button type="button" class="btn btn-compact btn-link" onclick="toggleShareLinkPassword(this)">{{ icon_link() }} Link</button>
+                        <form action="{{ url_for('create_share_link_route') }}" method="post" class="share-link-form" style="display:none;">
                             <input type="hidden" name="file_path" value="{{ (folder_path + '/' + item.name if folder_path else item.name) }}">
                             <input type="hidden" name="file_name" value="{{ item.name }}">
                             <input type="hidden" name="expires_days" value="7">
-                            <button type="submit" class="btn btn-compact btn-link">{{ icon_link() }} Link</button>
+                            <input type="password" name="password" placeholder="{{ t.share_password_placeholder }}" class="share-password-input" autocomplete="off">
+                            <button type="submit" class="btn btn-compact btn-link">{{ t.create_share_link }}</button>
                         </form>
                         {% endif %}
                         <form action="{{ url_for('delete') }}" method="post" onsubmit="return confirm('{{ t.confirm_delete }}')">
