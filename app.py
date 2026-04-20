@@ -403,16 +403,6 @@ def migrate_passwords_to_bcrypt():
                 print("  [OK] BRIDGE_PASSWORD gehasht met bcrypt")
                 continue
 
-        if stripped.startswith('CSS_PASSWORD='):
-            value = stripped.split('=', 1)[1]
-            if value and not is_bcrypt_hash(value):
-                hashed = hash_password_bcrypt(value)
-                new_lines.append(f'CSS_PASSWORD={hashed}\n')
-                os.environ['CSS_PASSWORD'] = hashed
-                changed = True
-                print("  [OK] CSS_PASSWORD gehasht met bcrypt")
-                continue
-
         new_lines.append(line)
 
     if changed:
@@ -432,6 +422,11 @@ def auto_setup():
     if os.path.exists(env_path):
         load_dotenv(env_path, override=True)
         if os.getenv('CLIENT_ID') and os.getenv('CLIENT_SECRET'):
+            if is_bcrypt_hash(os.getenv('CSS_PASSWORD', '')):
+                print("  [LET OP] CSS_PASSWORD in .env is een bcrypt-hash (legacy).")
+                print("           Voor externe Solid-app login: wijzig het wachtwoord")
+                print("           via de Profile-pagina, of verwijder .env + .data/ voor")
+                print("           een volledig verse setup.")
             print("  [OK] Bestaande configuratie gevonden")
             return True
 
@@ -1840,12 +1835,18 @@ def profile():
     stats['total_size_formatted'] = format_size(stats['total_size'])
     bridge_password = os.getenv('BRIDGE_PASSWORD', '')
     bridge_url = os.getenv('SHARE_BASE_URL', '')
+    css_email = os.getenv('CSS_EMAIL', '')
+    css_password_raw = os.getenv('CSS_PASSWORD', '')
+    css_password_available = bool(css_password_raw) and not is_bcrypt_hash(css_password_raw)
     return render_template('profile.html',
         webid=OWNER_WEBID,
         pod_url=SOLID_POD_URL,
         stats=stats,
         bridge_url=bridge_url,
         bridge_configured=bool(bridge_password),
+        css_email=css_email,
+        css_password=css_password_raw if css_password_available else '',
+        css_password_available=css_password_available,
     )
 
 
@@ -1884,6 +1885,107 @@ def change_bridge_password():
 
     flash_t('flash_password_changed')
     log_action('bridge_password_changed', {})
+    return redirect(url_for('profile'))
+
+
+@app.route('/profile/css-password', methods=['POST'])
+def change_css_password():
+    if BRIDGE_MODE:
+        abort(403)
+
+    new_password = request.form.get('new_password', '').strip()
+    if len(new_password) < 8:
+        flash_t('flash_password_too_short', 'error')
+        return redirect(url_for('profile'))
+
+    email = os.getenv('CSS_EMAIL', '')
+    current_password = os.getenv('CSS_PASSWORD', '')
+    css_base = CSS_BASE_URL or 'http://127.0.0.1:3000'
+
+    if not email or not current_password or is_bcrypt_hash(current_password):
+        flash_t('flash_css_password_unavailable', 'error')
+        return redirect(url_for('profile'))
+
+    try:
+        r = requests.get(f'{css_base}/.account/',
+            headers={'Accept': 'application/json'}, timeout=10)
+        if r.status_code != 200:
+            flash_t('flash_css_unreachable', 'error')
+            return redirect(url_for('profile'))
+
+        initial_controls = r.json().get('controls', {})
+        login_url = (
+            initial_controls.get('password', {}).get('login')
+            or initial_controls.get('html', {}).get('password', {}).get('login')
+        )
+        if not login_url:
+            flash_t('flash_css_password_change_failed', 'error')
+            return redirect(url_for('profile'))
+
+        r = requests.post(login_url,
+            json={'email': email, 'password': current_password, 'remember': False},
+            timeout=10)
+        if r.status_code not in (200, 201):
+            flash_t('flash_css_password_change_failed', 'error')
+            return redirect(url_for('profile'))
+
+        authorization = r.json().get('authorization')
+        if not authorization:
+            flash_t('flash_css_password_change_failed', 'error')
+            return redirect(url_for('profile'))
+
+        r = requests.get(f'{css_base}/.account/',
+            headers={
+                'Authorization': f'CSS-Account-Token {authorization}',
+                'Accept': 'application/json'
+            }, timeout=10)
+        if r.status_code != 200:
+            flash_t('flash_css_password_change_failed', 'error')
+            return redirect(url_for('profile'))
+
+        full_controls = r.json().get('controls', {})
+        password_section = full_controls.get('password', {})
+        update_url = password_section.get('update')
+        if not update_url:
+            flash_t('flash_css_password_change_failed', 'error')
+            return redirect(url_for('profile'))
+
+        r = requests.post(update_url,
+            headers={
+                'Authorization': f'CSS-Account-Token {authorization}',
+                'Content-Type': 'application/json',
+            },
+            json={'oldPassword': current_password, 'newPassword': new_password},
+            timeout=10)
+        if r.status_code not in (200, 201, 204):
+            flash_t('flash_css_password_change_failed', 'error')
+            return redirect(url_for('profile'))
+
+    except requests.RequestException:
+        flash_t('flash_css_unreachable', 'error')
+        return redirect(url_for('profile'))
+
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            lines = f.readlines()
+
+        found = False
+        with open(env_path, 'w') as f:
+            for line in lines:
+                if line.startswith('CSS_PASSWORD='):
+                    f.write(f'CSS_PASSWORD={new_password}\n')
+                    found = True
+                else:
+                    f.write(line)
+            if not found:
+                f.write(f'CSS_PASSWORD={new_password}\n')
+
+        load_dotenv(env_path, override=True)
+        os.environ['CSS_PASSWORD'] = new_password
+
+    flash_t('flash_css_password_changed')
+    log_action('css_password_changed', {})
     return redirect(url_for('profile'))
 
 

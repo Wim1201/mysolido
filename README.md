@@ -79,6 +79,39 @@ Local is master. The Bridge syncs along.
 
 ---
 
+## Connecting external Solid apps
+
+MySolido is a fully-fledged Solid pod — you can connect any Solid-compatible app to it.
+
+### Login URL
+
+Use your WebID as the login URL:
+
+```
+http://127.0.0.1:3000/mysolido/profile/card#me
+```
+
+### Credentials
+
+Find your CSS account e-mail and password on the Profile page in MySolido under **Solid app login** / **Inloggen in Solid apps**. The password is auto-generated on first start and stored locally in your `.env`; you can reveal, copy, and change it from that page.
+
+### Example apps
+
+- [Umai](https://umai.app) — recipe management
+- [Solid Data Browser](https://solidcommunity.net) — generic pod browser
+- Any other app listed at [solidproject.org/apps](https://solidproject.org/apps)
+
+### Limitations
+
+Because MySolido runs on your own machine (`127.0.0.1`), your WebID is not publicly resolvable. This means:
+
+- External apps can connect to your pod only from the same machine (or via a Bridge if configured)
+- Other users cannot reference your WebID from their own apps without a publicly resolvable URL
+
+For use cases that require publicly resolvable WebIDs (sharing data across machines, multi-user scenarios), setting up a Bridge is recommended.
+
+---
+
 ## Installation
 
 ### Requirements

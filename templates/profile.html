@@ -43,6 +43,53 @@
 
     {% if not bridge_mode %}
     <div class="card" style="margin-top: 20px;">
+        <h3>&#128273; {{ t.solid_login_title }}</h3>
+        <p class="text-secondary">{{ t.solid_login_desc }}</p>
+
+        <div class="bridge-info">
+            <div class="info-row">
+                <span class="info-label">{{ t.solid_login_webid }}</span>
+                <span class="info-value">
+                    <code id="solid-login-webid" style="word-break: break-all;">{{ webid }}</code>
+                    <button type="button" class="btn btn-compact" onclick="copySolidField('solid-login-webid', this)">{{ t.copy_button }}</button>
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">{{ t.solid_login_email }}</span>
+                <span class="info-value">
+                    <code id="solid-login-email">{{ css_email }}</code>
+                    <button type="button" class="btn btn-compact" onclick="copySolidField('solid-login-email', this)">{{ t.copy_button }}</button>
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">{{ t.solid_login_password }}</span>
+                <span class="info-value">
+                    {% if css_password_available %}
+                    <code id="solid-login-password" data-password="{{ css_password }}">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</code>
+                    <button type="button" class="btn btn-compact" onclick="toggleSolidPassword(this)">{{ t.show }}</button>
+                    <button type="button" class="btn btn-compact" onclick="copySolidPassword(this)">{{ t.copy_button }}</button>
+                    {% else %}
+                    <span class="text-secondary" style="font-size: 0.85rem;">{{ t.solid_login_password_unavailable }}</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--color-border);">
+
+        <h4>{{ t.solid_login_change_password }}</h4>
+        <form action="{{ url_for('change_css_password') }}" method="post" class="bridge-password-form">
+            <div class="form-row">
+                <input type="password" name="new_password" placeholder="{{ t.bridge_new_password_placeholder }}"
+                        minlength="8" required class="form-input">
+                <button type="submit" class="btn btn-compact btn-primary">{{ t.save }}</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
         <h3>&#127760; {{ t.bridge_title }}</h3>
         <p class="text-secondary">{{ t.bridge_desc }}</p>
 
@@ -130,4 +177,45 @@
         {% endif %}
     </div>
     {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const T_copied = {{ t.copied | tojson }};
+const T_copy = {{ t.copy_button | tojson }};
+const T_show = {{ t.show | tojson }};
+const T_hide = {{ t.hide | tojson }};
+const PASSWORD_DOTS = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+
+function copySolidField(id, btn) {
+    const el = document.getElementById(id);
+    const text = el.dataset.password || el.textContent;
+    navigator.clipboard.writeText(text).then(function() {
+        const original = btn.textContent;
+        btn.textContent = T_copied;
+        setTimeout(function() { btn.textContent = original; }, 2000);
+    });
+}
+
+function toggleSolidPassword(btn) {
+    const el = document.getElementById('solid-login-password');
+    const real = el.dataset.password;
+    if (el.textContent === PASSWORD_DOTS) {
+        el.textContent = real;
+        btn.textContent = T_hide;
+    } else {
+        el.textContent = PASSWORD_DOTS;
+        btn.textContent = T_show;
+    }
+}
+
+function copySolidPassword(btn) {
+    const el = document.getElementById('solid-login-password');
+    navigator.clipboard.writeText(el.dataset.password).then(function() {
+        const original = btn.textContent;
+        btn.textContent = T_copied;
+        setTimeout(function() { btn.textContent = original; }, 2000);
+    });
+}
+</script>
 {% endblock %}
