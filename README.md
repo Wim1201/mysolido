@@ -134,11 +134,11 @@ cd mysolido
 # 2. Install Python dependencies
 pip install -r requirements.txt
 
-# 3. Install Community Solid Server
-npm install @solid/community-server
+# 3. Install Community Solid Server (exact version, same as package.json)
+npm install @solid/community-server@7.2.0 --save-exact
 
 # 4. Start CSS (terminal 1)
-node node_modules/.bin/community-solid-server -p 3000 -f .data/ -c @css:config/file.json -b http://127.0.0.1:3000
+node node_modules/@solid/community-server/bin/server.js -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json
 
 # 5. Start MySolido (terminal 2)
 python app.py
@@ -249,9 +249,11 @@ The data cannot be resold (enforced via ODRL policy). Watermarks make any leak t
 
 ## Technology
 
+MySolido is tested with CSS 7.2.0; other versions are not supported.
+
 | Component | Technology |
 |-----------|-----------|
-| Pod storage | [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer) v7.1.9 |
+| Pod storage | [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer) v7.2.0 |
 | Interface | Flask (Python) |
 | Protocol | [Solid](https://solidproject.org) (W3C standard) |
 | Data format | RDF / Linked Data / JSON-LD |

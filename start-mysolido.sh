@@ -47,9 +47,9 @@ else
     echo "[2/4] Python dependencies aanwezig"
 fi
 
-# Start CSS in background
+# Start CSS in background from node_modules (version pinned in package.json)
 echo "[3/4] Community Solid Server starten..."
-npx @solid/community-server@7.1.8 \
+node node_modules/@solid/community-server/bin/server.js \
     -p 3000 \
     -b http://127.0.0.1:3000 \
     -f .data/ \

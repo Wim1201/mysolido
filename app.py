@@ -4015,7 +4015,8 @@ if __name__ == '__main__':
         if not auto_setup():
             print()
             print("  Setup mislukt. Zorg dat Community Solid Server draait op poort 3000:")
-            print("  npx @solid/community-server -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json")
+            print("  npm install   (eenmalig, installeert de versie uit package.json)")
+            print("  node node_modules/@solid/community-server/bin/server.js -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json")
             print()
             exit(1)
 

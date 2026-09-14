@@ -243,7 +243,7 @@ cd /d "%INSTALL_DIR%"
 set /a npm_attempts=0
 :retry_npm
 set /a npm_attempts+=1
-call npm install @solid/community-server@7.1.8 --quiet 2>nul
+call npm install --no-audit --no-fund --quiet 2>nul
 if !errorlevel! equ 0 goto :npm_ok
 
 if !npm_attempts! lss 3 (
@@ -255,7 +255,7 @@ if !npm_attempts! lss 3 (
 echo.
 echo   [FOUT] Community Solid Server kon niet worden geinstalleerd na 3 pogingen.
 echo   Controleer je internetverbinding en probeer het opnieuw.
-echo   Of probeer handmatig: npm install @solid/community-server@7.1.8
+echo   Of probeer handmatig in de MySolido-map: npm install
 echo.
 goto :cleanup
 

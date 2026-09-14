@@ -18,7 +18,7 @@ echo.
 :: Check of lokale node bestaat, anders systeem-node
 if exist "%~dp0node\node.exe" (
     set "NODE_CMD=%~dp0node\node.exe"
-    set "NPX_CMD=%~dp0node\npx.cmd"
+    set "NPM_CMD=%~dp0node\npm.cmd"
 ) else (
     where node >nul 2>nul
     if errorlevel 1 (
@@ -29,7 +29,7 @@ if exist "%~dp0node\node.exe" (
         exit /b 1
     )
     set "NODE_CMD=node"
-    set "NPX_CMD=npx"
+    set "NPM_CMD=npm"
 )
 
 :: Check of lokale python bestaat, anders systeem-python
@@ -58,17 +58,17 @@ if %ERRORLEVEL% equ 0 (
 :: Zorg dat npm global map bestaat
 if not exist "%APPDATA%\npm" mkdir "%APPDATA%\npm"
 
-:: Check of node_modules bestaat
+:: Check of node_modules bestaat (de CSS-versie staat in package.json)
 if not exist "node_modules" (
     echo   [1/3] Community Solid Server installeren...
     echo         Dit kan een paar minuten duren bij de eerste keer.
-    call %NPX_CMD% --yes @solid/community-server@7.1.9 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json
+    call %NPM_CMD% install --no-audit --no-fund
     echo.
 )
 
-:: Start CSS op de achtergrond
+:: Start CSS op de achtergrond vanuit node_modules (versie uit package.json)
 echo   [1/2] Solid Server starten...
-start /b "" cmd /c "%NPX_CMD% --yes @solid/community-server@7.1.9 -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
+start /b "" cmd /c "%NODE_CMD% node_modules\@solid\community-server\bin\server.js -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json > css.log 2>&1"
 
 :: Wacht tot CSS bereikbaar is (max 60 pogingen van 1 seconde)
 set /a attempts=0

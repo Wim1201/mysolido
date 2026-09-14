@@ -15,8 +15,9 @@ notifications.json
 audit.json
 shares.json
 
-# Node
+# Node (package-lock.json wordt lokaal door npm install herschreven en hoort niet in git)
 node_modules/
+package-lock.json
 
 # OS
 .DS_Store

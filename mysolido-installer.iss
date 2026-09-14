@@ -252,12 +252,12 @@ begin
       ResultCode
     );
 
-    // npm install community-solid-server
+    // npm install: installs the CSS version pinned in package.json
     WizardForm.StatusLabel.Caption := 'Community Solid Server installeren (even geduld)...';
     WizardForm.StatusLabel.Update;
     Exec(
       NodeDir + '\npm.cmd',
-      'install @solid/community-server',
+      'install --no-audit --no-fund',
       AppDir,
       SW_HIDE,
       ewWaitUntilTerminated,

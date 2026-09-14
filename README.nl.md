@@ -134,11 +134,11 @@ cd mysolido
 # 2. Installeer Python dependencies
 pip install -r requirements.txt
 
-# 3. Installeer Community Solid Server
-npm install @solid/community-server
+# 3. Installeer Community Solid Server (exacte versie, gelijk aan package.json)
+npm install @solid/community-server@7.2.0 --save-exact
 
 # 4. Start CSS (terminal 1)
-node node_modules/.bin/community-solid-server -p 3000 -f .data/ -c @css:config/file.json -b http://127.0.0.1:3000
+node node_modules/@solid/community-server/bin/server.js -p 3000 -b http://127.0.0.1:3000 -f .data/ -c @css:config/file.json
 
 # 5. Start MySolido (terminal 2)
 python app.py
@@ -249,9 +249,11 @@ De gegevens mogen niet worden doorverkocht (afgedwongen via ODRL policy). Waterm
 
 ## Technologie
 
+MySolido is getest met CSS 7.2.0; andere versies worden niet ondersteund.
+
 | Component | Technologie |
 |-----------|------------|
-| Pod-opslag | [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer) v7.1.9 |
+| Pod-opslag | [Community Solid Server](https://github.com/CommunitySolidServer/CommunitySolidServer) v7.2.0 |
 | Protocol | [Solid](https://solidproject.org) (W3C-standaard) |
 | Frontend | [Flask](https://flask.palletsprojects.com) (Python) |
 | Data-formaat | RDF / Linked Data / JSON-LD |
