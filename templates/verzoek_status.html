@@ -18,6 +18,13 @@
         <p style="color: var(--color-text-muted);">{{ t.req_status_received_desc }}</p>
         <span class="badge badge-nieuw" style="margin-top: 12px; display: inline-block;">{{ t.req_status_pending }}</span>
 
+        {% elif status == 'ingetrokken' %}
+        {# toestemming ingetrokken door de eigenaar (subtaak 4b): geen gegevens meer #}
+        <div style="font-size: 2.5rem; margin-bottom: 16px;">&#128683;</div>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_withdrawn_on.format(date=withdrawn_at) }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_withdrawn_desc }}</p>
+        <span class="badge badge-ingetrokken" style="margin-top: 12px; display: inline-block;">{{ t.req_withdrawn }}</span>
+
         {% elif status == 'wacht-op-bevestiging' %}
         {# gericht aanbod: acceptatie geregistreerd, eigenaar bevestigt nog (subtaak 4a) #}
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#128172;</div>

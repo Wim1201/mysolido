@@ -10,6 +10,14 @@
         <p style="color: var(--color-text-muted);">{{ t.req_resp_not_found_desc }}</p>
     </div>
 
+    {% elif withdrawn %}
+    {# toestemming ingetrokken (subtaak 4b): geen gegevens meer, alleen de intrekdatum #}
+    <div class="card" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 2.5rem; margin-bottom: 16px;">&#128683;</div>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_withdrawn_on.format(date=withdrawn_at) }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_withdrawn_desc }}</p>
+    </div>
+
     {% elif expired %}
     <div class="card" style="text-align: center; padding: 40px 20px;">
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9203;</div>

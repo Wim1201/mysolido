@@ -24,6 +24,7 @@
                         {% elif req._status == 'goedgekeurd' %}{{ t.req_approved }}
                         {% elif req._status == 'geaccepteerd' %}{{ t.req_accepted }}
                         {% elif req._status == 'wacht-op-bevestiging' %}{{ t.req_awaiting }}
+                        {% elif req._status == 'ingetrokken' %}{{ t.req_withdrawn }}
                         {% elif req._status == 'afgewezen' %}{{ t.req_rejected }}
                         {% elif req._status == 'verlopen' %}{{ t.req_expired }}
                         {% else %}{{ req._status|capitalize }}{% endif %}

@@ -19,6 +19,87 @@
         <p class="consent-description">{{ consent.get('dct:description') }}</p>
         {% endif %}
 
+        {% if links %}
+        {# === Intentiegebonden record in ISO/IEC TS 27560-structuur (subtaak 4b) === #}
+        {% set controller = consent.get('dpv:hasDataController', {}) %}
+        {% set purpose = consent.get('dpv:hasPurpose', {}) %}
+        {% set storage = consent.get('dpv:hasStorageCondition', {}) %}
+        <table class="consent-detail-table" id="consent-27560">
+            <tr>
+                <th>{{ t.consent_detail_id }}</th>
+                <td><code>{{ consent.get('@id', '') }}</code></td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_schema }}</th>
+                <td>{{ consent.get('dct:conformsTo', '') }} (schema {{ consent.get('mysolido:recordSchemaVersion', '') }})</td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_party }}</th>
+                <td>{{ controller.get('rdfs:label', '') }}<br><code style="font-size: 0.8rem;">{{ controller.get('@id', '') }}</code>
+                    {% if controller.get('mysolido:contactName') %}<br>{{ t.consent_27560_contact }}: {{ controller.get('mysolido:contactName') }}{% endif %}
+                    {% if controller.get('mysolido:contact') %} &middot; {{ controller.get('mysolido:contact') }}{% endif %}</td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_purpose }}</th>
+                <td>{{ purpose.get('rdfs:label', '') }} <span style="color: var(--color-text-muted); font-size: 0.85rem;">({{ purpose.get('@type', '') }}, <code>{{ purpose.get('@id', '') }}</code>)</span></td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_data }}</th>
+                <td>
+                    {% for pdata in consent.get('dpv:hasPersonalData', []) %}
+                    <div data-attribute="{{ pdata.get('@id', '') }}"><strong>{{ pdata.get('rdfs:label', '') }}</strong>: {{ pdata.get('mysolido:value', '') }}
+                        <span style="color: var(--color-text-muted); font-size: 0.8rem;">({{ pdata.get('@type', '') }})</span></div>
+                    {% endfor %}
+                </td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_validity }}</th>
+                <td>{{ t.consent_detail_valid_until|lower }} {{ expiry_date }}{% if storage.get('dpv:hasDuration', {}).get('mysolido:days') is not none %} &middot; {{ storage['dpv:hasDuration']['mysolido:days'] }} {{ t.consent_27560_days }}{% endif %}</td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_onward }}</th>
+                <td>{% if consent.get('mysolido:onwardTransfer') == 'prohibited' %}{{ t.consent_27560_onward_prohibited }}{% else %}{{ t.consent_27560_onward_permitted }}{% endif %}</td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_status }}</th>
+                <td><code>{{ consent._status.term }}</code> &middot; {{ consent._status.icon }} {{ consent._status.label }}</td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_events }}</th>
+                <td>
+                    {% for ev in consent.get('mysolido:events', []) %}
+                    <div data-event="{{ ev.get('@type', '') }}">{% if ev.get('@type') == 'withdrawn' %}{{ t.consent_27560_event_withdrawn }}{% else %}{{ t.consent_27560_event_given }}{% endif %}: {{ ev.get('at', '') }} <span style="color: var(--color-text-muted); font-size: 0.8rem;">({{ ev.get('by', '') }})</span></div>
+                    {% endfor %}
+                </td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_legal_basis }}</th>
+                <td><code>{{ consent.get('dpv:hasLegalBasis', '') }}</code> &middot; {{ t.consent_detail_right }}: <code>{{ consent.get('dpv:hasRight', '') }}</code></td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_jurisdiction }}</th>
+                <td><code>{{ (consent.get('dpv:hasJurisdiction') or {}).get('@id', '') }}</code></td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_27560_links }}</th>
+                <td>
+                    {% if bridge_mode %}
+                    <div>{{ t.consent_27560_link_intention }}: <a href="{{ url_for('intentie_detail', intention_id=links.intention_id) }}">{{ consent.get('mysolido:intention', '') }}</a></div>
+                    <div>{{ t.consent_27560_link_request }}: <code>{{ consent.get('mysolido:request', '') }}</code></div>
+                    {% else %}
+                    <div>{{ t.consent_27560_link_intention }}: <a href="{{ url_for('intentie_detail', intention_id=links.intention_id) }}">{{ consent.get('mysolido:intention', '') }}</a></div>
+                    <div>{{ t.consent_27560_link_request }}: <a href="{{ url_for('verzoek_detail_owner', request_id=links.request_id) }}">{{ consent.get('mysolido:request', '') }}</a></div>
+                    {% endif %}
+                    <div>{{ t.consent_27560_link_agreement }}: {% if links.agreement_exists %}<a href="{{ url_for('verzoek_agreement_file', request_id=links.request_id) }}">{{ consent.get('mysolido:agreement', '') }}</a>{% else %}<code>{{ consent.get('mysolido:agreement', '') }}</code>{% endif %}</div>
+                    <div style="color: var(--color-text-muted); font-size: 0.8rem;">{{ t.req_accepted_policy }}: <code>{{ consent.get('mysolido:acceptedPolicy', '') }}</code> &middot; {{ t.req_policy_hash }}: <code>{{ consent.get('mysolido:offerHash', '') }}</code></div>
+                </td>
+            </tr>
+            <tr>
+                <th>{{ t.consent_detail_created }} / {{ t.consent_detail_modified }}</th>
+                <td>{{ consent.get('dct:created', '') }} / {{ consent.get('dct:modified', '') }}</td>
+            </tr>
+        </table>
+        {% else %}
         <table class="consent-detail-table">
             <tr>
                 <th>{{ t.consent_detail_id }}</th>
@@ -76,6 +157,7 @@
             </tr>
             {% endif %}
         </table>
+        {% endif %}
 
         {% if not bridge_mode %}
         <div class="consent-detail-actions">

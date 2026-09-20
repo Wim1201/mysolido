@@ -45,7 +45,7 @@
 
     <div class="verzoek-intro">
         <h2>{{ t.req_int_title }}: {{ intention.get('mysolido:categoryLabel', '') }}</h2>
-        <p>{{ t.req_int_intro }}</p>
+        <p>{% if acceptable %}{{ t.req_int_intro }}{% else %}{{ t.req_int_intro_inactive }}{% endif %}</p>
     </div>
 
     {# === Voorwaarden (Offer) === #}
@@ -96,6 +96,8 @@
                 <label for="email" class="terms-label">{{ t.req_your_email }} <span style="color: var(--color-danger);">*</span></label>
                 <input type="email" name="email" id="email" class="form-input" required placeholder="{{ t.req_your_email_placeholder }}">
             </div>
+
+            <p class="notice" id="identity-note">{{ t.req_int_identity_note }}</p>
 
             <div class="agree-group">
                 <label>

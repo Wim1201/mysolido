@@ -38,6 +38,7 @@
                 {% elif req._status == 'goedgekeurd' %}{{ t.req_approved }}
                 {% elif req._status == 'geaccepteerd' %}{{ t.req_accepted }}
                 {% elif req._status == 'wacht-op-bevestiging' %}{{ t.req_awaiting }}
+                {% elif req._status == 'ingetrokken' %}{{ t.req_withdrawn }}
                 {% elif req._status == 'afgewezen' %}{{ t.req_rejected }}
                 {% elif req._status == 'verlopen' %}{{ t.req_expired }}
                 {% else %}{{ req._status|capitalize }}{% endif %}
@@ -74,6 +75,7 @@
             <p style="margin: 0; white-space: pre-wrap;">{{ req.get('mysolido:purpose', '') }}</p>
         </div>
 
+        {% if not acceptance %}
         <div style="margin-top: 16px;">
             <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_requested_data }}</div>
             <p style="margin: 0;">
@@ -83,6 +85,7 @@
                 {% endfor %}
             </p>
         </div>
+        {% endif %}
     </div>
 
     {% if acceptance %}
@@ -98,7 +101,7 @@
             </div>
             <div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_party }}</div>
-                <p style="margin: 0;">{{ acceptance.party.get('rdfs:label', '') }}{% if acceptance.party.get('mysolido:organisation') %} ({{ acceptance.party['mysolido:organisation'] }}){% endif %}<br>
+                <p style="margin: 0;">{{ acceptance.party.get('rdfs:label', '') }}{% if acceptance.party.get('mysolido:contactName') and acceptance.party.get('mysolido:contactName') != acceptance.party.get('rdfs:label') %} &middot; {{ acceptance.party['mysolido:contactName'] }}{% endif %}<br>
                     <code style="font-size: 0.8rem;">{{ acceptance.party.get('@id', '') }}</code></p>
             </div>
             <div>
@@ -124,13 +127,28 @@
             </div>
         </div>
         <div style="margin-top: 12px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_shared_data }}</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_requested_data }}</div>
             <p style="margin: 0;">
                 {% for label in acceptance.attributes %}
-                <span class="badge badge-{{ 'geaccepteerd' if acceptance.agreement else 'concept' }}" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ label }}</span>
+                <span class="badge badge-concept" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ label }}</span>
                 {% endfor %}
             </p>
         </div>
+        {% if acceptance.shared %}
+        <div style="margin-top: 12px;">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_shared_values }}</div>
+            {% for attr in acceptance.shared %}
+            <div data-attribute="{{ attr.get('@id', '') }}" style="font-size: 0.9rem;"><strong>{{ attr.get('label', '') }}</strong>: {{ attr.get('valueLabel', '') }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if acceptance.consent_id %}
+        <div style="margin-top: 12px;">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_consent_record }}</div>
+            <p style="margin: 0;"><a href="{{ url_for('consent_detail', consent_id=acceptance.consent_id) }}">{{ t.req_consent_view }}</a>
+                {% if req._status == 'ingetrokken' %}<span class="badge badge-ingetrokken" style="margin-left: 6px;">{{ t.req_withdrawn_on.format(date=acceptance.withdrawn_at) }}</span>{% endif %}</p>
+        </div>
+        {% endif %}
         {% if req.get('mysolido:validUntil') %}
         <div style="margin-top: 12px;">
             <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_valid_through }}</div>

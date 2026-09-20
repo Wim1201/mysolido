@@ -120,7 +120,8 @@
         <h3>{{ t.int_accepted_by_title }}</h3>
         {% for item in accepted_by %}
         <div class="snapshot-row" data-request="{{ item.request_id }}">
-            <span class="snapshot-key">{{ t.int_accepted_by_line.format(party=item.party, date=item.accepted_at) }}{% if item.organisation %} ({{ item.organisation }}){% endif %}</span>
+            <span class="snapshot-key">{{ t.int_accepted_by_line.format(party=item.party, date=item.accepted_at) }}{% if item.contact_name and item.contact_name != item.party %} &middot; {{ item.contact_name }}{% endif %}
+                {% if item.withdrawn %}<span class="badge badge-ingetrokken" style="margin-left: 6px;">{{ t.int_accepted_withdrawn.format(date=item.withdrawn_at) }}</span>{% endif %}</span>
             <span class="snapshot-value">
                 {% if not read_only %}<a href="{{ url_for('verzoek_detail_owner', request_id=item.request_id) }}">{{ t.req_view_title }}</a>{% else %}<code style="font-size: 0.8rem;">{{ item.agreement }}</code>{% endif %}
             </span>
@@ -187,9 +188,10 @@
             </form>
             {% endif %}
             {% elif intention._status == 'actief' %}
+            {# "Aanbod intrekken" (4b): geen nieuwe acceptaties; lopende afspraken blijven, toestemming per afspraak intrekken #}
             <form action="{{ url_for('intentie_withdraw', intention_id=intention._id) }}" method="post" style="display:inline;"
-                  onsubmit="return confirm('{{ t.int_confirm_withdraw }}')">
-                <button type="submit" class="btn" style="background: var(--color-secondary);">{{ t.consent_withdraw }}</button>
+                  onsubmit="return confirm('{{ t.int_confirm_withdraw_offer }}')">
+                <button type="submit" class="btn" style="background: var(--color-secondary);">{{ t.int_withdraw_offer }}</button>
             </form>
             {% elif intention._status in ['ingetrokken', 'verlopen'] %}
             {% if not accepted_by %}

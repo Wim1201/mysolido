@@ -28,6 +28,7 @@
                 <h3 class="consent-title">{{ c.get('dct:title', t.consent_no_title) }}</h3>
                 <div class="consent-meta">
                     <span>{{ t.consent_receiver }} <strong>{{ c._receiver }}</strong></span>
+                    {% if c._category %}<span>{{ t.consent_category }} {{ c._category }}</span>{% endif %}
                     <span>{{ t.consent_purpose }} {{ c._purpose }}</span>
                     {% if c._expiry_date %}
                     <span>{{ t.consent_valid_until }} {{ c._expiry_date }}</span>

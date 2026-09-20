@@ -703,7 +703,7 @@ def phase_consent_request(ctx: Ctx):
         rec = json.loads(record_file.read_text(encoding='utf-8'))
         rep.check('Toestemming: JSON-LD velden correct',
                   rec.get('@type') == 'dpv:ConsentRecord' and rec.get('dct:title') == title
-                  and rec.get('dpv:hasConsentStatus') == 'dpv:ConsentStatusGiven',
+                  and rec.get('dpv:hasConsentStatus') == 'dpv:ConsentGiven',
                   cid, json.dumps(rec)[:200])
         r = flask(ctx, 'GET', f'/consent/{cid}')
         rep.check('Toestemming: detailpagina leest record terug', r.status_code == 200 and title in r.text,
@@ -719,8 +719,8 @@ def phase_consent_request(ctx: Ctx):
         copy.unlink()
         flask(ctx, 'POST', f'/consent/{cid}/withdraw')
         rec = json.loads(record_file.read_text(encoding='utf-8'))
-        rep.check('Toestemming: intrekken zet status Withdrawn',
-                  rec.get('dpv:hasConsentStatus') == 'dpv:ConsentStatusWithdrawn', '', rec.get('dpv:hasConsentStatus'))
+        rep.check('Toestemming: intrekken zet status dpv:ConsentWithdrawn',
+                  rec.get('dpv:hasConsentStatus') == 'dpv:ConsentWithdrawn', '', rec.get('dpv:hasConsentStatus'))
         flask(ctx, 'POST', f'/consent/{cid}/delete')
         rep.check('Toestemming: verwijderen', not record_file.exists(), '', 'bestand bestaat nog')
 
@@ -1456,7 +1456,8 @@ def phase_acceptance(ctx: Ctx):
                   req.get('mysolido:intention') == rec.get('@id') and req.get('mysolido:acceptedPolicy') == uid
                   and req.get('mysolido:acceptedPolicyHash') == policy_hash
                   and '.' not in str(req.get('mysolido:acceptedAt', '')).split('+')[0]
-                  and str(party.get('@id', '')).startswith('urn:mysolido:party:') and party.get('rdfs:label') == 'Verzekeraar X'
+                  and str(party.get('@id', '')).startswith('urn:mysolido:party:') and party.get('rdfs:label') == 'Verzekeraar X BV'
+                  and party.get('mysolido:contactName') == 'Verzekeraar X'   # label = organisatie, persoon apart (4b)
                   and party.get('mysolido:organisation') == 'Verzekeraar X BV' and party.get('mysolido:contact') == 'offerte@verzekeraar-x.test',
                   '', json.dumps({k: req.get(k) for k in ('mysolido:intention', 'mysolido:acceptedPolicy', 'mysolido:acceptedAt',
                                                           'mysolido:acceptedPolicyHash', 'mysolido:party')}))
@@ -1471,7 +1472,7 @@ def phase_acceptance(ctx: Ctx):
 
         def strip_assignee(rules):
             return [{k: v for k, v in r.items() if k != 'assignee'} for r in rules]
-        assignee_ok = all(r.get('assignee', {}).get('@id') == party.get('@id') and r.get('assignee', {}).get('rdfs:label') == 'Verzekeraar X'
+        assignee_ok = all(r.get('assignee', {}).get('@id') == party.get('@id') and r.get('assignee', {}).get('rdfs:label') == 'Verzekeraar X BV'
                           for r in agr.get('permission', []) + agr.get('prohibition', []))
         rep.check('Acceptatie: Agreement met @type, uid, assigner, assignee op permission én prohibition',
                   agr.get('@type') == 'Agreement' and agr.get('uid') == f'urn:mysolido:agreement:{rid}'
@@ -1493,7 +1494,7 @@ def phase_acceptance(ctx: Ctx):
                   '', json.dumps(resp)[:300])
         r = anon.get(f"{ctx.flask_base}{req.get('mysolido:responseLink')}", timeout=TIMEOUT)
         rep.check('Acceptatie: responspagina toont zin, Agreement-uid en de vier waarden, niet brandstof of bouwjaar',
-                  r.status_code == 200 and 'Verzekeraar X mag' in r.text and f'urn:mysolido:agreement:{rid}' in r.text
+                  r.status_code == 200 and 'Verzekeraar X BV mag' in r.text and f'urn:mysolido:agreement:{rid}' in r.text
                   and all(v in r.text for v in ('35-44', '5611', 'Auto', 'Schadevrije jaren: 5'))
                   and 'Benzine' not in r.text and '2019' not in r.text,
                   '', f'status {r.status_code}')
@@ -1506,7 +1507,7 @@ def phase_acceptance(ctx: Ctx):
                   '', json.dumps(rec.get('mysolido:acceptedBy')))
         r = flask(ctx, 'GET', f'/intenties/{iid}')
         rep.check('Acceptatie: detailpagina toont "Geaccepteerd door Verzekeraar X"',
-                  r.status_code == 200 and 'Geaccepteerd door' in r.text and 'Verzekeraar X op' in r.text, '', f'status {r.status_code}')
+                  r.status_code == 200 and 'Geaccepteerd door' in r.text and 'Verzekeraar X BV op' in r.text, '', f'status {r.status_code}')
         r = flask(ctx, 'POST', f'/intenties/{iid}/delete')
         rep.check('Acceptatie: verwijderen van een geaccepteerde intentie geblokkeerd',
                   r.status_code in REDIRECT and open_file.exists() and policy_file.exists(), '', f'status {r.status_code}, bestaat {open_file.exists()}')
@@ -1576,7 +1577,19 @@ def phase_acceptance(ctx: Ctx):
         rep.check('Acceptatie: Agreement niet als verzoek in het overzicht; verzoeken tonen labels',
                   r.status_code == 200 and '.agreement' not in r.text and 'Leeftijdscategorie' in r.text, '', f'status {r.status_code}')
     finally:
+        consent_leftovers = []
         for f in request_files:
+            # consentrecord van deze acceptatie (subtaak 4b) mee opruimen
+            if f.exists():
+                try:
+                    cid = str(json.loads(f.read_text(encoding='utf-8')).get('mysolido:consent', '')).rsplit(':', 1)[-1]
+                except (ValueError, OSError):
+                    cid = ''
+                cpath = ctx.pod_dir / 'toestemmingen' / f'{cid}.jsonld'
+                if cid and cpath.exists():
+                    cpath.unlink()
+                if cid and cpath.exists():
+                    consent_leftovers.append(cpath)
             for p in files_for(f):
                 if p.exists():
                     p.unlink()
@@ -1587,7 +1600,257 @@ def phase_acceptance(ctx: Ctx):
                     p.unlink()
         leftovers = [p for f in intentions for p in (f, f.with_name(f.stem + '.policy.jsonld')) if p.exists()]
         leftovers += [p for f in request_files for p in files_for(f) if p.exists()]
-        rep.check('Acceptatie: testintenties, verzoeken, Agreements en responses opgeruimd', not leftovers, '', str(leftovers))
+        leftovers += consent_leftovers
+        rep.check('Acceptatie: testintenties, verzoeken, Agreements, responses en consentrecords opgeruimd', not leftovers, '', str(leftovers))
+
+
+def phase_consent_record(ctx: Ctx):
+    """Consentrecord in ISO/IEC TS 27560-structuur (subtaak 4b): velden, weergave, intrekken, statusnormalisatie."""
+    rep = ctx.report
+    idir = ctx.pod_dir / 'intenties'
+    vdir = ctx.pod_dir / 'verzoeken'
+    cdir = ctx.pod_dir / 'toestemmingen'
+    profile = read_profile(ctx)
+    expected = expected_scenario_values(profile)
+    if not all(expected.values()):
+        rep.skip('Consentrecord: profiel mist scenariowaarden, fase overgeslagen', json.dumps(expected))
+        return
+    anon = requests.Session()
+
+    def listing(folder):
+        return {p.name for p in folder.glob('*.jsonld')} if folder.exists() else set()
+
+    def new_records(folder, before):
+        return [p for p in folder.glob('*.jsonld') if p.name not in before and not p.name.startswith('.')
+                and not p.name.endswith(('.policy.jsonld', '.agreement.jsonld'))] if folder.exists() else []
+
+    def create_intention(data):
+        before = listing(idir)
+        r = flask(ctx, 'POST', '/intenties/nieuw', data=data)
+        new = new_records(idir, before)
+        return (new[0] if len(new) == 1 and r.status_code in REDIRECT else None)
+
+    def accept(iid, data):
+        before = listing(vdir)
+        r = anon.post(f'{ctx.flask_base}/verzoek/intentie/{iid}', data=data, timeout=TIMEOUT, allow_redirects=False)
+        return r, new_records(vdir, before)
+
+    def consent_file_of(req):
+        cid = str(req.get('mysolido:consent', '')).rsplit(':', 1)[-1]
+        return cid, (cdir / f'{cid}.jsonld' if cid else None)
+
+    intentions, request_files, consent_files, fixtures = [], [], [], []
+    try:
+        # 1. Open aanbod accepteren -> consentrecord
+        open_file = create_intention({'category': 'autoverzekering', 'description': 'Regressietest consent open',
+                                      'validity': '2w', 'attributes': list(SCENARIO_ATTRIBUTES),
+                                      'purpose': 'quote_calculation', 'no_onward_transfer': '1', 'offer_mode': 'open'})
+        if not rep.check('Consentrecord: open intentie aangemaakt', open_file is not None, '', 'geen record'):
+            return
+        intentions.append(open_file)
+        iid = open_file.stem
+        flask(ctx, 'POST', f'/intenties/{iid}/activate')
+        rec = json.loads(open_file.read_text(encoding='utf-8'))
+        r, new = accept(iid, {'name': 'Verzekeraar X', 'organization': 'Verzekeraar X BV',
+                              'email': 'offerte@verzekeraar-x.test', 'accept_terms': 'yes'})
+        if not rep.check('Consentrecord: acceptatie geregistreerd', r.status_code == 200 and len(new) == 1, '', f'status {r.status_code}'):
+            return
+        req_file = new[0]
+        request_files.append(req_file)
+        rid = req_file.stem
+        req = json.loads(req_file.read_text(encoding='utf-8'))
+        party = req.get('mysolido:party') or {}
+        cid, cfile = consent_file_of(req)
+        if not rep.check('Consentrecord: verzoek heeft mysolido:consent en toestemmingen/<id>.jsonld bestaat',
+                         bool(cid) and cfile is not None and cfile.exists() and req.get('mysolido:consent') == f'urn:mysolido:consent:{cid}',
+                         cid, f'consent {req.get("mysolido:consent")}, bestaat {cfile.exists() if cfile else None}'):
+            return
+        consent_files.append(cfile)
+        con = json.loads(cfile.read_text(encoding='utf-8'))
+        # -- kop --
+        rep.check('Consentrecord: kop (dpv:ConsentRecord, dct:conformsTo 27560, schemaversie, identifier, hasDataSubject = WEBID)',
+                  con.get('@type') == 'dpv:ConsentRecord' and con.get('dct:conformsTo') == 'ISO/IEC TS 27560:2023'
+                  and con.get('mysolido:recordSchemaVersion') == '1.0' and con.get('dct:identifier') == cid
+                  and con.get('@id') == f'urn:mysolido:consent:{cid}'
+                  and (con.get('dpv:hasDataSubject') or {}).get('@id') == ctx.webid,
+                  '', json.dumps({k: con.get(k) for k in ('@type', 'dct:conformsTo', 'dct:identifier', 'dpv:hasDataSubject')}))
+        # -- verwerking --
+        purpose = con.get('dpv:hasPurpose') or {}
+        rep.check('Consentrecord: hasPurpose = purpose-urn met dpv:ServiceProvision en label; hasLegalBasis ExplicitlyExpressedConsent',
+                  purpose.get('@id') == 'urn:mysolido:purpose:quote_calculation' and purpose.get('@type') == 'dpv:ServiceProvision'
+                  and purpose.get('rdfs:label') == 'Offerteberekening' and con.get('dpv:hasLegalBasis') == 'dpv:ExplicitlyExpressedConsent',
+                  '', json.dumps(purpose))
+        pdata = con.get('dpv:hasPersonalData') or []
+        resp = json.loads(req_file.with_name(f'{rid}_response.json').read_text(encoding='utf-8'))
+        resp_values = {a['@id']: a['valueLabel'] for a in resp.get('attributes', [])}
+        expected_types = {ATTR + 'age_category': 'pd:AgeRange', ATTR + 'postal_area': 'pd:PostalCode',
+                          ATTR + 'vehicle_type': 'pd:Vehicle', ATTR + 'claims_history': 'pd:Insurance'}
+        rep.check('Consentrecord: hasPersonalData precies vier, urn als @id, pd-term als @type, label en waarde uit het snapshot',
+                  [p.get('@id') for p in pdata] == [ATTR + k for k in SCENARIO_ATTRIBUTES]
+                  and all(p.get('@type') == expected_types[p['@id']] and p.get('rdfs:label') and p.get('mysolido:value') == resp_values.get(p['@id'])
+                          for p in pdata),
+                  '', json.dumps(pdata)[:300])
+        ctrl = con.get('dpv:hasDataController') or {}
+        rep.check('Consentrecord: hasDataController = partij-@id met organisatie als label, contactpersoon en e-mail',
+                  ctrl.get('@id') == party.get('@id') and ctrl.get('@type') == 'dpv:DataController'
+                  and ctrl.get('rdfs:label') == 'Verzekeraar X BV' and ctrl.get('mysolido:contactName') == 'Verzekeraar X'
+                  and ctrl.get('mysolido:contact') == 'offerte@verzekeraar-x.test',
+                  '', json.dumps(ctrl))
+        storage = con.get('dpv:hasStorageCondition') or {}
+        rep.check('Consentrecord: hasStorageCondition met validUntil = validThrough en 14 dagen',
+                  storage.get('@type') == 'dpv:StorageDuration' and storage.get('mysolido:validUntil') == rec.get('schema:validThrough')
+                  and (storage.get('dpv:hasDuration') or {}).get('mysolido:days') == 14
+                  and (storage.get('dpv:hasDuration') or {}).get('mysolido:iso8601') == 'P14D',
+                  '', json.dumps(storage))
+        rep.check('Consentrecord: hasRecipient leeg, onwardTransfer prohibited met verwijzing naar de Agreement, jurisdictie loc:NL',
+                  con.get('dpv:hasRecipient') == [] and con.get('mysolido:onwardTransfer') == 'prohibited'
+                  and con.get('mysolido:onwardTransferProhibition') == req.get('mysolido:agreement')
+                  and (con.get('dpv:hasJurisdiction') or {}).get('@id') == 'loc:NL',
+                  '', json.dumps({k: con.get(k) for k in ('dpv:hasRecipient', 'mysolido:onwardTransfer', 'dpv:hasJurisdiction')}))
+        # -- gebeurtenis --
+        events = con.get('mysolido:events') or []
+        rep.check('Consentrecord: status dpv:ConsentGiven, één event given op acceptedAt door de partij, isImplementedByEntity = WEBID',
+                  con.get('dpv:hasConsentStatus') == 'dpv:ConsentGiven' and len(events) == 1
+                  and events[0].get('@type') == 'given' and events[0].get('at') == req.get('mysolido:acceptedAt')
+                  and events[0].get('by') == party.get('@id')
+                  and (con.get('dpv:isImplementedByEntity') or {}).get('@id') == ctx.webid,
+                  '', json.dumps({'status': con.get('dpv:hasConsentStatus'), 'events': events}))
+        # -- koppelingen --
+        rep.check('Consentrecord: vijf koppelingen (agreement, intention, request, acceptedPolicy, offerHash) en recht eu-gdpr:A7-3',
+                  con.get('mysolido:agreement') == req.get('mysolido:agreement') and con.get('mysolido:intention') == rec.get('@id')
+                  and con.get('mysolido:request') == req.get('@id') and con.get('mysolido:acceptedPolicy') == req.get('mysolido:acceptedPolicy')
+                  and con.get('mysolido:offerHash') == req.get('mysolido:acceptedPolicyHash') and con.get('dpv:hasRight') == 'eu-gdpr:A7-3',
+                  '', json.dumps({k: con.get(k) for k in ('mysolido:agreement', 'mysolido:intention', 'mysolido:request')}))
+        # -- weergave --
+        r = flask(ctx, 'GET', '/consent')
+        rep.check('Consentrecord: consentlijst toont het record met partijlabel en intentiecategorie',
+                  r.status_code == 200 and cid in r.text and 'Verzekeraar X BV' in r.text and 'Autoverzekering' in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/consent/{cid}')
+        rep.check('Consentrecord: detailpagina toont 27560-weergave met vier attributen, waarden, gebeurtenis en koppelingen',
+                  r.status_code == 200 and 'ISO/IEC TS 27560' in r.text and 'dpv:ConsentGiven' in r.text
+                  and all(f'data-attribute="{ATTR}{k}"' in r.text for k in SCENARIO_ATTRIBUTES) and '5611' in r.text
+                  and f'/verzoeken/{rid}/agreement.jsonld' in r.text and f'/intenties/{iid}' in r.text and 'data-event="given"' in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/verzoeken/{rid}')
+        rep.check('Consentrecord: eigenaarsdetail van het verzoek linkt naar het consentrecord en toont de gedeelde waarden',
+                  r.status_code == 200 and f'/consent/{cid}' in r.text and '5611' in r.text, '', f'status {r.status_code}')
+
+        # 2. Toestemming intrekken
+        created_stamp = con.get('dct:created')
+        r = flask(ctx, 'POST', f'/consent/{cid}/withdraw')
+        con2 = json.loads(cfile.read_text(encoding='utf-8'))
+        events2 = con2.get('mysolido:events') or []
+        rep.check('Consentrecord: intrekken zet dpv:ConsentWithdrawn, tweede event withdrawn door WEBID, dct:modified gezet',
+                  r.status_code in REDIRECT and con2.get('dpv:hasConsentStatus') == 'dpv:ConsentWithdrawn' and len(events2) == 2
+                  and events2[1].get('@type') == 'withdrawn' and events2[1].get('by') == ctx.webid
+                  and con2.get('dct:modified') and con2.get('dct:modified') >= created_stamp,
+                  '', json.dumps({'status': con2.get('dpv:hasConsentStatus'), 'events': events2, 'modified': con2.get('dct:modified')}))
+        req2 = json.loads(req_file.read_text(encoding='utf-8'))
+        rep.check('Consentrecord: gekoppeld verzoek op ingetrokken met withdrawnAt',
+                  req2.get('mysolido:status') == 'ingetrokken' and bool(req2.get('mysolido:withdrawnAt')),
+                  '', json.dumps({k: req2.get(k) for k in ('mysolido:status', 'mysolido:withdrawnAt')}))
+        r = anon.get(f"{ctx.flask_base}{req.get('mysolido:responseLink')}", timeout=TIMEOUT)
+        rep.check('Consentrecord: responspagina toont "Toestemming ingetrokken op" en geen gegevens meer',
+                  r.status_code == 200 and 'Toestemming ingetrokken op' in r.text and '5611' not in r.text and '35-44' not in r.text,
+                  '', f'status {r.status_code}')
+        r = anon.get(f"{ctx.flask_base}/verzoek/status/{req.get('mysolido:statusToken')}", timeout=TIMEOUT)
+        rep.check('Consentrecord: statuspagina toont "Toestemming ingetrokken op" zonder link naar gegevens',
+                  r.status_code == 200 and 'Toestemming ingetrokken op' in r.text and req.get('mysolido:responseLink') not in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/intenties/{iid}')
+        rep.check('Consentrecord: intentiepagina toont "(toestemming ingetrokken op"',
+                  r.status_code == 200 and '(toestemming ingetrokken op' in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/consent/{cid}')
+        rep.check('Consentrecord: detailpagina toont status ConsentWithdrawn en het withdrawn-event',
+                  r.status_code == 200 and 'dpv:ConsentWithdrawn' in r.text and 'data-event="withdrawn"' in r.text, '', f'status {r.status_code}')
+        agr_file = req_file.with_name(f'{rid}.agreement.jsonld')
+        agr = json.loads(agr_file.read_text(encoding='utf-8')) if agr_file.exists() else {}
+        rep.check('Consentrecord: Agreement blijft ongewijzigd bestaan na intrekken',
+                  agr.get('@type') == 'Agreement' and 'mysolido:withdrawn' not in json.dumps(agr), '', 'Agreement ontbreekt of gewijzigd')
+
+        # 3. Gericht aanbod: record na bevestiging, label = naam zonder organisatie
+        targeted_file = create_intention({'category': 'autoverzekering', 'description': 'Regressietest consent gericht',
+                                          'validity': '1w', 'attributes': ['vehicle_type', 'postal_area'], 'purpose': 'quote_calculation',
+                                          'offer_mode': 'targeted', 'targeted_party': 'Verzekeraar Y'})
+        if rep.check('Consentrecord: gerichte intentie aangemaakt', targeted_file is not None, '', 'geen record'):
+            intentions.append(targeted_file)
+            tid = targeted_file.stem
+            flask(ctx, 'POST', f'/intenties/{tid}/activate')
+            r, new = accept(tid, {'name': 'Verzekeraar Y', 'email': 'y@verzekeraar-y.test', 'accept_terms': 'yes'})
+            if rep.check('Consentrecord: gericht: acceptatie geregistreerd', r.status_code == 200 and len(new) == 1, '', f'status {r.status_code}'):
+                treq_file = new[0]
+                request_files.append(treq_file)
+                treq = json.loads(treq_file.read_text(encoding='utf-8'))
+                rep.check('Consentrecord: gericht: nog geen consentrecord vóór bevestiging', not treq.get('mysolido:consent'), '', str(treq.get('mysolido:consent')))
+                flask(ctx, 'POST', f'/verzoeken/{treq_file.stem}/approve')
+                treq = json.loads(treq_file.read_text(encoding='utf-8'))
+                tcid, tcfile = consent_file_of(treq)
+                if rep.check('Consentrecord: gericht: na bevestiging consentrecord aanwezig', bool(tcid) and tcfile is not None and tcfile.exists(), '', str(treq.get('mysolido:consent'))):
+                    consent_files.append(tcfile)
+                    tcon = json.loads(tcfile.read_text(encoding='utf-8'))
+                    tctrl = tcon.get('dpv:hasDataController') or {}
+                    rep.check('Consentrecord: gericht: label = naam (geen organisatie), controller = targetedParty.@id, onwardTransfer permitted',
+                              tctrl.get('rdfs:label') == 'Verzekeraar Y' and tctrl.get('mysolido:contactName') == 'Verzekeraar Y'
+                              and tctrl.get('@id') == (json.loads(targeted_file.read_text(encoding='utf-8')).get('mysolido:targetedParty') or {}).get('@id')
+                              and tcon.get('mysolido:onwardTransfer') == 'permitted' and 'mysolido:onwardTransferProhibition' not in tcon
+                              and len(tcon.get('dpv:hasPersonalData') or []) == 2,
+                              '', json.dumps(tctrl))
+
+        # 4. Fixtures: oude statusterm en verstreken geldigheid
+        cdir.mkdir(exist_ok=True)
+        legacy = cdir / f'regressietest-legacy-{ctx.run_id}.jsonld'
+        legacy.write_text(json.dumps({'@type': 'dpv:ConsentRecord', '@id': f'urn:mysolido:consent:{legacy.stem}',
+                                      'dct:title': 'Regressietest oude statusterm', 'dct:created': '2026-04-02T10:00:00Z',
+                                      'dct:modified': '2026-04-02T10:00:00Z', 'dpv:hasDataSubject': 'urn:mysolido:owner',
+                                      'dpv:hasDataController': {'@id': 'urn:mysolido:party:00000001', 'dct:title': 'Fixture BV'},
+                                      'dpv:hasPurpose': {'@type': 'dpv:ServiceProvision', 'dct:description': 'Verzekering'},
+                                      'dpv:hasPersonalDataCategory': 'dpv:Financial', 'dpv:hasConsentStatus': 'dpv:ConsentStatusGiven',
+                                      'dpv:hasLegalBasis': 'dpv:Consent', 'dpv:hasRight': 'dpv:RightToWithdrawConsent'}, indent=2), encoding='utf-8')
+        fixtures.append(legacy)
+        expired = cdir / f'regressietest-expired-{ctx.run_id}.jsonld'
+        expired.write_text(json.dumps({'@type': 'dpv:ConsentRecord', '@id': f'urn:mysolido:consent:{expired.stem}',
+                                       'dct:title': 'Regressietest verlopen', 'dct:created': '2026-01-01T10:00:00Z',
+                                       'dct:modified': '2026-01-01T10:00:00Z', 'dpv:hasDataSubject': 'urn:mysolido:owner',
+                                       'dpv:hasDataController': {'@id': 'urn:mysolido:party:00000002', 'dct:title': 'Fixture BV'},
+                                       'dpv:hasPurpose': {'@type': 'dpv:ServiceProvision', 'dct:description': 'Verzekering'},
+                                       'dpv:hasPersonalDataCategory': 'dpv:Financial', 'dpv:hasConsentStatus': 'dpv:ConsentStatusGiven',
+                                       'dpv:hasExpiry': {'@type': 'dpv:TemporalDuration', 'dpv:hasExpiryTime': '2026-02-01T00:00:00Z'},
+                                       'dpv:hasLegalBasis': 'dpv:Consent'}, indent=2), encoding='utf-8')
+        fixtures.append(expired)
+        r = flask(ctx, 'GET', f'/consent/{legacy.stem}')
+        rep.check('Consentrecord: oude statusterm dpv:ConsentStatusGiven leest terug als ConsentGiven / Actief',
+                  r.status_code == 200 and 'ConsentGiven' in r.text and 'ConsentStatusGiven' not in r.text and 'Actief' in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/consent/{expired.stem}')
+        rep.check('Consentrecord: verstreken hasExpiry toont Verlopen (afgeleid, niet geschreven)',
+                  r.status_code == 200 and 'Verlopen' in r.text and json.loads(expired.read_text(encoding='utf-8')).get('dpv:hasConsentStatus') == 'dpv:ConsentStatusGiven',
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', '/consent')
+        rep.check('Consentrecord: lijst toont beide fixtures met genormaliseerde status', r.status_code == 200 and legacy.stem in r.text and expired.stem in r.text,
+                  '', f'status {r.status_code}')
+    finally:
+        for f in fixtures:
+            if f.exists():
+                f.unlink()
+        for f in consent_files:
+            if f and f.exists():
+                flask(ctx, 'POST', f'/consent/{f.stem}/delete')
+                if f.exists():
+                    f.unlink()
+        for f in request_files:
+            for p in (f, f.with_name(f.stem + '.agreement.jsonld'), f.with_name(f.stem + '_response.json')):
+                if p.exists():
+                    p.unlink()
+        for f in intentions:
+            flask(ctx, 'POST', f'/intenties/{f.stem}/delete')
+            for p in (f, f.with_name(f.stem + '.policy.jsonld')):
+                if p.exists():
+                    p.unlink()
+        leftovers = [p for p in fixtures + [c for c in consent_files if c] if p.exists()]
+        leftovers += [p for f in request_files for p in (f, f.with_name(f.stem + '.agreement.jsonld'), f.with_name(f.stem + '_response.json')) if p.exists()]
+        leftovers += [p for f in intentions for p in (f, f.with_name(f.stem + '.policy.jsonld')) if p.exists()]
+        rep.check('Consentrecord: testintenties, verzoeken, Agreements, responses, consentrecords en fixtures opgeruimd', not leftovers, '', str(leftovers))
 
 
 # --- main --------------------------------------------------------------------------------
@@ -1625,6 +1888,7 @@ def main():
         run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
         run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
         run_phase(ctx, 'Acceptatie en Agreement', phase_acceptance)
+        run_phase(ctx, 'Consentrecord (27560)', phase_consent_record)
     else:
         run_phase(ctx, 'Preflight', phase_preflight)
         account = run_phase(ctx, 'Accountcreatie en test-Pod (CSS account-API)', phase_account)
@@ -1640,6 +1904,7 @@ def main():
         run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
         run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
         run_phase(ctx, 'Acceptatie en Agreement', phase_acceptance)
+        run_phase(ctx, 'Consentrecord (27560)', phase_consent_record)
         run_phase(ctx, 'Backup en restore', phase_backup_restore, content)
         run_phase(ctx, 'Flask /debug (HTTP-laag)', phase_debug)
         run_phase(ctx, 'Probes 7.2.0-changelog', phase_probes)

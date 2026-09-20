@@ -169,7 +169,9 @@ def pod_write(relative_path, content):
         return False
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
     mode = 'wb' if isinstance(content, bytes) else 'w'
-    with open(full_path, mode) as f:
+    # Tekst altijd als UTF-8 schrijven: alle lezers openen met encoding='utf-8'; zonder deze
+    # parameter schreef Windows cp1252 en brak elk record met een niet-ASCII-teken (20-09-2026)
+    with open(full_path, mode, encoding=None if mode == 'wb' else 'utf-8') as f:
         f.write(content)
     return True
 
@@ -2650,6 +2652,7 @@ AGREEMENT_UID_PREFIX = 'urn:mysolido:agreement:'
 REQUEST_STATUS_ACCEPTED = 'geaccepteerd'
 REQUEST_STATUS_AWAITING = 'wacht-op-bevestiging'
 REQUEST_STATUSES_WITH_RESPONSE = ('goedgekeurd', REQUEST_STATUS_ACCEPTED)
+REQUEST_STATUS_WITHDRAWN = 'ingetrokken'   # toestemming ingetrokken (subtaak 4b)
 
 
 def agreement_uid(request_id):
@@ -2762,6 +2765,126 @@ def build_response_data(intention_record, agreement):
     }
 
 
+CONSENT_RECORD_CONTEXT = {
+    "dpv": "https://w3id.org/dpv#",
+    "pd": "https://w3id.org/dpv/pd#",
+    "loc": "https://w3id.org/dpv/loc#",
+    "eu-gdpr": "https://w3id.org/dpv/legal/eu/gdpr#",
+    "dct": "http://purl.org/dc/terms/",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "mysolido": "https://mysolido.com/vocab#"
+}
+CONSENT_RECORD_SCHEMA = "ISO/IEC TS 27560:2023"
+CONSENT_RECORD_SCHEMA_VERSION = "1.0"
+
+
+def _days_between(start_iso, end_iso):
+    try:
+        start = datetime.fromisoformat(str(start_iso))
+        end = datetime.fromisoformat(str(end_iso))
+        return max(0, (end - start).days)
+    except (TypeError, ValueError):
+        return None
+
+
+def build_consent_record(request_record, intention_record, agreement):
+    """Consentrecord in de structuur van ISO/IEC TS 27560 met DPV-vocabulaire (subtaak 4b).
+
+    Velden en termen: notitie §3, rij Consentrecord. Geverifieerd tegen de DPV-27560-gids en
+    DPV 2.1; waar DPV geen term heeft staat mysolido:<veld>. De attribuut-urn is de identiteit
+    van elk gedeeld gegeven, de pd-term uit PROFILE_ATTRIBUTES de categorie erbij.
+    """
+    consent_id = generate_consent_id()
+    now = utc_now_iso_seconds()
+    webid = os.getenv('WEBID', WEBID)
+    party = request_record.get('mysolido:party') or {}
+    purpose = intention_record.get('mysolido:purpose') or {}
+    accepted_at = request_record.get('mysolido:acceptedAt', now)
+    valid_until = intention_record.get('schema:validThrough', '')
+    days = _days_between(accepted_at, valid_until)
+    prohibited = bool(intention_record.get('mysolido:noOnwardTransfer'))
+
+    personal_data = []
+    for attr in intention_record.get('mysolido:sharedAttributes', []):
+        key = str(attr.get('@id', ''))[len(ATTRIBUTE_URN_PREFIX):]
+        meta = PROFILE_ATTRIBUTES.get(key, {})
+        personal_data.append({
+            "@id": attr.get('@id', ''),
+            "@type": meta.get('dpv', f'mysolido:{key}'),
+            "rdfs:label": attr.get('label', ''),
+            "mysolido:value": attr.get('valueLabel', ''),
+        })
+
+    record = {
+        "@context": dict(CONSENT_RECORD_CONTEXT),
+        "@type": "dpv:ConsentRecord",
+        "@id": f"urn:mysolido:consent:{consent_id}",
+        # --- kop (27560: schema_version, record_id, pii_principal_id) ---
+        "dct:conformsTo": CONSENT_RECORD_SCHEMA,
+        "mysolido:recordSchemaVersion": CONSENT_RECORD_SCHEMA_VERSION,
+        "dct:identifier": consent_id,
+        "dct:title": f"{intention_record.get('mysolido:categoryLabel', 'Intentie')} — {party.get('rdfs:label', '')}",
+        "dct:description": intention_policy_summary_nl(agreement, intention_record),
+        "dct:created": now,
+        "dct:modified": now,
+        "dpv:hasDataSubject": {"@id": webid, "@type": "dpv:DataSubject"},
+        # --- verwerking (purpose, lawful_basis, pii_information, pii_controllers, retention, recipients, jurisdiction) ---
+        "dpv:hasPurpose": {
+            "@id": purpose.get('@id', ''),
+            "@type": purpose.get('dpv', 'dpv:Purpose'),
+            "rdfs:label": purpose.get('label', ''),
+        },
+        "dpv:hasLegalBasis": "dpv:ExplicitlyExpressedConsent",
+        "dpv:hasPersonalData": personal_data,
+        "dpv:hasDataController": {
+            "@id": party.get('@id', ''),
+            "@type": "dpv:DataController",
+            "rdfs:label": party.get('rdfs:label', ''),
+            "dct:title": party.get('rdfs:label', ''),
+            "mysolido:contactName": party.get('mysolido:contactName', ''),
+            "mysolido:contact": party.get('mysolido:contact', ''),
+        },
+        "dpv:hasStorageCondition": {
+            "@type": "dpv:StorageDuration",
+            "dpv:hasDuration": {
+                "@type": "dpv:TemporalDuration",
+                "mysolido:days": days,
+                "mysolido:iso8601": f"P{days}D" if days is not None else None,
+            },
+            "mysolido:validUntil": valid_until,
+        },
+        "dpv:hasRecipient": [],
+        "mysolido:onwardTransfer": "prohibited" if prohibited else "permitted",
+        "dpv:hasJurisdiction": {"@id": "loc:NL"},
+        # --- gebeurtenis (event_state, event_time, entity_id; event_type via hasLegalBasis) ---
+        "dpv:hasConsentStatus": CONSENT_STATUS_GIVEN,
+        "mysolido:events": [
+            {"@type": "given", "at": accepted_at, "by": party.get('@id', '')},
+        ],
+        "dpv:isImplementedByEntity": {"@id": webid},
+        # --- koppelingen en rechten ---
+        "mysolido:agreement": agreement.get('uid', ''),
+        "mysolido:intention": intention_record.get('@id', ''),
+        "mysolido:request": request_record.get('@id', ''),
+        "mysolido:acceptedPolicy": request_record.get('mysolido:acceptedPolicy', ''),
+        "mysolido:offerHash": request_record.get('mysolido:acceptedPolicyHash', ''),
+        "mysolido:intentionCategoryLabel": intention_record.get('mysolido:categoryLabel', ''),
+        "dpv:hasRight": "eu-gdpr:A7-3",
+    }
+    if prohibited:
+        record["mysolido:onwardTransferProhibition"] = agreement.get('uid', '')
+    return record
+
+
+def write_consent_record(record):
+    """Schrijf een consentrecord in toestemmingen/ (zelfde bestandsnaam als consent_new)."""
+    consent_id = record.get('dct:identifier') or str(record.get('@id', '')).rsplit(':', 1)[-1]
+    pod_mkdir('toestemmingen')
+    pod_write(f'toestemmingen/{consent_id}.jsonld', _json.dumps(record, indent=2, ensure_ascii=False))
+    return consent_id
+
+
 def conclude_agreement(request_record, intention_record):
     """Sluitmoment: Agreement en response schrijven, verzoek en intentie bijwerken.
 
@@ -2785,6 +2908,11 @@ def conclude_agreement(request_record, intention_record):
     request_record['mysolido:approvedData'] = [a['@id'] for a in response_data['attributes']]
     request_record['mysolido:responseLink'] = f"/verzoek/response/{request_record.get('mysolido:statusToken', '')}"
     request_record['mysolido:validUntil'] = intention_record.get('schema:validThrough', '')
+
+    # Consentrecord (subtaak 4b): één record per gesloten Agreement, ISO/IEC TS 27560-structuur
+    consent_record = build_consent_record(request_record, intention_record, agreement)
+    consent_id = write_consent_record(consent_record)
+    request_record['mysolido:consent'] = consent_record['@id']
     save_pod_json(f'verzoeken/{request_id}.jsonld', request_record)
 
     accepted_by = intention_record.setdefault('mysolido:acceptedBy', [])
@@ -2796,7 +2924,8 @@ def conclude_agreement(request_record, intention_record):
                                   'party': party.get('@id', ''), 'policy': offer.get('uid', '')})
     log_action('agreement_create', {'id': request_id, 'agreement': agreement['uid'],
                                     'offer_hash': request_record.get('mysolido:acceptedPolicyHash', '')})
-    # 4b: hier komt het consentrecord (één aanroep met request_record, intention_record, agreement)
+    log_action('consent_create', {'id': consent_id, 'agreement': agreement['uid'],
+                                  'controller': party.get('@id', ''), 'title': consent_record.get('dct:title', '')})
     return agreement
 
 
@@ -2810,10 +2939,14 @@ def accepted_requests_for(intention_record):
         items.append({
             'request_id': request_id,
             'party': party.get('rdfs:label') or record.get('mysolido:requester', {}).get('schema:name', '?'),
+            'contact_name': party.get('mysolido:contactName', ''),
             'organisation': party.get('mysolido:organisation', ''),
             'accepted_at': format_date_nl_iso(record.get('mysolido:acceptedAt', '')),
             'agreement': record.get('mysolido:agreement', ''),
+            'consent': record.get('mysolido:consent', ''),
             'status': record.get('mysolido:status', ''),
+            'withdrawn': record.get('mysolido:status') == REQUEST_STATUS_WITHDRAWN,   # toestemming ingetrokken (4b)
+            'withdrawn_at': format_date_nl_iso(record.get('mysolido:withdrawnAt', '')),
         })
     return items
 
@@ -2860,6 +2993,9 @@ def load_all_consents():
                     record = _json.load(f)
                 record['_filename'] = fname
                 record['_id'] = fname.replace('.jsonld', '')
+                # oude statuswaarden alleen in het geheugen normaliseren (geen migratie op schijf)
+                if 'dpv:hasConsentStatus' in record:
+                    record['dpv:hasConsentStatus'] = normalize_consent_status(record['dpv:hasConsentStatus'])
                 consents.append(record)
             except (_json.JSONDecodeError, IOError):
                 continue
@@ -2868,26 +3004,60 @@ def load_all_consents():
     return consents
 
 
-def get_consent_status_display(record):
-    """Return status display info for a consent record"""
-    status = record.get('dpv:hasConsentStatus', '')
-    if status == 'dpv:ConsentStatusWithdrawn':
-        return {'label': 'Ingetrokken', 'icon': '\u274c', 'class': 'status-withdrawn'}
+# Statustermen (subtaak 4b): DPV kent dpv:ConsentGiven / dpv:ConsentWithdrawn / dpv:ConsentExpired.
+# De waarden dpv:ConsentStatusGiven / dpv:ConsentStatusWithdrawn die tot 20-09-2026 werden
+# geschreven bestaan niet in DPV; bij lezen worden ze genormaliseerd, op schijf blijven ze staan.
+CONSENT_STATUS_GIVEN = 'dpv:ConsentGiven'
+CONSENT_STATUS_WITHDRAWN = 'dpv:ConsentWithdrawn'
+CONSENT_STATUS_EXPIRED = 'dpv:ConsentExpired'
+_LEGACY_CONSENT_STATUS = {
+    'dpv:ConsentStatusGiven': CONSENT_STATUS_GIVEN,
+    'dpv:ConsentStatusWithdrawn': CONSENT_STATUS_WITHDRAWN,
+}
 
+
+def normalize_consent_status(value):
+    """Oude statuswaarden naar de DPV-termen; onbekende waarden ongewijzigd."""
+    return _LEGACY_CONSENT_STATUS.get(value, value)
+
+
+def consent_expiry_time(record):
+    """Einddatum van een consentrecord: 27560-vorm (hasStorageCondition.mysolido:validUntil)
+    of de oude vorm (hasExpiry.hasExpiryTime). Leeg als er geen einddatum is."""
+    storage = record.get('dpv:hasStorageCondition')
+    if isinstance(storage, dict) and storage.get('mysolido:validUntil'):
+        return str(storage['mysolido:validUntil'])
     expiry = record.get('dpv:hasExpiry', {})
-    expiry_time = expiry.get('dpv:hasExpiryTime', '') if isinstance(expiry, dict) else ''
-    if expiry_time:
-        try:
-            exp_dt = datetime.fromisoformat(expiry_time.replace('Z', '+00:00'))
-            if exp_dt < datetime.now(exp_dt.tzinfo):
-                return {'label': 'Verlopen', 'icon': '\u23f0', 'class': 'status-expired'}
-        except (ValueError, TypeError):
-            pass
+    return str(expiry.get('dpv:hasExpiryTime', '')) if isinstance(expiry, dict) else ''
 
-    if status == 'dpv:ConsentStatusGiven':
-        return {'label': 'Actief', 'icon': '\u2705', 'class': 'status-active'}
 
-    return {'label': 'Onbekend', 'icon': '\u2753', 'class': 'status-unknown'}
+def consent_is_expired(record):
+    expiry_time = consent_expiry_time(record)
+    if not expiry_time:
+        return False
+    try:
+        exp_dt = datetime.fromisoformat(expiry_time.replace('Z', '+00:00'))
+        if exp_dt.tzinfo is None:
+            exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+        return exp_dt < datetime.now(timezone.utc)
+    except (ValueError, TypeError):
+        return False
+
+
+def get_consent_status_display(record):
+    """Return status display info for a consent record (label, icon, class, DPV-term)"""
+    status = normalize_consent_status(record.get('dpv:hasConsentStatus', ''))
+    if status == CONSENT_STATUS_WITHDRAWN:
+        return {'label': 'Ingetrokken', 'icon': '\u274c', 'class': 'status-withdrawn', 'term': CONSENT_STATUS_WITHDRAWN}
+
+    if consent_is_expired(record):
+        # "verlopen" wordt niet geschreven maar bij lezen afgeleid
+        return {'label': 'Verlopen', 'icon': '\u23f0', 'class': 'status-expired', 'term': CONSENT_STATUS_EXPIRED}
+
+    if status == CONSENT_STATUS_GIVEN:
+        return {'label': 'Actief', 'icon': '\u2705', 'class': 'status-active', 'term': CONSENT_STATUS_GIVEN}
+
+    return {'label': 'Onbekend', 'icon': '\u2753', 'class': 'status-unknown', 'term': status}
 
 
 def get_consent_stats():
@@ -2933,11 +3103,17 @@ def consent_list():
         c['_status'] = get_consent_status_display(c)
         # Extract readable fields
         controller = c.get('dpv:hasDataController', {})
-        c['_receiver'] = controller.get('dct:title', 'Onbekend') if isinstance(controller, dict) else str(controller)
+        if isinstance(controller, dict):
+            c['_receiver'] = controller.get('rdfs:label') or controller.get('dct:title', 'Onbekend')
+        else:
+            c['_receiver'] = str(controller)
         purpose = c.get('dpv:hasPurpose', {})
-        c['_purpose'] = purpose.get('dct:description', purpose.get('@type', 'Onbekend')) if isinstance(purpose, dict) else str(purpose)
-        expiry = c.get('dpv:hasExpiry', {})
-        c['_expiry_date'] = expiry.get('dpv:hasExpiryTime', '')[:10] if isinstance(expiry, dict) else ''
+        if isinstance(purpose, dict):
+            c['_purpose'] = purpose.get('rdfs:label') or purpose.get('dct:description', purpose.get('@type', 'Onbekend'))
+        else:
+            c['_purpose'] = str(purpose)
+        c['_expiry_date'] = consent_expiry_time(c)[:10]
+        c['_category'] = c.get('mysolido:intentionCategoryLabel', '')   # intentiegebonden record (4b)
         enriched.append(c)
 
     return render_template('consent_list.html', consents=enriched)
@@ -2992,7 +3168,7 @@ def consent_new():
                 "dct:description": purpose_info['label']
             },
             "dpv:hasPersonalDataCategory": category_info['@type'],
-            "dpv:hasConsentStatus": "dpv:ConsentStatusGiven",
+            "dpv:hasConsentStatus": CONSENT_STATUS_GIVEN,
             "dpv:hasLegalBasis": "dpv:Consent",
             "dpv:hasRight": "dpv:RightToWithdrawConsent"
         }
@@ -3043,9 +3219,25 @@ def consent_detail(consent_id):
         record = _json.load(f)
 
     record['_id'] = consent_id
+    if 'dpv:hasConsentStatus' in record:
+        record['dpv:hasConsentStatus'] = normalize_consent_status(record['dpv:hasConsentStatus'])
     record['_status'] = get_consent_status_display(record)
 
-    return render_template('consent_detail.html', consent=record)
+    # 27560-record (subtaak 4b): koppelingen als links, attributen met waarden, gebeurtenissen
+    links = None
+    if record.get('dct:conformsTo'):
+        request_id = str(record.get('mysolido:request', '')).rsplit(':', 1)[-1]
+        links = {
+            'intention_id': str(record.get('mysolido:intention', '')).rsplit(':', 1)[-1],
+            'request_id': request_id,
+            'agreement_exists': bool(request_id) and pod_exists(agreement_relpath(request_id)),
+        }
+
+    return render_template('consent_detail.html',
+        consent=record,
+        links=links,
+        expiry_date=format_date_nl_iso(consent_expiry_time(record)),
+    )
 
 
 @app.route('/consent/<consent_id>/withdraw', methods=['POST'])
@@ -3068,15 +3260,30 @@ def consent_withdraw(consent_id):
     with open(fpath, 'r', encoding='utf-8') as f:
         record = _json.load(f)
 
-    record['dpv:hasConsentStatus'] = 'dpv:ConsentStatusWithdrawn'
-    record['dct:modified'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    # "Toestemming intrekken" (subtaak 4b): status, gebeurtenis, modified; bij een
+    # intentiegebonden record ook het verzoek op 'ingetrokken' zodat de responspagina sluit.
+    # De Agreement blijft ongewijzigd als bewijs; dit record is de bron van de status.
+    withdrawn_at = utc_now_iso_seconds()
+    record['dpv:hasConsentStatus'] = CONSENT_STATUS_WITHDRAWN
+    record['dct:modified'] = withdrawn_at
+    if 'mysolido:events' in record or record.get('dct:conformsTo'):
+        record.setdefault('mysolido:events', []).append(
+            {"@type": "withdrawn", "at": withdrawn_at, "by": os.getenv('WEBID', WEBID)})
 
     with open(fpath, 'w', encoding='utf-8') as f:
         _json.dump(record, f, indent=4, ensure_ascii=False)
 
+    linked_request = str(record.get('mysolido:request', '')).rsplit(':', 1)[-1]
+    if linked_request:
+        request_record = load_request_record(linked_request)
+        if request_record:
+            request_record['mysolido:status'] = REQUEST_STATUS_WITHDRAWN
+            request_record['mysolido:withdrawnAt'] = withdrawn_at
+            save_pod_json(f'verzoeken/{linked_request}.jsonld', request_record)
+
     title = record.get('dct:title', consent_id)
     flash_t('flash_consent_withdrawn', 'success', title=title)
-    log_action('consent_withdraw', {'id': consent_id, 'title': title})
+    log_action('consent_withdraw', {'id': consent_id, 'title': title, 'request': linked_request or None})
     return redirect(url_for('consent_list'))
 
 
@@ -4195,7 +4402,8 @@ def count_new_requests():
     """Count unhandled (new) requests for badge display"""
     try:
         reqs = load_all_requests()
-        return sum(1 for r in reqs if r.get('mysolido:status') == 'nieuw')
+        # 'wacht-op-bevestiging' telt mee: een gerichte acceptatie vraagt om bevestiging (4b)
+        return sum(1 for r in reqs if r.get('mysolido:status') in ('nieuw', REQUEST_STATUS_AWAITING))
     except Exception:
         return 0
 
@@ -4370,6 +4578,7 @@ def verzoek_status(status_token):
         status=status,
         response_link=response_link,
         valid_until=valid_until[:10] if valid_until else '',
+        withdrawn_at=format_date_nl_iso(record.get('mysolido:withdrawnAt', '')),   # toestemming ingetrokken (4b)
         status_token=status_token,
     )
 
@@ -4383,6 +4592,11 @@ def verzoek_response(status_token):
 
     status = record.get('mysolido:status', 'nieuw')
     valid_until = record.get('mysolido:validUntil', '')
+
+    if status == REQUEST_STATUS_WITHDRAWN:
+        # Toestemming ingetrokken (subtaak 4b): geen gegevens meer, alleen de intrekdatum
+        return render_template('verzoek_response.html', found=True, expired=False, withdrawn=True,
+                               withdrawn_at=format_date_nl_iso(record.get('mysolido:withdrawnAt', '')))
 
     if status not in REQUEST_STATUSES_WITH_RESPONSE:
         return render_template('verzoek_response.html', found=False), 404
@@ -4501,6 +4715,10 @@ def verzoek_detail_owner(request_id):
             'policy_hash': record.get('mysolido:acceptedPolicyHash', ''),
             'agreement': agreement,
             'attributes': [attribute_label_from_urn(u) for u in record.get('mysolido:requestedData', [])],
+            # gedeelde waarden uit de response en het consentrecord (subtaak 4b)
+            'shared': (load_pod_json(request_response_relpath(request_id)) or {}).get('attributes', []),
+            'consent_id': str(record.get('mysolido:consent', '')).rsplit(':', 1)[-1],
+            'withdrawn_at': format_date_nl_iso(record.get('mysolido:withdrawnAt', '')),
         }
 
     return render_template('verzoek_detail.html',
@@ -4576,7 +4794,11 @@ def verzoek_approve(request_id):
         with open(fpath, 'w', encoding='utf-8') as f:
             _json.dump(record, f, indent=2, ensure_ascii=False)
 
-        # Create consent record (using existing consent module pattern)
+        # Generieke goedkeuring (verzoek zonder intentie): er wordt bewust géén consentrecord
+        # geschreven. Alleen intentiegebonden acceptaties krijgen een 27560-record, via
+        # conclude_agreement() (subtaak 4b). Zie docs/mysolido_verslag_myterms-demo-subtaak4b.
+        log_action('request_approve_generic', {'id': request_id, 'consent_record': None,
+                                               'note': 'generieke goedkeuring zonder consentrecord'})
         requester = record.get('mysolido:requester', {})
         requester_name = requester.get('schema:name', 'Onbekend')
         requester_org = requester.get('schema:worksFor', '')
@@ -4660,7 +4882,10 @@ def _acceptance_party(intention, name, organization, email):
         party_id = (intention.get('mysolido:targetedParty') or {}).get('@id') or generate_party_id()
     else:
         party_id = generate_party_id()
-    return {"@id": party_id, "rdfs:label": name, "mysolido:organisation": organization, "mysolido:contact": email}
+    # In MyTerms is de wederpartij de organisatie: label = organisatie als die is ingevuld,
+    # anders de naam; de persoon staat apart als contactName (besluit 20-09, subtaak 4b)
+    return {"@id": party_id, "rdfs:label": organization or name, "mysolido:contactName": name,
+            "mysolido:organisation": organization, "mysolido:contact": email}
 
 
 def _build_acceptance_request(intention, policy, party, request_id, status_token):
