@@ -1096,7 +1096,9 @@ def phase_intention(ctx: Ctx):
               '', f'status {r.status_code}')
 
     def new_files(before):
-        return [p for p in idir.glob('*.jsonld') if p.name not in before and not p.name.startswith('.')] if idir.exists() else []
+        # <uuid>.policy.jsonld is de Offer naast het record (subtaak 3), geen intentie
+        return [p for p in idir.glob('*.jsonld') if p.name not in before and not p.name.startswith('.')
+                and not p.name.endswith('.policy.jsonld')] if idir.exists() else []
 
     def listing():
         return {p.name for p in idir.glob('*.jsonld')} if idir.exists() else set()
@@ -1175,9 +1177,10 @@ def phase_intention(ctx: Ctx):
         if rep.check('Intentie: gericht aanbod weggeschreven', len(new) == 1, '', f'status {r.status_code}'):
             created.append(new[0])
             rec2 = json.loads(new[0].read_text(encoding='utf-8'))
-            rep.check('Intentie: offerMode targeted met targetedParty, noOnwardTransfer false zonder vinkje',
+            party = rec2.get('mysolido:targetedParty') or {}
+            rep.check('Intentie: offerMode targeted met targetedParty (@id + name), noOnwardTransfer false zonder vinkje',
                       rec2.get('mysolido:offerMode') == 'targeted'
-                      and rec2.get('mysolido:targetedParty') == {'name': 'Verzekeraar X'}
+                      and party.get('name') == 'Verzekeraar X' and str(party.get('@id', '')).startswith('urn:mysolido:party:')
                       and rec2.get('mysolido:noOnwardTransfer') is False
                       and [a['@id'] for a in rec2.get('mysolido:sharedAttributes', [])] == [ATTR + 'vehicle_type'],
                       '', json.dumps(rec2)[:300])
@@ -1201,9 +1204,175 @@ def phase_intention(ctx: Ctx):
         for f in created:
             if f.exists():
                 r = flask(ctx, 'POST', f'/intenties/{f.stem}/delete')
-                if f.exists():
-                    f.unlink()
-        rep.check('Intentie: testrecords opgeruimd', not any(f.exists() for f in created), '', 'bestanden bestaan nog')
+            for p in (f, f.with_name(f.stem + '.policy.jsonld')):
+                if p.exists():
+                    p.unlink()
+        rep.check('Intentie: testrecords (en hun policybestanden) opgeruimd',
+                  not any(p.exists() for f in created for p in (f, f.with_name(f.stem + '.policy.jsonld'))),
+                  '', 'bestanden bestaan nog')
+
+
+def phase_intention_policy(ctx: Ctx):
+    """ODRL-Offer per intentie (subtaak 3): bestand, vorm, samenvatting, leesroute, herstelroute, listing."""
+    rep = ctx.report
+    idir = ctx.pod_dir / 'intenties'
+    profile = read_profile(ctx)
+    expected = expected_scenario_values(profile)
+    if not all(expected.values()):
+        rep.skip('Intentiepolicy: profiel mist scenariowaarden, fase overgeslagen', json.dumps(expected))
+        return
+
+    def listing():
+        return {p.name for p in idir.glob('*.jsonld')} if idir.exists() else set()
+
+    def new_files(before):
+        return [p for p in idir.glob('*.jsonld') if p.name not in before
+                and not p.name.startswith('.') and not p.name.endswith('.policy.jsonld')] if idir.exists() else []
+
+    def policy_file(rec_file: Path) -> Path:
+        return rec_file.with_name(rec_file.stem + '.policy.jsonld')
+
+    def create(data):
+        before = listing()
+        r = flask(ctx, 'POST', '/intenties/nieuw', data=data)
+        return r, new_files(before)
+
+    created = []
+    route_removed_policy = None
+    try:
+        # 1. Open aanbod, vier attributen, doorleververbod
+        r, new = create({'category': 'autoverzekering', 'description': 'Regressietest policy open',
+                         'validity': '2w', 'attributes': list(SCENARIO_ATTRIBUTES),
+                         'purpose': 'quote_calculation', 'no_onward_transfer': '1', 'offer_mode': 'open'})
+        if not rep.check('Intentiepolicy: intentie aangemaakt', r.status_code in REDIRECT and len(new) == 1,
+                         '', f'status {r.status_code}, nieuwe bestanden: {len(new)}'):
+            return
+        rec_file = new[0]
+        created.append(rec_file)
+        iid = rec_file.stem
+        uid = f'urn:mysolido:policy:intention:{iid}'
+        rec = json.loads(rec_file.read_text(encoding='utf-8'))
+        pf = policy_file(rec_file)
+        if not rep.check('Intentiepolicy: intenties/<uuid>.policy.jsonld geschreven', pf.exists(), pf.name, 'ontbreekt'):
+            return
+        pol = json.loads(pf.read_text(encoding='utf-8'))
+        rep.check('Intentiepolicy: @type Offer, uid, profile en assigner = WEBID',
+                  pol.get('@type') == 'Offer' and pol.get('uid') == uid and pol.get('assigner') == ctx.webid
+                  and pol.get('profile') == 'http://www.w3.org/ns/odrl/2/core',
+                  '', json.dumps({k: pol.get(k) for k in ('@type', 'uid', 'assigner', 'profile')}))
+        perms = pol.get('permission') or [{}]
+        perm = perms[0]
+        rep.check('Intentiepolicy: één permission "use" met de vier targets in recordvolgorde',
+                  len(perms) == 1 and perm.get('action') == 'use'
+                  and perm.get('target') == [ATTR + k for k in SCENARIO_ATTRIBUTES],
+                  '', json.dumps(perm.get('target')))
+        cons = {c.get('leftOperand'): c for c in perm.get('constraint', [])}
+        purpose_c = cons.get('purpose') or {}
+        rep.check('Intentiepolicy: constraint purpose eq urn:mysolido:purpose:quote_calculation',
+                  purpose_c.get('operator') == 'eq'
+                  and (purpose_c.get('rightOperand') or {}).get('@id') == 'urn:mysolido:purpose:quote_calculation',
+                  '', json.dumps(purpose_c))
+        date_c = cons.get('dateTime') or {}
+        rep.check('Intentiepolicy: constraint dateTime lteq schema:validThrough (xsd:dateTime)',
+                  date_c.get('operator') == 'lteq'
+                  and (date_c.get('rightOperand') or {}).get('@value') == rec.get('schema:validThrough')
+                  and (date_c.get('rightOperand') or {}).get('@type') == 'xsd:dateTime',
+                  '', json.dumps(date_c))
+        prohib = pol.get('prohibition') or []
+        rep.check('Intentiepolicy: prohibition distribute + transfer op dezelfde targets (noOnwardTransfer true)',
+                  len(prohib) == 1 and sorted(actions(prohib[0].get('action'))) == ['distribute', 'transfer']
+                  and prohib[0].get('target') == perm.get('target'),
+                  '', json.dumps(prohib))
+        rep.check('Intentiepolicy: open aanbod heeft geen assignee',
+                  'assignee' not in perm and not any('assignee' in p for p in prohib), '', json.dumps(perm.get('assignee')))
+        rep.check('Intentiepolicy: record bevat mysolido:policy = uid', rec.get('mysolido:policy') == uid,
+                  '', str(rec.get('mysolido:policy')))
+        r = flask(ctx, 'GET', f'/intenties/{iid}')
+        needles = ('Iedereen die deze voorwaarden accepteert', 'leeftijdscategorie', 'postcodegebied',
+                   'voertuigtype', 'schadeverleden', 'offerteberekening', 'niet doorleveren', 'Voorwaarden (ODRL-aanbod)')
+        rep.check('Intentiepolicy: detailpagina toont de samenvatting met vier labels, doel en doorleverzin',
+                  r.status_code == 200 and all(n in r.text for n in needles),
+                  '', f'status {r.status_code}, ontbreekt: {[n for n in needles if n not in r.text]}')
+        rep.check('Intentiepolicy: detailpagina toont de ruwe JSON-LD (uid zichtbaar)', uid in r.text, '', 'uid niet in pagina')
+        rep.check('Intentiepolicy: "Vastgelegd op" in dd-mm-jjjj',
+                  f"Vastgelegd op {datetime.fromisoformat(rec['schema:dateCreated']).strftime('%d-%m-%Y')}" in r.text,
+                  '', 'datumnotatie niet gevonden')
+        r = flask(ctx, 'GET', f'/intenties/{iid}/policy.jsonld')
+        rep.check('Intentiepolicy: GET /intenties/<uuid>/policy.jsonld geeft application/ld+json met de Offer',
+                  r.status_code == 200 and 'application/ld+json' in r.headers.get('Content-Type', '')
+                  and r.json().get('uid') == uid,
+                  r.headers.get('Content-Type', ''), f'status {r.status_code}')
+
+        # 2. Gericht aanbod zonder doorleververbod
+        r, new = create({'category': 'autoverzekering', 'description': 'Regressietest policy gericht',
+                         'validity': '1w', 'attributes': ['vehicle_type', 'postal_area'],
+                         'purpose': 'quote_calculation', 'offer_mode': 'targeted', 'targeted_party': 'Verzekeraar X'})
+        if rep.check('Intentiepolicy: gericht aanbod aangemaakt', r.status_code in REDIRECT and len(new) == 1,
+                     '', f'status {r.status_code}'):
+            rec2_file = new[0]
+            created.append(rec2_file)
+            rec2 = json.loads(rec2_file.read_text(encoding='utf-8'))
+            pf2 = policy_file(rec2_file)
+            pol2 = json.loads(pf2.read_text(encoding='utf-8')) if pf2.exists() else {}
+            perm2 = (pol2.get('permission') or [{}])[0]
+            party_id = str((rec2.get('mysolido:targetedParty') or {}).get('@id', ''))
+            assignee = perm2.get('assignee') or {}
+            rep.check('Intentiepolicy: assignee = targetedParty.@id met rdfs:label, targets in volgorde, geen prohibition',
+                      party_id.startswith('urn:mysolido:party:') and assignee.get('@id') == party_id
+                      and assignee.get('rdfs:label') == 'Verzekeraar X' and not pol2.get('prohibition')
+                      and perm2.get('target') == [ATTR + 'vehicle_type', ATTR + 'postal_area'],
+                      '', json.dumps(pol2)[:300])
+            r = flask(ctx, 'GET', f'/intenties/{rec2_file.stem}')
+            rep.check('Intentiepolicy: samenvatting gericht aanbod begint met de partijnaam, zonder doorleverzin',
+                      r.status_code == 200 and 'Verzekeraar X mag voertuigtype en postcodegebied' in r.text
+                      and 'niet doorleveren' not in r.text,
+                      '', f'status {r.status_code}')
+
+        # 3. Zonder attributen geweigerd
+        before = listing()
+        r = flask(ctx, 'POST', '/intenties/nieuw', data={'category': 'anders', 'description': 'Regressietest zonder attributen',
+                                                          'validity': '1w', 'purpose': 'quote_calculation'})
+        refused_new = new_files(before)
+        follow = flask(ctx, 'GET', '/intenties/nieuw')
+        rep.check('Intentiepolicy: intentie zonder attributen wordt geweigerd met melding',
+                  r.status_code in REDIRECT and not refused_new and 'minstens' in follow.text,
+                  '', f'status {r.status_code}, nieuwe bestanden: {len(refused_new)}')
+
+        # 4. "Voorwaarden opstellen" voor een record zonder policybestand
+        pf.unlink()
+        r = flask(ctx, 'GET', f'/intenties/{iid}')
+        rep.check('Intentiepolicy: zonder policybestand toont de detailpagina "Voorwaarden opstellen"',
+                  r.status_code == 200 and 'Voorwaarden opstellen' in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'POST', f'/intenties/{iid}/policy/create')
+        pol_again = json.loads(pf.read_text(encoding='utf-8')) if pf.exists() else {}
+        rep.check('Intentiepolicy: POST policy/create maakt de Offer opnieuw aan',
+                  r.status_code in REDIRECT and pol_again.get('uid') == uid, '', f'status {r.status_code}, bestaat: {pf.exists()}')
+
+        # 5. Listing, zoeken en overzicht
+        r = flask(ctx, 'GET', '/browse/intenties')
+        rep.check('Intentiepolicy: policybestand niet in de kluislisting', r.status_code == 200 and '.policy.jsonld' not in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', '/search', params={'q': 'policy'})
+        rep.check('Intentiepolicy: policybestand niet in zoekresultaten', r.status_code == 200 and '.policy.jsonld' not in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', '/intenties')
+        rep.check('Intentiepolicy: policybestand niet als intentie in het overzicht',
+                  r.status_code == 200 and f'{iid}.policy' not in r.text, '', f'status {r.status_code}')
+
+        # 6. Verwijderen van de intentie neemt de Offer mee
+        flask(ctx, 'POST', f'/intenties/{iid}/delete')
+        route_removed_policy = not rec_file.exists() and not pf.exists()
+        rep.check('Intentiepolicy: verwijderen van de intentie verwijdert ook de Offer', bool(route_removed_policy),
+                  '', f'record: {rec_file.exists()}, policy: {pf.exists()}')
+    finally:
+        for f in created:
+            if f.exists():
+                flask(ctx, 'POST', f'/intenties/{f.stem}/delete')
+            for p in (f, policy_file(f)):
+                if p.exists():
+                    p.unlink()
+        rep.check('Intentiepolicy: testrecords en policybestanden opgeruimd',
+                  not any(p.exists() for f in created for p in (f, policy_file(f))), '', 'bestanden bestaan nog')
 
 
 # --- main --------------------------------------------------------------------------------
@@ -1239,6 +1408,7 @@ def main():
         run_phase(ctx, 'Demodata (seed_demo.py)', phase_seed)
         run_phase(ctx, 'Profielvelden MyTerms-demo', phase_profile_fields)
         run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
+        run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
     else:
         run_phase(ctx, 'Preflight', phase_preflight)
         account = run_phase(ctx, 'Accountcreatie en test-Pod (CSS account-API)', phase_account)
@@ -1252,6 +1422,7 @@ def main():
         run_phase(ctx, 'Demodata (seed_demo.py)', phase_seed)
         run_phase(ctx, 'Profielvelden MyTerms-demo', phase_profile_fields)
         run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
+        run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
         run_phase(ctx, 'Backup en restore', phase_backup_restore, content)
         run_phase(ctx, 'Flask /debug (HTTP-laag)', phase_debug)
         run_phase(ctx, 'Probes 7.2.0-changelog', phase_probes)

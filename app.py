@@ -240,8 +240,8 @@ def list_folder_filesystem(relative_path=''):
                 'modified': datetime.fromtimestamp(os.path.getmtime(full_path)).strftime('%d %b %Y'),
             })
         else:
-            # Skip metadata bestanden
-            if entry.endswith('.acl') or entry.endswith('.meta'):
+            # Skip metadata bestanden en ODRL-policies naast records (<uuid>.policy.jsonld)
+            if entry.endswith('.acl') or entry.endswith('.meta') or entry.endswith('.policy.jsonld'):
                 continue
 
             stat = os.stat(full_path)
@@ -274,7 +274,7 @@ def search_pod_filesystem(query, relative_path='', depth=0, max_depth=5):
     pod_url = os.getenv('SOLID_POD_URL', SOLID_POD_URL or 'http://127.0.0.1:3000/mysolido/')
 
     for entry in os.listdir(search_path):
-        if entry.startswith('.') or entry.endswith('.acl') or entry.endswith('.meta'):
+        if entry.startswith('.') or entry.endswith('.acl') or entry.endswith('.meta') or entry.endswith('.policy.jsonld'):
             continue
 
         full_path = os.path.join(search_path, entry)
@@ -330,7 +330,7 @@ def get_pod_stats_filesystem():
                 countable = []
             total_folders += len(countable)
         for f in files:
-            if not f.startswith('.') and not f.endswith('.acl') and not f.endswith('.meta'):
+            if not f.startswith('.') and not f.endswith('.acl') and not f.endswith('.meta') and not f.endswith('.policy.jsonld'):
                 filepath = os.path.join(root, f)
                 size = os.path.getsize(filepath)
                 total_size += size
@@ -2474,6 +2474,170 @@ def edit_policy(folder_path):
     )
 
 
+# === INTENTIEPOLICY: ODRL-Offer per intentie (MyTerms-demo, subtaak 3) ===
+# Los van build_policy(): de mapregels hierboven blijven ongemoeid. Vorm en namen staan
+# in docs/mysolido_notitie_datamodel-myterms_20-09-2026.md (§3). Eén Offer per intentie,
+# bestand intenties/<uuid>.policy.jsonld, uid urn:mysolido:policy:intention:<uuid>.
+# De constanten PROFILE_ATTRIBUTES en INTENTION_PURPOSES staan verderop in dit bestand;
+# de functies hier gebruiken ze alleen op het moment van aanroepen.
+
+INTENTION_POLICY_CONTEXT = [
+    "http://www.w3.org/ns/odrl.jsonld",
+    {"dpv": "https://w3id.org/dpv#", "rdfs": "http://www.w3.org/2000/01/rdf-schema#"}
+]
+INTENTION_POLICY_UID_PREFIX = 'urn:mysolido:policy:intention:'
+PARTY_URN_PREFIX = 'urn:mysolido:party:'
+OPEN_OFFER_WHO_NL = 'Iedereen die deze voorwaarden accepteert'
+
+
+def intention_policy_uid(intention_id):
+    return f'{INTENTION_POLICY_UID_PREFIX}{intention_id}'
+
+
+def intention_policy_relpath(intention_id):
+    return f'intenties/{intention_id}.policy.jsonld'
+
+
+def intention_id_from_record(record):
+    return str(record.get('@id', '')).rsplit(':', 1)[-1]
+
+
+def generate_party_id():
+    """Partij-id in dezelfde vorm als consent_new(): urn:mysolido:party:<hex>."""
+    return f'{PARTY_URN_PREFIX}{secrets.token_hex(4)}'
+
+
+def build_intention_policy(record):
+    """ODRL-Offer voor een mysolido:Intention met sharedAttributes (zie notitie §3)."""
+    intention_id = intention_id_from_record(record)
+    targets = [a['@id'] for a in record.get('mysolido:sharedAttributes', []) if a.get('@id')]
+    purpose_id = (record.get('mysolido:purpose') or {}).get(
+        '@id', f'urn:mysolido:purpose:{DEFAULT_INTENTION_PURPOSE}')
+
+    permission = {"target": targets}
+    assignee = None
+    if record.get('mysolido:offerMode') == 'targeted':
+        party = record.get('mysolido:targetedParty') or {}
+        assignee = {"@id": party.get('@id', ''), "rdfs:label": party.get('name', '')}
+        permission["assignee"] = assignee
+    permission["action"] = "use"
+    permission["constraint"] = [
+        {"leftOperand": "purpose", "operator": "eq", "rightOperand": {"@id": purpose_id}},
+        {"leftOperand": "dateTime", "operator": "lteq",
+         "rightOperand": {"@type": "xsd:dateTime", "@value": record.get('schema:validThrough', '')}},
+    ]
+
+    policy = {
+        "@context": list(INTENTION_POLICY_CONTEXT),
+        "@type": "Offer",
+        "uid": intention_policy_uid(intention_id),
+        "profile": "http://www.w3.org/ns/odrl/2/core",
+        "assigner": os.getenv('WEBID', WEBID),
+        "permission": [permission],
+    }
+    if record.get('mysolido:noOnwardTransfer'):
+        prohibition = {"target": list(targets)}
+        if assignee:
+            prohibition["assignee"] = dict(assignee)
+        prohibition["action"] = ["distribute", "transfer"]
+        policy["prohibition"] = [prohibition]
+    return policy
+
+
+def write_intention_policy(record):
+    """Schrijf de Offer naast het intentierecord. Geeft de policy terug, of None zonder targets."""
+    if not record.get('mysolido:sharedAttributes'):
+        return None
+    policy = build_intention_policy(record)
+    pod_write(intention_policy_relpath(intention_id_from_record(record)),
+              _json.dumps(policy, indent=2, ensure_ascii=False))
+    return policy
+
+
+def load_intention_policy(intention_id):
+    """Lees intenties/<uuid>.policy.jsonld; None als het bestand ontbreekt of onleesbaar is."""
+    path = safe_pod_path(intention_policy_relpath(intention_id))
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return _json.load(f)
+    except (ValueError, IOError):
+        return None
+
+
+def format_date_nl_iso(value):
+    """'2026-10-04T08:56:20+00:00' -> '04-10-2026'; onbekende invoer komt ongewijzigd terug."""
+    try:
+        return datetime.fromisoformat(str(value)[:10]).strftime('%d-%m-%Y')
+    except (TypeError, ValueError):
+        return value or ''
+
+
+def _join_nl(items):
+    items = [i for i in items if i]
+    if len(items) <= 1:
+        return ''.join(items)
+    return ', '.join(items[:-1]) + ' en ' + items[-1]
+
+
+def _lower_first(text):
+    return text[:1].lower() + text[1:] if text else ''
+
+
+def _summary_label(label):
+    """Label voor in de zin: kleine beginletter, zonder toelichting tussen haakjes ("(4 cijfers)")."""
+    return _lower_first(re.sub(r'\s*\([^)]*\)\s*$', '', label or ''))
+
+
+def _operand_value(operand, key):
+    return operand.get(key, '') if isinstance(operand, dict) else ''
+
+
+def intention_policy_summary_nl(policy, record):
+    """Nederlandse zin voor een intentie-Offer; los van policy_summary_nl() (mapregels).
+
+    Vorm: "<Wie> mag <labels> gebruiken, uitsluitend voor <doel>, tot <dd-mm-jjjj>,
+    en mag ze niet doorleveren." Zonder prohibition vervalt het laatste zinsdeel.
+    """
+    if not policy:
+        return ''
+    perm = (policy.get('permission') or [{}])[0]
+    targets = perm.get('target', [])
+    if isinstance(targets, str):
+        targets = [targets]
+    labels = []
+    for urn in targets:
+        key = urn[len(ATTRIBUTE_URN_PREFIX):] if str(urn).startswith(ATTRIBUTE_URN_PREFIX) else None
+        attr = PROFILE_ATTRIBUTES.get(key) if key else None
+        labels.append(_summary_label(attr['label']) if attr else str(urn))
+
+    purpose_label = (record.get('mysolido:purpose') or {}).get('label', '')
+    until = ''
+    for constraint in perm.get('constraint', []):
+        if constraint.get('leftOperand') == 'purpose':
+            code = str(_operand_value(constraint.get('rightOperand'), '@id')).rsplit(':', 1)[-1]
+            if code in INTENTION_PURPOSES:
+                purpose_label = INTENTION_PURPOSES[code]['label']
+        elif constraint.get('leftOperand') == 'dateTime':
+            until = format_date_nl_iso(_operand_value(constraint.get('rightOperand'), '@value'))
+
+    assignee = perm.get('assignee')
+    if isinstance(assignee, dict) and assignee.get('rdfs:label'):
+        who = assignee['rdfs:label']
+    elif assignee:
+        who = (record.get('mysolido:targetedParty') or {}).get('name') or str(assignee)
+    else:
+        who = OPEN_OFFER_WHO_NL
+
+    sentence = f"{who} mag {_join_nl(labels)} gebruiken, uitsluitend voor {_lower_first(purpose_label)}"
+    if until:
+        sentence += f", tot {until}"
+    if policy.get('prohibition'):
+        sentence += ", en mag ze niet doorleveren"
+    return sentence + '.'
+
+
 # === CONSENT MODULE ===
 
 PURPOSE_MAP = {
@@ -3213,7 +3377,8 @@ def profiel_data_save():
 # (tot 20-09-2026 waren dit groepsnamen; sinds subtaak 2 selecteert het formulier per veld)
 INTENTION_CATEGORIES = {
     'autoverzekering': {'label': 'Autoverzekering', 'icon': '\U0001f697',
-                        'profile_fields': ['age_category', 'postal_area', 'vehicle_type', 'claims_history']},
+                        'profile_fields': ['age_category', 'postal_area', 'vehicle_type', 'claims_history'],
+                        'default_validity': '2w'},   # scenario: geldigheid 2 weken voorgeselecteerd
     'zorgverzekering': {'label': 'Zorgverzekering', 'icon': '\U0001f3e5',
                         'profile_fields': ['age_category', 'smoking_status', 'household_size']},
     'woonverzekering': {'label': 'Woonverzekering', 'icon': '\U0001f3e0',
@@ -3399,7 +3564,8 @@ def load_all_intentions():
 
     intentions = []
     for fname in os.listdir(intenties_dir):
-        if fname.endswith('.jsonld') and not fname.startswith('.'):
+        # <uuid>.policy.jsonld is de Offer naast een record, geen intentie
+        if fname.endswith('.jsonld') and not fname.startswith('.') and not fname.endswith('.policy.jsonld'):
             fpath = os.path.join(intenties_dir, fname)
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
@@ -3536,6 +3702,10 @@ def intentie_new():
         profile = load_profile_data()
         selected_keys = request.form.getlist('attributes')
         shared_attributes = build_shared_attributes(profile, selected_keys, now.isoformat())
+        if not shared_attributes:
+            # Een Offer zonder targets is leeg (besluit 20-09, subtaak 3)
+            flash_t('flash_attributes_required', 'error')
+            return redirect(url_for('intentie_new'))
 
         record = {
             "@context": {
@@ -3560,18 +3730,23 @@ def intentie_new():
             },
             "mysolido:noOnwardTransfer": no_onward_transfer,
             "mysolido:offerMode": offer_mode,
+            "mysolido:policy": intention_policy_uid(intention_id),
         }
         if offer_mode == 'targeted':
-            record["mysolido:targetedParty"] = {"name": targeted_party}
+            # Partij-id nu al vast, zodat Offer (assignee) en subtaak 4 dezelfde id gebruiken
+            record["mysolido:targetedParty"] = {"@id": generate_party_id(), "name": targeted_party}
 
         pod_mkdir('intenties')
         pod_write(f'intenties/{intention_id}.jsonld',
                   _json.dumps(record, indent=2, ensure_ascii=False))
         ensure_intenties_policy()
+        # ODRL-Offer naast het record (subtaak 3)
+        write_intention_policy(record)
 
         flash_t('flash_intention_saved', 'success', label=cat_info["label"])
         log_action('intention_create', {'id': intention_id, 'category': category,
-                                        'attributes': [a['@id'] for a in shared_attributes]})
+                                        'attributes': [a['@id'] for a in shared_attributes],
+                                        'policy': record["mysolido:policy"]})
         return redirect(url_for('intenties_overview'))
 
     # GET: show form
@@ -3624,14 +3799,60 @@ def intentie_detail(intention_id):
         captured_at = shared_attributes[0].get('capturedAt', '')
     captured_at = captured_at or record.get('schema:dateCreated', '')
 
+    # ODRL-Offer naast het record (subtaak 3); ook zichtbaar in Bridge-modus
+    policy = load_intention_policy(intention_id)
+    policy_summary = intention_policy_summary_nl(policy, record) if policy else ''
+
     return render_template('intentie_detail.html',
         intention=record,
         shared_attributes=shared_attributes or [],
-        captured_at=captured_at[:10],
+        captured_at=format_date_nl_iso(captured_at),
         legacy_shared=legacy_shared,
         profile_groups=profile_groups,
+        policy=policy,
+        policy_summary=policy_summary,
         read_only=BRIDGE_MODE,
     )
+
+
+@app.route('/intenties/<intention_id>/policy.jsonld')
+def intentie_policy_file(intention_id):
+    """De Offer van een intentie als application/ld+json (na eigenaarslogin, ook in Bridge-modus)."""
+    path = safe_pod_path(intention_policy_relpath(intention_id))
+    if not path or not os.path.isfile(path):
+        abort(404)
+    with open(path, 'r', encoding='utf-8') as f:
+        return Response(f.read(), mimetype='application/ld+json')
+
+
+@app.route('/intenties/<intention_id>/policy/create', methods=['POST'])
+def intentie_policy_create(intention_id):
+    """Maak de Offer alsnog voor een record zonder policybestand ("Voorwaarden opstellen")."""
+    if BRIDGE_MODE:
+        abort(403)
+
+    intenties_dir = get_intenties_dir()
+    fpath = os.path.join(intenties_dir, f"{intention_id}.jsonld") if intenties_dir else None
+    if not fpath or not os.path.exists(fpath):
+        flash_t('flash_intention_not_found', 'error')
+        return redirect(url_for('intenties_overview'))
+
+    with open(fpath, 'r', encoding='utf-8') as f:
+        record = _json.load(f)
+
+    if not record.get('mysolido:sharedAttributes'):
+        flash_t('flash_policy_no_attributes', 'error')
+        return redirect(url_for('intentie_detail', intention_id=intention_id))
+
+    write_intention_policy(record)
+    if record.get('mysolido:policy') != intention_policy_uid(intention_id):
+        record['mysolido:policy'] = intention_policy_uid(intention_id)
+        with open(fpath, 'w', encoding='utf-8') as f:
+            _json.dump(record, f, indent=2, ensure_ascii=False)
+
+    flash_t('flash_policy_created')
+    log_action('intention_policy_create', {'id': intention_id, 'policy': record['mysolido:policy']})
+    return redirect(url_for('intentie_detail', intention_id=intention_id))
 
 
 @app.route('/intenties/<intention_id>/activate', methods=['POST'])
@@ -3707,6 +3928,10 @@ def intentie_delete(intention_id):
         return redirect(url_for('intenties_overview'))
 
     os.remove(fpath)
+    # De Offer naast het record gaat mee (subtaak 3)
+    policy_path = safe_pod_path(intention_policy_relpath(intention_id))
+    if policy_path and os.path.isfile(policy_path):
+        os.remove(policy_path)
     flash_t('flash_intention_deleted')
     log_action('intention_delete', {'id': intention_id})
     return redirect(url_for('intenties_overview'))

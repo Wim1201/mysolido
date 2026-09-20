@@ -190,12 +190,22 @@
         {% endfor %}
     };
 
+    // Voorselectie van de geldigheidsduur per categorie (INTENTION_CATEGORIES.default_validity)
+    var categoryValidity = {
+        {% for key, cat in categories.items() %}
+        '{{ key }}': {{ cat.get('default_validity', '')|tojson }},
+        {% endfor %}
+    };
+
     function updateAttributeSelection() {
         var category = document.getElementById('category').value;
         var fields = categoryFields[category] || [];
         document.querySelectorAll('input[name="attributes"]').forEach(function(cb) {
             cb.checked = !cb.disabled && fields.indexOf(cb.value) !== -1;
         });
+        if (categoryValidity[category]) {
+            document.getElementById('validity').value = categoryValidity[category];
+        }
     }
 
     function toggleTargetedParty() {

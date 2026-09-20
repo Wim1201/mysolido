@@ -63,7 +63,8 @@ Draai beide scenario's op de huidige CSS-versie (nulmeting) en beide op de nieuw
 | 13 | Consentrequest | Publiek formulier schrijft verzoek, statustoken, statuspagina, eigenaar ziet verzoek, afwijzen, statuspagina toont afgewezen |
 | 13a | Demodata (seed) | `scripts/seed_demo.py` op een Pod zonder `profiel/profiel.jsonld`: exit 0, twintig standaardmappen, demoprofiel met de vier scenariowaarden (35-44, 5611, auto, 5 schadevrije jaren / geen claims), `profiel/.policy.jsonld`, drie voorbeeldbestanden; tweede run zonder `--force` weigert met exit 1 en laat alles staan. Bestond het profiel al, dan alleen de weigering (info voor de rest). De demodata blijft na de run staan |
 | 13b | Profielvelden | Opslaan via `/profiel-data` schrijft `pd:AgeRange`, `pd:PostalCode` en `mysolido:claimsHistory` naast de bestaande velden; formulier leest ze terug; ongeldig postcodegebied (geen 4 cijfers) wordt niet opgeslagen, de rest wel; oorspronkelijk profiel wordt teruggezet |
-| 13c | Intentie | `/intenties/nieuw` toont attributen per veld plus doel, doorleververbod en aanbodvorm; autoverzekering met vier attributen levert `mysolido:sharedAttributes` met precies die vier urn's, de profielwaarden, label/valueLabel en één `capturedAt`; `purpose` = `urn:mysolido:purpose:quote_calculation`; `noOnwardTransfer` true; `offerMode` open; geen `sharedProfileData`; 2 weken = 14 dagen; detailpagina toont "Vastgelegd op" en blijft gelijk na een profielwijziging (snapshot); gericht aanbod zonder naam geweigerd, met naam opgeslagen als `targetedParty`; oud record met `sharedProfileData` blijft leesbaar; testrecords opgeruimd |
+| 13c | Intentie | `/intenties/nieuw` toont attributen per veld plus doel, doorleververbod en aanbodvorm; autoverzekering met vier attributen levert `mysolido:sharedAttributes` met precies die vier urn's, de profielwaarden, label/valueLabel en één `capturedAt`; `purpose` = `urn:mysolido:purpose:quote_calculation`; `noOnwardTransfer` true; `offerMode` open; geen `sharedProfileData`; 2 weken = 14 dagen; detailpagina toont "Vastgelegd op" en blijft gelijk na een profielwijziging (snapshot); gericht aanbod zonder naam geweigerd, met naam opgeslagen als `targetedParty` (met `@id`); oud record met `sharedProfileData` blijft leesbaar; testrecords en policybestanden opgeruimd |
+| 13d | Intentiepolicy | Na aanmaken staat `intenties/<uuid>.policy.jsonld` naast het record: `odrl:Offer`, uid `urn:mysolido:policy:intention:<uuid>`, `assigner` = WEBID, één permission `use` met de vier attribuut-urn's in recordvolgorde, constraints `purpose eq` en `dateTime lteq validThrough`, prohibition `distribute`+`transfer` bij doorleververbod en afwezig zonder, assignee alleen bij gericht aanbod met dezelfde `@id` als `targetedParty`; record bevat `mysolido:policy`; detailpagina toont de Nederlandse samenvatting (vier labels, doel, doorleverzin), de ruwe JSON-LD en "Vastgelegd op dd-mm-jjjj"; `GET /intenties/<uuid>/policy.jsonld` geeft `application/ld+json`; intentie zonder attributen geweigerd; "Voorwaarden opstellen" maakt een ontbrekende Offer aan; policybestand niet in listing, zoekresultaten of intentieoverzicht; verwijderen van de intentie neemt de Offer mee; opruimen |
 | 14 | Backup | Zip-export bevat testbestand; dotfiles/ACL's/deellinkregister in zip (info) |
 | 15 | Restore | Bestand verwijderd, uit zip teruggezet, via CSS weer leesbaar |
 | 16 | HTTP-laag | `/debug` leest de Pod-root via CSS (de root is publiek, dus dit bewijst geen authenticatie) |
@@ -87,9 +88,9 @@ vergelijking, geen oordeel).
 
 ## Geautomatiseerd, aparte run: demodata, profielvelden en intentie (MyTerms-demo)
 
-`python scripts/regressietest.py --phase demo` draait alleen de onderdelen 13a, 13b en 13c
+`python scripts/regressietest.py --phase demo` draait alleen de onderdelen 13a tot en met 13d
 tegen de lopende CSS en Flask, zonder testaccount of testmap. Handig na wijzigingen aan
-`PROFILE_ATTRIBUTES`, het profielformulier of het intentieformulier. Let op: als de Pod nog
+`PROFILE_ATTRIBUTES`, het profielformulier, het intentieformulier of de intentiepolicy. Let op: als de Pod nog
 geen `profiel/profiel.jsonld` heeft, vult deze run de Pod met de demodata van
 `scripts/seed_demo.py` en laat die staan.
 

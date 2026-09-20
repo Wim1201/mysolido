@@ -89,6 +89,31 @@
     </div>
     {% endif %}
 
+    {# === ODRL-aanbod (intenties/<uuid>.policy.jsonld, subtaak 3); ook zichtbaar in Bridge-modus === #}
+    <div class="card" style="margin-bottom: 20px;" id="intention-policy">
+        <h3>{{ t.int_policy_title }}</h3>
+        {% if policy %}
+        <p style="margin: 8px 0 12px;" class="policy-summary-nl">{{ policy_summary }}</p>
+        <details class="policy-raw">
+            <summary>{{ t.policy_raw }}</summary>
+            <pre><code>{{ policy | tojson(indent=2) }}</code></pre>
+        </details>
+        <p class="snapshot-note" style="margin-top: 8px;">
+            <a href="{{ url_for('intentie_policy_file', intention_id=intention._id) }}">{{ t.int_policy_file }}</a>
+            &middot; <code>{{ policy.get('uid', '') }}</code>
+        </p>
+        {% elif shared_attributes %}
+        <p class="snapshot-note">{{ t.int_policy_missing }}</p>
+        {% if not read_only %}
+        <form action="{{ url_for('intentie_policy_create', intention_id=intention._id) }}" method="post" style="display:inline;">
+            <button type="submit" class="btn btn-primary">{{ t.int_policy_create }}</button>
+        </form>
+        {% endif %}
+        {% else %}
+        <p class="snapshot-note">{{ t.int_policy_none }}</p>
+        {% endif %}
+    </div>
+
     {# === Snapshot van de gedeelde attributen (mysolido:sharedAttributes) === #}
     {% if legacy_shared is none %}
     <div class="card" style="margin-bottom: 20px;">
