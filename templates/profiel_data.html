@@ -35,6 +35,22 @@
 
     <form action="{{ url_for('profiel_data_save') }}" method="post" class="profiel-data-form">
 
+    {# === PERSOONLIJK (scenario-attribuut age_category, PROFILE_ATTRIBUTES) === #}
+    <div class="card profiel-card">
+        <h3 class="profiel-section-title">👤 {{ t.pd_personal }}</h3>
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="age_category">{{ t.pd_age_category }}</label>
+                <select name="age_category" id="age_category" class="form-input" {% if read_only %}disabled{% endif %}>
+                    <option value="">{{ t.pd_choose }}</option>
+                    {% for val, label in attributes['age_category'].options %}
+                    <option value="{{ val }}" {% if data.get('pd:AgeRange') == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
     {# === WOONSITUATIE === #}
     <div class="card profiel-card">
         <h3 class="profiel-section-title">🏠 {{ t.pd_housing }}</h3>
@@ -61,6 +77,13 @@
                 <label for="region">{{ t.pd_region }}</label>
                 <input type="text" name="region" id="region" class="form-input" placeholder="{{ t.pd_region_placeholder }}"
                        value="{{ data.get('pd:Location', '') }}" {% if read_only %}readonly{% endif %}>
+            </div>
+            {# scenario-attribuut postal_area (PROFILE_ATTRIBUTES): precies 4 cijfers #}
+            <div class="form-group">
+                <label for="postal_area">{{ t.pd_postal_area }}</label>
+                <input type="text" name="postal_area" id="postal_area" class="form-input" placeholder="{{ t.pd_postal_area_placeholder }}"
+                       inputmode="numeric" pattern="[0-9]{4}" maxlength="4"
+                       value="{{ data.get('pd:PostalCode', '') }}" {% if read_only %}readonly{% endif %}>
             </div>
         </div>
     </div>
@@ -160,6 +183,25 @@
         {% if not read_only %}
         <button type="button" class="btn btn-compact" onclick="addInsurance()">{{ t.pd_add_insurance }}</button>
         {% endif %}
+
+        {# scenario-attribuut claims_history (PROFILE_ATTRIBUTES): twee subvelden #}
+        {% set claims = data.get('mysolido:claimsHistory', {}) %}
+        <h4 style="margin: 16px 0 8px; font-size: 0.95rem;">{{ t.pd_claims_history }}</h4>
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="claim_free_years">{{ t.pd_claim_free_years }}</label>
+                <input type="number" name="claim_free_years" id="claim_free_years" class="form-input" min="0" max="99"
+                       value="{{ claims.get('claimFreeYears', '') }}" {% if read_only %}readonly{% endif %}>
+            </div>
+            <div class="form-group">
+                <label for="claims_last_3_years">{{ t.pd_claims_last_3_years }}</label>
+                <select name="claims_last_3_years" id="claims_last_3_years" class="form-input" {% if read_only %}disabled{% endif %}>
+                    <option value="">{{ t.pd_choose }}</option>
+                    <option value="ja" {% if claims.get('claimsLast3Years') is true %}selected{% endif %}>{{ t.pd_yes }}</option>
+                    <option value="nee" {% if claims.get('claimsLast3Years') is false %}selected{% endif %}>{{ t.pd_no }}</option>
+                </select>
+            </div>
+        </div>
     </div>
 
     {# === WERK === #}

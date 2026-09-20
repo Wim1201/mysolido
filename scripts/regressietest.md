@@ -61,6 +61,9 @@ Draai beide scenario's op de huidige CSS-versie (nulmeting) en beide op de nieuw
 | 11 | ODRL | Policy als `.policy.jsonld` op de submap, regel correct opgebouwd, teruggelezen in Flask, verborgen in listing; zichtbaarheid via CSS (info) |
 | 12 | Toestemming | Record weggeschreven, velden correct, detailpagina, niet publiek via CSS, `.jsonld` door CSS geserveerd als `application/ld+json`, intrekken, verwijderen |
 | 13 | Consentrequest | Publiek formulier schrijft verzoek, statustoken, statuspagina, eigenaar ziet verzoek, afwijzen, statuspagina toont afgewezen |
+| 13a | Demodata (seed) | `scripts/seed_demo.py` op een Pod zonder `profiel/profiel.jsonld`: exit 0, twintig standaardmappen, demoprofiel met de vier scenariowaarden (35-44, 5611, auto, 5 schadevrije jaren / geen claims), `profiel/.policy.jsonld`, drie voorbeeldbestanden; tweede run zonder `--force` weigert met exit 1 en laat alles staan. Bestond het profiel al, dan alleen de weigering (info voor de rest). De demodata blijft na de run staan |
+| 13b | Profielvelden | Opslaan via `/profiel-data` schrijft `pd:AgeRange`, `pd:PostalCode` en `mysolido:claimsHistory` naast de bestaande velden; formulier leest ze terug; ongeldig postcodegebied (geen 4 cijfers) wordt niet opgeslagen, de rest wel; oorspronkelijk profiel wordt teruggezet |
+| 13c | Intentie | `/intenties/nieuw` toont attributen per veld plus doel, doorleververbod en aanbodvorm; autoverzekering met vier attributen levert `mysolido:sharedAttributes` met precies die vier urn's, de profielwaarden, label/valueLabel en één `capturedAt`; `purpose` = `urn:mysolido:purpose:quote_calculation`; `noOnwardTransfer` true; `offerMode` open; geen `sharedProfileData`; 2 weken = 14 dagen; detailpagina toont "Vastgelegd op" en blijft gelijk na een profielwijziging (snapshot); gericht aanbod zonder naam geweigerd, met naam opgeslagen als `targetedParty`; oud record met `sharedProfileData` blijft leesbaar; testrecords opgeruimd |
 | 14 | Backup | Zip-export bevat testbestand; dotfiles/ACL's/deellinkregister in zip (info) |
 | 15 | Restore | Bestand verwijderd, uit zip teruggezet, via CSS weer leesbaar |
 | 16 | HTTP-laag | `/debug` leest de Pod-root via CSS (de root is publiek, dus dit bewijst geen authenticatie) |
@@ -81,6 +84,14 @@ vergelijking, geen oordeel).
    `.policy.jsonld` nog op schijf staan, dat CSS de ACL nog volgt (anoniem 200 op het gedeelde
    bestand, schrijven geweigerd, policy-map en testmap 401) en dat Flask de policy nog leest.
    Zonder `--keep-persist` ruimt deze fase `regressietest/` daarna op.
+
+## Geautomatiseerd, aparte run: demodata, profielvelden en intentie (MyTerms-demo)
+
+`python scripts/regressietest.py --phase demo` draait alleen de onderdelen 13a, 13b en 13c
+tegen de lopende CSS en Flask, zonder testaccount of testmap. Handig na wijzigingen aan
+`PROFILE_ATTRIBUTES`, het profielformulier of het intentieformulier. Let op: als de Pod nog
+geen `profiel/profiel.jsonld` heeft, vult deze run de Pod met de demodata van
+`scripts/seed_demo.py` en laat die staan.
 
 ## Geautomatiseerd, aparte run: Bridge read-only modus
 

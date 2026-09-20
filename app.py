@@ -2762,6 +2762,329 @@ def consent_delete(consent_id):
 # === PROFILE DATA MODULE (Omgekeerde Google) ===
 
 
+# === PROFIEL-ATTRIBUTEN (MyTerms-demo, subtaak 2) ===
+# Eén bron van waarheid voor de deelbare profielvelden; zie
+# docs/mysolido_notitie_datamodel-myterms_20-09-2026.md (punt 1 en 2).
+# Een nieuw attribuut is één regel in PROFILE_ATTRIBUTES: per-veldselectie in het
+# intentieformulier en het snapshot in het intentierecord volgen daaruit. Alleen
+# attributen met 'form_field' hebben een eigen invoerveld in profiel_data.html dat
+# hier generiek wordt uitgelezen; de overige velden houden hun bestaande formulier-
+# en opslagcode in profiel_data_save().
+#   path : plaats van de waarde in profiel/profiel.jsonld (sleutels; een geheel
+#          getal is een lijstindex)
+#   dpv  : geverifieerde DPV-PD-term (DPV-PD 2.1), anders mysolido:<key>
+
+PROFILE_CONTEXT = {
+    "dpv": "https://w3id.org/dpv#",
+    "pd": "https://w3id.org/dpv/pd#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "mysolido": "https://mysolido.com/vocab#"
+}
+
+PROFILE_GROUPS = {
+    'personal':   {'label': 'Persoonlijk',   'icon': '\U0001f464'},
+    'housing':    {'label': 'Woonsituatie',  'icon': '\U0001f3e0'},
+    'household':  {'label': 'Gezin',         'icon': '\U0001f468‍\U0001f469‍\U0001f467‍\U0001f466'},
+    'vehicle':    {'label': 'Voertuigen',    'icon': '\U0001f697'},
+    'insurance':  {'label': 'Verzekeringen', 'icon': '\U0001f6e1️'},
+    'occupation': {'label': 'Werk',          'icon': '\U0001f4bc'},
+    'health':     {'label': 'Gezondheid',    'icon': '❤️'},
+}
+
+ATTRIBUTE_URN_PREFIX = 'urn:mysolido:attribute:'
+
+PROFILE_ATTRIBUTES = {
+    # -- personal --
+    'age_category': {                                   # scenario-attribuut 1
+        'label': 'Leeftijdscategorie', 'group': 'personal', 'input': 'select',
+        'options': [('18-24', '18-24'), ('25-34', '25-34'), ('35-44', '35-44'),
+                    ('45-54', '45-54'), ('55-64', '55-64'), ('65+', '65+')],
+        'dpv': 'pd:AgeRange', 'path': ['pd:AgeRange'], 'form_field': 'age_category',
+    },
+    # -- housing --
+    'housing_ownership': {
+        'label': 'Eigendom', 'group': 'housing', 'input': 'select',
+        'options': [('huur', 'Huur'), ('koop', 'Koop'), ('anders', 'Anders')],
+        'dpv': 'mysolido:housing_ownership', 'path': ['pd:HousingOwnership'],
+    },
+    'housing_type': {
+        'label': 'Woningtype', 'group': 'housing', 'input': 'select',
+        'options': [('appartement', 'Appartement'), ('tussenwoning', 'Tussenwoning'),
+                    ('hoekwoning', 'Hoekwoning'), ('vrijstaand', 'Vrijstaand'), ('anders', 'Anders')],
+        'dpv': 'mysolido:housing_type', 'path': ['mysolido:housingType'],
+    },
+    'region': {
+        'label': 'Regio / provincie', 'group': 'housing', 'input': 'text',
+        'dpv': 'pd:Location', 'path': ['pd:Location'],
+    },
+    'postal_area': {                                    # scenario-attribuut 2
+        'label': 'Postcodegebied (4 cijfers)', 'group': 'housing', 'input': 'text',
+        'pattern': r'^\d{4}$', 'dpv': 'pd:PostalCode', 'path': ['pd:PostalCode'],
+        'form_field': 'postal_area',
+    },
+    # -- household --
+    'household_size': {
+        'label': 'Aantal personen in huishouden', 'group': 'household', 'input': 'int',
+        'dpv': 'mysolido:household_size', 'path': ['pd:HouseholdSize'],
+    },
+    'children': {
+        'label': 'Kinderen (leeftijdscategorie)', 'group': 'household', 'input': 'list',
+        'dpv': 'pd:FamilyStructure', 'path': ['pd:FamilyStructure', 'children'], 'item_keys': ['ageCategory'],
+    },
+    # -- vehicle --
+    'vehicle_type': {                                   # scenario-attribuut 3 (bestaand veld)
+        'label': 'Voertuigtype', 'group': 'vehicle', 'input': 'select',
+        'options': [('auto', 'Auto'), ('motor', 'Motor'), ('scooter', 'Scooter'),
+                    ('fiets', 'Fiets'), ('geen', 'Geen')],
+        'dpv': 'pd:Vehicle', 'path': ['pd:Vehicle', 0, 'type'],
+    },
+    'vehicle_fuel': {
+        'label': 'Brandstof', 'group': 'vehicle', 'input': 'select',
+        'options': [('benzine', 'Benzine'), ('diesel', 'Diesel'), ('elektrisch', 'Elektrisch'),
+                    ('hybride', 'Hybride'), ('nvt', 'N.v.t.')],
+        'dpv': 'pd:Vehicle', 'path': ['pd:Vehicle', 0, 'fuel'],
+    },
+    'vehicle_year': {
+        'label': 'Bouwjaar', 'group': 'vehicle', 'input': 'int',
+        'dpv': 'pd:Vehicle', 'path': ['pd:Vehicle', 0, 'yearBuilt'],
+    },
+    # -- insurance --
+    'insurances': {
+        'label': 'Lopende verzekeringen', 'group': 'insurance', 'input': 'list',
+        'dpv': 'pd:Insurance', 'path': ['pd:Insurance'], 'item_keys': ['type', 'provider'],
+    },
+    'claims_history': {                                 # scenario-attribuut 4
+        'label': 'Schadeverleden', 'group': 'insurance', 'input': 'composite',
+        'dpv': 'pd:Insurance',   # naaste bredere term; DPV-PD 2.1 kent geen claims-term
+        'path': ['mysolido:claimsHistory'], 'form_field': True,
+        'fields': {
+            'claim_free_years': {'label': 'Schadevrije jaren', 'input': 'int', 'json_key': 'claimFreeYears'},
+            'claims_last_3_years': {'label': 'Schade geclaimd in de laatste 3 jaar', 'input': 'bool',
+                                    'json_key': 'claimsLast3Years'},
+        },
+    },
+    # -- occupation --
+    'work_sector': {
+        'label': 'Sector', 'group': 'occupation', 'input': 'select',
+        'options': [('ict', 'ICT'), ('zorg', 'Zorg'), ('onderwijs', 'Onderwijs'), ('bouw', 'Bouw'),
+                    ('overheid', 'Overheid'), ('financieel', 'Financieel'), ('retail', 'Retail'), ('anders', 'Anders')],
+        'dpv': 'pd:Professional', 'path': ['pd:Occupation', 'sector'],
+    },
+    'employment_type': {
+        'label': 'Dienstverband', 'group': 'occupation', 'input': 'select',
+        'options': [('loondienst', 'Loondienst'), ('zzp', 'ZZP'), ('ondernemer', 'Ondernemer'),
+                    ('gepensioneerd', 'Gepensioneerd'), ('student', 'Student'), ('anders', 'Anders')],
+        'dpv': 'pd:Professional', 'path': ['pd:Occupation', 'employmentType'],
+    },
+    # -- health (huisartspraktijk bewust niet deelbaar) --
+    'smoking_status': {
+        'label': 'Rookstatus', 'group': 'health', 'input': 'select',
+        'options': [('ja', 'Roker'), ('nee', 'Niet-roker'), ('gestopt', 'Gestopt met roken')],
+        'dpv': 'pd:Health', 'path': ['pd:HealthData', 'smokingStatus'],
+    },
+}
+
+# Doel van een intentie (datamodel punt 2); DPV-koppeling zoals PURPOSE_MAP.
+INTENTION_PURPOSES = {
+    'quote_calculation': {'label': 'Offerteberekening', 'dpv': 'dpv:ServiceProvision'},
+}
+DEFAULT_INTENTION_PURPOSE = 'quote_calculation'
+OFFER_MODES = ('open', 'targeted')
+
+
+def attribute_urn(key):
+    """urn:mysolido:attribute:<key>"""
+    return f'{ATTRIBUTE_URN_PREFIX}{key}'
+
+
+def _profile_get(profile, path):
+    """Lees een waarde uit het profiel-JSON-LD langs een pad; None als het pad ontbreekt."""
+    node = profile
+    for step in path:
+        if isinstance(step, int):
+            if not isinstance(node, list) or step >= len(node):
+                return None
+        elif not isinstance(node, dict) or step not in node:
+            return None
+        node = node[step]
+    return node
+
+
+def _profile_set(profile, path, value):
+    """Schrijf een waarde in het profiel-JSON-LD langs een pad; tussenliggende dicts/lijsten worden aangemaakt."""
+    node = profile
+    for i, step in enumerate(path[:-1]):
+        next_is_index = isinstance(path[i + 1], int)
+        if isinstance(step, int):
+            while len(node) <= step:
+                node.append({})
+            if not isinstance(node[step], (dict, list)):
+                node[step] = [] if next_is_index else {}
+        elif not isinstance(node.get(step), (dict, list)):
+            node[step] = [] if next_is_index else {}
+        node = node[step]
+    node[path[-1]] = value
+
+
+def profile_attribute_value(profile, key):
+    """Ruwe opgeslagen waarde van een attribuut, of None als leeg."""
+    value = _profile_get(profile, PROFILE_ATTRIBUTES[key]['path'])
+    if value in (None, '', [], {}):
+        return None
+    return value
+
+
+def _bool_label(value):
+    return 'ja' if value else 'nee'
+
+
+def attribute_value_label(key, value):
+    """Leesbare Nederlandse weergave van een attribuutwaarde."""
+    if value is None:
+        return ''
+    attr = PROFILE_ATTRIBUTES[key]
+    kind = attr['input']
+    if kind == 'select':
+        return dict(attr['options']).get(value, str(value))
+    if kind == 'bool':
+        return _bool_label(value)
+    if kind == 'composite':
+        parts = []
+        for field in attr['fields'].values():
+            sub = value.get(field['json_key']) if isinstance(value, dict) else None
+            if sub is None:
+                continue
+            shown = _bool_label(sub) if field['input'] == 'bool' else str(sub)
+            parts.append(f"{field['label']}: {shown}")
+        return ', '.join(parts)
+    if kind == 'list':
+        items = []
+        for item in (value if isinstance(value, list) else []):
+            if isinstance(item, dict):
+                items.append(' - '.join(str(item[k]) for k in attr.get('item_keys', []) if item.get(k)))
+            else:
+                items.append(str(item))
+        return '; '.join(i for i in items if i)
+    return str(value)
+
+
+def extract_profile_attributes(profile):
+    """Per groep (volgorde PROFILE_GROUPS) de deelbare attributen met hun actuele waarde."""
+    groups = {}
+    for key, attr in PROFILE_ATTRIBUTES.items():
+        gkey = attr['group']
+        if gkey not in groups:
+            groups[gkey] = {'label': PROFILE_GROUPS[gkey]['label'], 'icon': PROFILE_GROUPS[gkey]['icon'],
+                            'attributes': []}
+        value = profile_attribute_value(profile, key)
+        groups[gkey]['attributes'].append({
+            'key': key, 'urn': attribute_urn(key), 'label': attr['label'],
+            'value': value, 'value_label': attribute_value_label(key, value),
+            'filled': value is not None,
+        })
+    return {g: groups[g] for g in PROFILE_GROUPS if g in groups}
+
+
+def build_shared_attributes(profile, keys, captured_at):
+    """Snapshot van de gekozen, gevulde attributen voor een intentierecord (datamodel punt 2)."""
+    shared = []
+    for key in keys:
+        if key not in PROFILE_ATTRIBUTES:
+            continue
+        value = profile_attribute_value(profile, key)
+        if value is None:
+            continue
+        shared.append({
+            '@id': attribute_urn(key),
+            'label': PROFILE_ATTRIBUTES[key]['label'],
+            'value': value,
+            'valueLabel': attribute_value_label(key, value),
+            'capturedAt': captured_at,
+        })
+    return shared
+
+
+def set_profile_attribute(profile, key, value):
+    """Zet een attribuutwaarde op zijn plaats in het profiel-JSON-LD (None wordt overgeslagen)."""
+    if value is None:
+        return
+    _profile_set(profile, PROFILE_ATTRIBUTES[key]['path'], value)
+
+
+def read_attributes_from_form(form):
+    """Lees de attributen met een eigen 'form_field' uit het profielformulier.
+
+    Geeft (waarden per key, labels van ongeldige velden). Lege velden worden overgeslagen.
+    """
+    values, invalid = {}, []
+    for key, attr in PROFILE_ATTRIBUTES.items():
+        form_field = attr.get('form_field')
+        if not form_field:
+            continue
+        if attr['input'] == 'composite':
+            composite = {}
+            for fkey, field in attr['fields'].items():
+                raw = (form.get(fkey) or '').strip()
+                if not raw:
+                    continue
+                if field['input'] == 'bool':
+                    if raw in ('ja', 'nee'):
+                        composite[field['json_key']] = (raw == 'ja')
+                elif field['input'] == 'int':
+                    try:
+                        composite[field['json_key']] = int(raw)
+                    except ValueError:
+                        invalid.append(field['label'])
+                else:
+                    composite[field['json_key']] = raw
+            if composite:
+                values[key] = composite
+            continue
+        raw = (form.get(form_field) or '').strip()
+        if not raw:
+            continue
+        if attr.get('pattern') and not re.match(attr['pattern'], raw):
+            invalid.append(attr['label'])
+            continue
+        if attr['input'] == 'select' and raw not in dict(attr['options']):
+            invalid.append(attr['label'])
+            continue
+        if attr['input'] == 'int':
+            try:
+                raw = int(raw)
+            except ValueError:
+                invalid.append(attr['label'])
+                continue
+        values[key] = raw
+    return values, invalid
+
+
+def ensure_profiel_policy():
+    """Vaste eigenaar-only mappolicy voor profiel/ (ongewijzigd t.o.v. profiel_data_save)."""
+    if pod_exists('profiel/.policy.jsonld'):
+        return
+    policy = {
+        "@context": [
+            "http://www.w3.org/ns/odrl.jsonld",
+            {"dpv": "https://w3id.org/dpv#"}
+        ],
+        "@type": "Set",
+        "uid": "urn:mysolido:policy:profiel",
+        "profile": "http://www.w3.org/ns/odrl/2/core",
+        "permission": [{
+            "target": "urn:mysolido:container:profiel",
+            "assignee": "urn:mysolido:owner",
+            "action": ["read", "write", "delete"]
+        }],
+        "prohibition": [{
+            "target": "urn:mysolido:container:profiel",
+            "action": "distribute"
+        }]
+    }
+    pod_write('profiel/.policy.jsonld',
+              _json.dumps(policy, indent=2, ensure_ascii=False))
+
+
 @app.route('/profiel-data', methods=['GET'])
 def profiel_data():
     """Show profile data form (Omgekeerde Google)"""
@@ -2776,6 +3099,7 @@ def profiel_data():
 
     return render_template('profiel_data.html',
         data=data,
+        attributes=PROFILE_ATTRIBUTES,
         read_only=BRIDGE_MODE,
     )
 
@@ -2790,12 +3114,7 @@ def profiel_data_save():
 
     # Build JSON-LD document
     profile = {
-        "@context": {
-            "dpv": "https://w3id.org/dpv#",
-            "pd": "https://w3id.org/dpv/pd#",
-            "xsd": "http://www.w3.org/2001/XMLSchema#",
-            "mysolido": "https://mysolido.com/vocab#"
-        },
+        "@context": dict(PROFILE_CONTEXT),
         "@type": "dpv:PersonalData"
     }
 
@@ -2866,6 +3185,14 @@ def profiel_data_save():
             health['gpPractice'] = form['gp_practice']
         profile['pd:HealthData'] = health
 
+    # Scenario-attributen met eigen formulierveld (PROFILE_ATTRIBUTES: age_category,
+    # postal_area, claims_history); ongeldige waarden worden niet opgeslagen
+    attr_values, invalid_labels = read_attributes_from_form(form)
+    for attr_key, attr_value in attr_values.items():
+        set_profile_attribute(profile, attr_key, attr_value)
+    for label in invalid_labels:
+        flash_t('flash_attribute_invalid', 'error', label=label)
+
     # Ensure profiel directory exists
     pod_mkdir('profiel')
 
@@ -2874,27 +3201,7 @@ def profiel_data_save():
               _json.dumps(profile, indent=2, ensure_ascii=False))
 
     # Create ODRL policy if it doesn't exist yet
-    if not pod_exists('profiel/.policy.jsonld'):
-        policy = {
-            "@context": [
-                "http://www.w3.org/ns/odrl.jsonld",
-                {"dpv": "https://w3id.org/dpv#"}
-            ],
-            "@type": "Set",
-            "uid": "urn:mysolido:policy:profiel",
-            "profile": "http://www.w3.org/ns/odrl/2/core",
-            "permission": [{
-                "target": "urn:mysolido:container:profiel",
-                "assignee": "urn:mysolido:owner",
-                "action": ["read", "write", "delete"]
-            }],
-            "prohibition": [{
-                "target": "urn:mysolido:container:profiel",
-                "action": "distribute"
-            }]
-        }
-        pod_write('profiel/.policy.jsonld',
-                  _json.dumps(policy, indent=2, ensure_ascii=False))
+    ensure_profiel_policy()
 
     flash_t('flash_profile_saved')
     return redirect(url_for('profiel_data'))
@@ -2902,16 +3209,28 @@ def profiel_data_save():
 
 # === INTENTION MODULE (Omgekeerde Google — Fase 2) ===
 
+# profile_fields = voorselectie per categorie, als attribuutsleutels uit PROFILE_ATTRIBUTES
+# (tot 20-09-2026 waren dit groepsnamen; sinds subtaak 2 selecteert het formulier per veld)
 INTENTION_CATEGORIES = {
-    'autoverzekering': {'label': 'Autoverzekering', 'icon': '\U0001f697', 'profile_fields': ['vehicle', 'insurance']},
-    'zorgverzekering': {'label': 'Zorgverzekering', 'icon': '\U0001f3e5', 'profile_fields': ['health', 'household']},
-    'woonverzekering': {'label': 'Woonverzekering', 'icon': '\U0001f3e0', 'profile_fields': ['housing', 'insurance']},
-    'energiecontract': {'label': 'Energiecontract', 'icon': '\u26a1', 'profile_fields': ['housing', 'household']},
-    'hypotheek': {'label': 'Hypotheek', 'icon': '\U0001f3e6', 'profile_fields': ['housing', 'occupation', 'household']},
-    'reisverzekering': {'label': 'Reisverzekering', 'icon': '\u2708\ufe0f', 'profile_fields': ['household', 'insurance']},
-    'rechtsbijstand': {'label': 'Rechtsbijstand', 'icon': '\u2696\ufe0f', 'profile_fields': ['occupation', 'household']},
-    'pensioen': {'label': 'Pensioen', 'icon': '\U0001f9d3', 'profile_fields': ['occupation', 'household']},
-    'internet_tv': {'label': 'Internet & TV', 'icon': '\U0001f4e1', 'profile_fields': ['housing', 'household']},
+    'autoverzekering': {'label': 'Autoverzekering', 'icon': '\U0001f697',
+                        'profile_fields': ['age_category', 'postal_area', 'vehicle_type', 'claims_history']},
+    'zorgverzekering': {'label': 'Zorgverzekering', 'icon': '\U0001f3e5',
+                        'profile_fields': ['age_category', 'smoking_status', 'household_size']},
+    'woonverzekering': {'label': 'Woonverzekering', 'icon': '\U0001f3e0',
+                        'profile_fields': ['postal_area', 'housing_ownership', 'housing_type', 'insurances']},
+    'energiecontract': {'label': 'Energiecontract', 'icon': '\u26a1',
+                        'profile_fields': ['postal_area', 'housing_type', 'household_size']},
+    'hypotheek': {'label': 'Hypotheek', 'icon': '\U0001f3e6',
+                  'profile_fields': ['age_category', 'postal_area', 'housing_ownership', 'work_sector',
+                                     'employment_type', 'household_size']},
+    'reisverzekering': {'label': 'Reisverzekering', 'icon': '\u2708\ufe0f',
+                        'profile_fields': ['age_category', 'household_size', 'children', 'insurances']},
+    'rechtsbijstand': {'label': 'Rechtsbijstand', 'icon': '\u2696\ufe0f',
+                       'profile_fields': ['employment_type', 'household_size']},
+    'pensioen': {'label': 'Pensioen', 'icon': '\U0001f9d3',
+                 'profile_fields': ['age_category', 'employment_type', 'household_size']},
+    'internet_tv': {'label': 'Internet & TV', 'icon': '\U0001f4e1',
+                    'profile_fields': ['postal_area', 'housing_type']},
     'anders': {'label': 'Anders', 'icon': '\U0001f4cb', 'profile_fields': []},
 }
 
@@ -2944,6 +3263,16 @@ def extract_profile_groups(profile):
     """Extract profile data organized by group for display in intention form"""
     groups = {}
 
+    # Personal (scenario-attribuut age_category, PROFILE_ATTRIBUTES)
+    age_category = profile.get('pd:AgeRange', '')
+    groups['personal'] = {
+        'label': PROFILE_GROUPS['personal']['label'],
+        'icon': PROFILE_GROUPS['personal']['icon'],
+        'filled': bool(age_category),
+        'summary': age_category,
+        'data': {'ageCategory': age_category} if age_category else {}
+    }
+
     # Housing
     housing_parts = []
     if profile.get('pd:HousingOwnership'):
@@ -2952,6 +3281,8 @@ def extract_profile_groups(profile):
         housing_parts.append(profile['mysolido:housingType'])
     if profile.get('pd:Location'):
         housing_parts.append(profile['pd:Location'])
+    if profile.get('pd:PostalCode'):
+        housing_parts.append(f"postcodegebied {profile['pd:PostalCode']}")
     groups['housing'] = {
         'label': 'Woonsituatie',
         'icon': '\U0001f3e0',
@@ -2961,6 +3292,7 @@ def extract_profile_groups(profile):
             'ownership': profile.get('pd:HousingOwnership', ''),
             'type': profile.get('mysolido:housingType', ''),
             'region': profile.get('pd:Location', ''),
+            'postalArea': profile.get('pd:PostalCode', ''),
         }
     }
 
@@ -3013,6 +3345,10 @@ def extract_profile_groups(profile):
             parts.append(ins['provider'])
         if parts:
             ins_parts.append(' - '.join(parts))
+    # Schadeverleden (scenario-attribuut claims_history, PROFILE_ATTRIBUTES)
+    claims = profile.get('mysolido:claimsHistory')
+    if claims:
+        ins_parts.append(attribute_value_label('claims_history', claims))
     groups['insurance'] = {
         'label': 'Verzekeringen',
         'icon': '\U0001f6e1\ufe0f',
@@ -3182,18 +3518,24 @@ def intentie_new():
         valid_through = now + timedelta(days=val_info['days'])
         intention_id = str(uuid.uuid4())
 
-        # Build shared profile data
-        profile = load_profile_data()
-        profile_groups = extract_profile_groups(profile)
-        shared_data = {}
-        selected_fields = request.form.getlist('profile_fields')
+        # MyTerms-velden (datamodel punt 2): doel, doorleververbod, aanbodvorm
+        purpose_code = request.form.get('purpose', DEFAULT_INTENTION_PURPOSE)
+        if purpose_code not in INTENTION_PURPOSES:
+            purpose_code = DEFAULT_INTENTION_PURPOSE
+        purpose_info = INTENTION_PURPOSES[purpose_code]
+        no_onward_transfer = request.form.get('no_onward_transfer') is not None
+        offer_mode = request.form.get('offer_mode', 'open')
+        if offer_mode not in OFFER_MODES:
+            offer_mode = 'open'
+        targeted_party = request.form.get('targeted_party', '').strip()
+        if offer_mode == 'targeted' and not targeted_party:
+            flash_t('flash_targeted_party_required', 'error')
+            return redirect(url_for('intentie_new'))
 
-        for group_key, group_info in profile_groups.items():
-            shared_data[group_key] = {
-                'included': group_key in selected_fields,
-            }
-            if group_key in selected_fields and group_info['filled']:
-                shared_data[group_key]['data'] = group_info['data']
+        # Snapshot van de gekozen attributen (per veld, waarde van dit moment)
+        profile = load_profile_data()
+        selected_keys = request.form.getlist('attributes')
+        shared_attributes = build_shared_attributes(profile, selected_keys, now.isoformat())
 
         record = {
             "@context": {
@@ -3210,8 +3552,17 @@ def intentie_new():
             "mysolido:status": "concept",
             "schema:dateCreated": now.isoformat(),
             "schema:validThrough": valid_through.isoformat(),
-            "mysolido:sharedProfileData": shared_data,
+            "mysolido:sharedAttributes": shared_attributes,
+            "mysolido:purpose": {
+                "@id": f"urn:mysolido:purpose:{purpose_code}",
+                "label": purpose_info['label'],
+                "dpv": purpose_info['dpv'],
+            },
+            "mysolido:noOnwardTransfer": no_onward_transfer,
+            "mysolido:offerMode": offer_mode,
         }
+        if offer_mode == 'targeted':
+            record["mysolido:targetedParty"] = {"name": targeted_party}
 
         pod_mkdir('intenties')
         pod_write(f'intenties/{intention_id}.jsonld',
@@ -3219,17 +3570,20 @@ def intentie_new():
         ensure_intenties_policy()
 
         flash_t('flash_intention_saved', 'success', label=cat_info["label"])
-        log_action('intention_create', {'id': intention_id, 'category': category})
+        log_action('intention_create', {'id': intention_id, 'category': category,
+                                        'attributes': [a['@id'] for a in shared_attributes]})
         return redirect(url_for('intenties_overview'))
 
     # GET: show form
     profile = load_profile_data()
-    profile_groups = extract_profile_groups(profile)
+    attribute_groups = extract_profile_attributes(profile)
 
     return render_template('intentie_nieuw.html',
         categories=INTENTION_CATEGORIES,
         validity_options=VALIDITY_OPTIONS,
-        profile_groups=profile_groups,
+        attribute_groups=attribute_groups,
+        purposes=INTENTION_PURPOSES,
+        default_purpose=DEFAULT_INTENTION_PURPOSE,
     )
 
 
@@ -3256,12 +3610,25 @@ def intentie_detail(intention_id):
     record['_category_label'] = cat_info['label']
     record['_status'] = record.get('mysolido:status', 'concept')
 
-    # Load current profile data for display
-    profile = load_profile_data()
-    profile_groups = extract_profile_groups(profile)
+    # Snapshot (datamodel punt 2): de detailpagina toont wat bij aanmaken is vastgelegd.
+    # Records van vóór 20-09-2026 hebben mysolido:sharedProfileData (per groep) en
+    # vallen terug op de groepsweergave met het actuele profiel.
+    shared_attributes = record.get('mysolido:sharedAttributes')
+    legacy_shared = None
+    profile_groups = {}
+    if shared_attributes is None and isinstance(record.get('mysolido:sharedProfileData'), dict):
+        legacy_shared = record['mysolido:sharedProfileData']
+        profile_groups = extract_profile_groups(load_profile_data())
+    captured_at = ''
+    if shared_attributes:
+        captured_at = shared_attributes[0].get('capturedAt', '')
+    captured_at = captured_at or record.get('schema:dateCreated', '')
 
     return render_template('intentie_detail.html',
         intention=record,
+        shared_attributes=shared_attributes or [],
+        captured_at=captured_at[:10],
+        legacy_shared=legacy_shared,
         profile_groups=profile_groups,
         read_only=BRIDGE_MODE,
     )

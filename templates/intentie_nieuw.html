@@ -5,36 +5,67 @@
 
 {% block content %}
     <style>
-    .profile-check-group {
+    .attr-group {
         background: var(--color-bg-hover);
         border: 1px solid var(--color-border);
         border-radius: 8px;
         padding: 12px 16px;
         margin-bottom: 8px;
     }
-    .profile-check-group label {
+    .attr-group-title {
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+    .attr-row label {
         display: flex;
         align-items: flex-start;
         gap: 10px;
         cursor: pointer;
         font-size: 0.9rem;
+        padding: 3px 0;
     }
-    .profile-check-group input[type="checkbox"] {
+    .attr-row input[type="checkbox"] {
         margin-top: 3px;
         flex-shrink: 0;
     }
-    .profile-check-label {
-        font-weight: 600;
-    }
-    .profile-check-value {
+    .attr-label { font-weight: 500; }
+    .attr-value {
         font-size: 0.85rem;
         color: var(--color-text-muted);
-        margin-top: 2px;
     }
-    .profile-check-empty {
+    .attr-empty {
         font-size: 0.85rem;
         color: var(--color-text-muted);
         font-style: italic;
+    }
+    .attr-row.disabled label { cursor: default; opacity: 0.7; }
+    .terms-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 20px;
+        margin-top: 12px;
+    }
+    @media (max-width: 768px) {
+        .terms-grid { grid-template-columns: 1fr; }
+    }
+    .terms-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--color-text-muted);
+        margin-bottom: 4px;
+        display: block;
+    }
+    .terms-hint {
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+    }
+    .radio-row label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: 0.9rem;
+        padding: 2px 0;
+        cursor: pointer;
     }
     </style>
 
@@ -49,7 +80,7 @@
 
             <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 12px;">
                 <div class="form-group" style="display: flex; flex-direction: column;">
-                    <label for="category" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_category }}</label>
+                    <label for="category" class="terms-label">{{ t.int_category }}</label>
                     <select name="category" id="category" class="form-input" required>
                         {% for key, cat in categories.items() %}
                         <option value="{{ key }}">{{ cat.icon }} {{ cat.label }}</option>
@@ -57,7 +88,7 @@
                     </select>
                 </div>
                 <div class="form-group" style="display: flex; flex-direction: column;">
-                    <label for="validity" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_validity }}</label>
+                    <label for="validity" class="terms-label">{{ t.int_validity }}</label>
                     <select name="validity" id="validity" class="form-input">
                         {% for key, opt in validity_options.items() %}
                         <option value="{{ key }}" {% if key == '1m' %}selected{% endif %}>{{ opt.label }}</option>
@@ -67,38 +98,80 @@
             </div>
 
             <div class="form-group" style="display: flex; flex-direction: column; margin-top: 12px;">
-                <label for="description" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_description_label }}</label>
+                <label for="description" class="terms-label">{{ t.int_description_label }}</label>
                 <textarea name="description" id="description" class="form-input"
                           rows="3" placeholder="{{ t.int_description_placeholder }}" required
                           style="resize: vertical; font-family: inherit;"></textarea>
             </div>
         </div>
 
+        {# === Gegevensselectie per attribuut (PROFILE_ATTRIBUTES) === #}
         <div class="card" style="margin-bottom: 20px;">
             <h3>{{ t.int_share_data_title }}</h3>
             <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 12px;">
-                {{ t.int_share_data_desc }}
+                {{ t.int_share_attr_desc }}
             </p>
 
-            {% for group_key, group in profile_groups.items() %}
-            <div class="profile-check-group">
-                <label>
-                    <input type="checkbox" name="profile_fields" value="{{ group_key }}"
-                           data-group="{{ group_key }}"
-                           {% if group.filled %}{% endif %}>
-                    <div>
-                        <div class="profile-check-label">{{ group.icon }} {{ group.label }}</div>
-                        {% if group.filled %}
-                        <div class="profile-check-value">{{ group.summary }}</div>
-                        {% else %}
-                        <div class="profile-check-empty">
-                            {{ t.int_not_filled }} &mdash; <a href="{{ url_for('profiel_data') }}">{{ t.int_fill_profile }}</a>
+            {% for group_key, group in attribute_groups.items() %}
+            <div class="attr-group">
+                <div class="attr-group-title">{{ group.icon }} {{ group.label }}</div>
+                {% for attr in group.attributes %}
+                <div class="attr-row {% if not attr.filled %}disabled{% endif %}">
+                    <label>
+                        <input type="checkbox" name="attributes" value="{{ attr.key }}"
+                               data-key="{{ attr.key }}" {% if not attr.filled %}disabled{% endif %}>
+                        <div>
+                            <span class="attr-label">{{ attr.label }}</span>
+                            {% if attr.filled %}
+                            <span class="attr-value">&mdash; {{ attr.value_label }}</span>
+                            {% else %}
+                            <span class="attr-empty">&mdash; {{ t.int_not_filled }},
+                                <a href="{{ url_for('profiel_data') }}">{{ t.int_fill_profile }}</a></span>
+                            {% endif %}
                         </div>
-                        {% endif %}
-                    </div>
-                </label>
+                    </label>
+                </div>
+                {% endfor %}
             </div>
             {% endfor %}
+        </div>
+
+        {# === MyTerms-voorwaarden: doel, doorleververbod, aanbodvorm === #}
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>{{ t.int_terms_title }}</h3>
+            <div class="terms-grid">
+                <div class="form-group" style="display: flex; flex-direction: column;">
+                    <label for="purpose" class="terms-label">{{ t.int_purpose }}</label>
+                    <select name="purpose" id="purpose" class="form-input">
+                        {% for code, p in purposes.items() %}
+                        <option value="{{ code }}" {% if code == default_purpose %}selected{% endif %}>{{ p.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <span class="terms-label">{{ t.int_onward_transfer }}</span>
+                    <label style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.9rem; cursor: pointer;">
+                        <input type="checkbox" name="no_onward_transfer" value="1" checked style="margin-top: 3px;">
+                        <span>{{ t.int_no_onward_transfer }}<br><span class="terms-hint">{{ t.int_no_onward_transfer_hint }}</span></span>
+                    </label>
+                </div>
+                <div class="form-group radio-row">
+                    <span class="terms-label">{{ t.int_offer_mode }}</span>
+                    <label>
+                        <input type="radio" name="offer_mode" value="open" checked onchange="toggleTargetedParty()">
+                        <span>{{ t.int_offer_open }} <span class="terms-hint">({{ t.int_offer_open_hint }})</span></span>
+                    </label>
+                    <label>
+                        <input type="radio" name="offer_mode" value="targeted" onchange="toggleTargetedParty()">
+                        <span>{{ t.int_offer_targeted }} <span class="terms-hint">({{ t.int_offer_targeted_hint }})</span></span>
+                    </label>
+                </div>
+                <div class="form-group" id="targeted-party-group" style="display: none; flex-direction: column;">
+                    <label for="targeted_party" class="terms-label">{{ t.int_targeted_party }}</label>
+                    <input type="text" name="targeted_party" id="targeted_party" class="form-input"
+                           placeholder="{{ t.int_targeted_party_placeholder }}" maxlength="120">
+                </div>
+            </div>
         </div>
 
         <div style="text-align: center; margin: 24px 0;">
@@ -110,24 +183,30 @@
     </form>
 
     <script>
-    // Pre-select profile fields based on selected category
+    // Voorselectie van attributen per categorie (INTENTION_CATEGORIES.profile_fields)
     var categoryFields = {
         {% for key, cat in categories.items() %}
         '{{ key }}': {{ cat.profile_fields|tojson }},
         {% endfor %}
     };
 
-    function updateProfileFields() {
+    function updateAttributeSelection() {
         var category = document.getElementById('category').value;
         var fields = categoryFields[category] || [];
-        var checkboxes = document.querySelectorAll('input[name="profile_fields"]');
-        checkboxes.forEach(function(cb) {
-            cb.checked = fields.indexOf(cb.value) !== -1;
+        document.querySelectorAll('input[name="attributes"]').forEach(function(cb) {
+            cb.checked = !cb.disabled && fields.indexOf(cb.value) !== -1;
         });
     }
 
-    document.getElementById('category').addEventListener('change', updateProfileFields);
-    // Set initial selection
-    updateProfileFields();
+    function toggleTargetedParty() {
+        var targeted = document.querySelector('input[name="offer_mode"][value="targeted"]').checked;
+        var group = document.getElementById('targeted-party-group');
+        group.style.display = targeted ? 'flex' : 'none';
+        document.getElementById('targeted_party').required = targeted;
+    }
+
+    document.getElementById('category').addEventListener('change', updateAttributeSelection);
+    updateAttributeSelection();
+    toggleTargetedParty();
     </script>
 {% endblock %}

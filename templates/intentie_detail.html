@@ -4,6 +4,33 @@
 {% block title %}{{ intention._category_label }} - MySolido{% endblock %}
 
 {% block content %}
+    <style>
+    .detail-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--color-text-muted);
+        margin-bottom: 4px;
+    }
+    .snapshot-row {
+        background: var(--color-bg-hover);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .snapshot-row .snapshot-key { font-weight: 600; }
+    .snapshot-row .snapshot-value { color: var(--color-text); }
+    .snapshot-note {
+        font-size: 0.85rem;
+        color: var(--color-text-muted);
+        margin: 0 0 12px;
+    }
+    </style>
+
     <div class="breadcrumbs">
         <a href="{{ url_for('intenties_overview') }}" class="btn-back">{{ icon_arrow_left() }} {{ t.int_back }}</a>
         <span class="current">{{ intention._category_label }}</span>
@@ -16,33 +43,76 @@
         </div>
 
         <div style="margin-top: 16px;">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_description }}</div>
+            <div class="detail-label">{{ t.int_description }}</div>
             <p style="margin: 0;">{{ intention.get('schema:description', '') }}</p>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 16px;">
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_created }}</div>
+                <div class="detail-label">{{ t.int_created }}</div>
                 <p style="margin: 0;">{{ intention.get('schema:dateCreated', '')[:10] }}</p>
             </div>
             <div>
-                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_valid_through }}</div>
+                <div class="detail-label">{{ t.int_valid_through }}</div>
                 <p style="margin: 0;">{{ intention.get('schema:validThrough', '')[:10] }}</p>
             </div>
         </div>
     </div>
 
-    {% set shared = intention.get('mysolido:sharedProfileData', {}) %}
-    {% set has_shared = shared.values()|selectattr('included')|list|length > 0 if shared is mapping else false %}
+    {# === MyTerms-voorwaarden (alleen aanwezig in records sinds 20-09-2026) === #}
+    {% set purpose = intention.get('mysolido:purpose') %}
+    {% if purpose is mapping or 'mysolido:offerMode' in intention %}
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>{{ t.int_terms_title }}</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 12px;">
+            <div>
+                <div class="detail-label">{{ t.int_purpose }}</div>
+                <p style="margin: 0;">{{ purpose.get('label', purpose.get('@id', '')) if purpose is mapping else '' }}</p>
+            </div>
+            <div>
+                <div class="detail-label">{{ t.int_onward_transfer }}</div>
+                <p style="margin: 0;">
+                    {% if intention.get('mysolido:noOnwardTransfer') %}{{ t.int_onward_prohibited }}{% else %}{{ t.int_onward_allowed }}{% endif %}
+                </p>
+            </div>
+            <div>
+                <div class="detail-label">{{ t.int_offer_mode }}</div>
+                <p style="margin: 0;">
+                    {% if intention.get('mysolido:offerMode') == 'targeted' %}
+                    {{ t.int_targeted_to }} {{ (intention.get('mysolido:targetedParty') or {}).get('name', '') }}
+                    {% else %}
+                    {{ t.int_offer_open }} ({{ t.int_offer_open_hint }})
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
+    {# === Snapshot van de gedeelde attributen (mysolido:sharedAttributes) === #}
+    {% if legacy_shared is none %}
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>{{ t.int_snapshot_title }}</h3>
+        {% if shared_attributes %}
+        <p class="snapshot-note">{{ t.int_snapshot_note.format(date=captured_at) }}</p>
+        {% for attr in shared_attributes %}
+        <div class="snapshot-row" data-attribute="{{ attr.get('@id', '') }}">
+            <span class="snapshot-key">{{ attr.get('label', attr.get('@id', '')) }}</span>
+            <span class="snapshot-value">{{ attr.get('valueLabel', attr.get('value', '')) }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="snapshot-note">{{ t.int_snapshot_empty }}</p>
+        {% endif %}
+    </div>
+    {% else %}
+    {# Oudere records (mysolido:sharedProfileData, per groep): groepsweergave met het actuele profiel #}
+    {% set has_shared = legacy_shared.values()|selectattr('included')|list|length > 0 %}
     {% if has_shared %}
     <div class="card" style="margin-bottom: 20px;">
         <h3>{{ t.int_selected_data }}</h3>
-        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 12px;">
-            {{ t.int_selected_data_desc }}
-        </p>
-
-        {% for group_key, group_data in shared.items() %}
+        <p class="snapshot-note">{{ t.int_legacy_note }}</p>
+        {% for group_key, group_data in legacy_shared.items() %}
         {% if group_data is mapping and group_data.get('included') %}
         {% set group_meta = profile_groups.get(group_key, {}) %}
         <div style="background: var(--color-bg-hover); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;">
@@ -50,18 +120,15 @@
                 {{ group_meta.get('icon', '') }} {{ group_meta.get('label', group_key) }}
             </div>
             {% if group_meta.get('filled') %}
-            <div style="font-size: 0.85rem; color: var(--color-text-muted);">
-                {{ group_meta.get('summary', '') }}
-            </div>
+            <div style="font-size: 0.85rem; color: var(--color-text-muted);">{{ group_meta.get('summary', '') }}</div>
             {% else %}
-            <div style="font-size: 0.85rem; color: var(--color-text-muted); font-style: italic;">
-                {{ t.int_not_filled }}
-            </div>
+            <div style="font-size: 0.85rem; color: var(--color-text-muted); font-style: italic;">{{ t.int_not_filled }}</div>
             {% endif %}
         </div>
         {% endif %}
         {% endfor %}
     </div>
+    {% endif %}
     {% endif %}
 
     {% if not read_only %}

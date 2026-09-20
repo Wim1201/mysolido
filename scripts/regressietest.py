@@ -41,6 +41,7 @@ import os
 import re
 import secrets
 import shutil
+import subprocess
 import sys
 import time
 import zipfile
@@ -58,6 +59,19 @@ TIMEOUT = 20
 REDIRECT = (301, 302, 303, 307, 308)
 ANSI = re.compile(r'\x1b\[[0-9;]*m')
 DEFAULT_FOLDERS_SAMPLE = ('identiteit', 'medisch', 'financieel')
+# Demodata (MyTerms-demo, subtaak 2): scripts/seed_demo.py maakt deze twintig mappen aan
+DEFAULT_FOLDERS_ALL = (
+    'identiteit', 'medisch', 'financieel', 'wonen', 'zakelijk',
+    'werk', 'voertuigen', 'juridisch', 'media', 'accounts',
+    'gezin', 'abonnementen', 'inbox', 'verzekeringen',
+    'huisdieren', 'opleiding', 'reizen', 'digitaal-testament',
+    'persoonlijk', 'projecten',
+)
+SEED_SCRIPT = ROOT / 'scripts' / 'seed_demo.py'
+SEED_FILES = ('voertuigen/demo-kentekenbewijs.txt', 'voertuigen/demo-apk-rapport-2026.txt',
+              'financieel/demo-jaaroverzicht-2025.txt')
+ATTR = 'urn:mysolido:attribute:'
+SCENARIO_ATTRIBUTES = ('age_category', 'postal_area', 'vehicle_type', 'claims_history')
 
 
 # --- helpers -----------------------------------------------------------------------------
@@ -181,8 +195,9 @@ class Ctx:
         self.run_id = secrets.token_hex(3)
         self.pre_existing = {
             name: (self.pod_dir / name).exists()
-            for name in ('_trash', 'toestemmingen', 'verzoeken', '.mysolido', TEST_FOLDER)
+            for name in ('_trash', 'toestemmingen', 'verzoeken', 'intenties', 'profiel', '.mysolido', TEST_FOLDER)
         }
+        self.seeded = False
 
     @property
     def token(self):
@@ -907,7 +922,10 @@ def phase_cleanup(ctx: Ctx, account, keep_persist: bool):
     r = css(ctx, 'GET', ctx.ldp_url, headers={'Accept': 'text/turtle'})
     rep.check('Opruimen: CSS geeft verwijderde submap niet meer terug', r.status_code in (401, 404),
               f'status {r.status_code}', f'status {r.status_code}')
-    for name in ('_trash', 'toestemmingen', 'verzoeken', '.mysolido'):
+    if ctx.seeded:
+        rep.info('Opruimen: demodata van seed_demo.py (standaardmappen, profiel/, voorbeeldbestanden) blijft staan',
+                 'bedoeld als demostand; verwijder handmatig als dat niet gewenst is')
+    for name in ('_trash', 'toestemmingen', 'verzoeken', 'intenties', '.mysolido'):
         path = ctx.pod_dir / name
         if ctx.pre_existing[name] or not path.exists():
             continue
@@ -964,6 +982,230 @@ def phase_bridge_mode(ctx: Ctx, password: str):
             ctx.test_dir.rmdir()
 
 
+# --- demodata, profielvelden en intentie (MyTerms-demo, subtaak 2) --------------------------
+
+def run_seed(force: bool = False):
+    cmd = [sys.executable, str(SEED_SCRIPT)] + (['--force'] if force else [])
+    return subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace',
+                          cwd=ROOT, timeout=120)
+
+
+def read_profile(ctx: Ctx) -> dict:
+    f = ctx.pod_dir / 'profiel' / 'profiel.jsonld'
+    return json.loads(f.read_text(encoding='utf-8')) if f.exists() else {}
+
+
+def expected_scenario_values(profile: dict) -> dict:
+    """De vier scenariowaarden zoals ze nu in profiel.jsonld staan (PROFILE_ATTRIBUTES.path)."""
+    vehicles = profile.get('pd:Vehicle') or [{}]
+    return {
+        ATTR + 'age_category': profile.get('pd:AgeRange'),
+        ATTR + 'postal_area': profile.get('pd:PostalCode'),
+        ATTR + 'vehicle_type': (vehicles[0] or {}).get('type'),
+        ATTR + 'claims_history': profile.get('mysolido:claimsHistory'),
+    }
+
+
+def phase_seed(ctx: Ctx):
+    """scripts/seed_demo.py: lege Pod -> twintig mappen + demoprofiel; tweede run weigert."""
+    rep = ctx.report
+    profile_file = ctx.pod_dir / 'profiel' / 'profiel.jsonld'
+    had_profile = profile_file.exists()
+    if had_profile:
+        rep.info('Seed: profiel/profiel.jsonld bestond al; seed niet met --force gedraaid', str(profile_file))
+    else:
+        r = run_seed()
+        rep.check('Seed: lege Pod gevuld (exit 0)', r.returncode == 0, '', (r.stdout + r.stderr)[-300:])
+        ctx.seeded = r.returncode == 0
+    folders = [f for f in DEFAULT_FOLDERS_ALL if (ctx.pod_dir / f).is_dir()]
+    if had_profile:
+        rep.info('Seed: standaardmappen op schijf', f'{len(folders)} van {len(DEFAULT_FOLDERS_ALL)}')
+    else:
+        rep.check('Seed: twintig standaardmappen aanwezig', len(folders) == len(DEFAULT_FOLDERS_ALL),
+                  '', f'{len(folders)} van {len(DEFAULT_FOLDERS_ALL)}: ontbreekt {sorted(set(DEFAULT_FOLDERS_ALL) - set(folders))}')
+        present = [p for p in SEED_FILES if (ctx.pod_dir / p).is_file()]
+        rep.check('Seed: voorbeeldbestanden in voertuigen/ en financieel/', len(present) == len(SEED_FILES),
+                  '', f'aanwezig: {present}')
+    rep.check('Seed: profiel/profiel.jsonld aanwezig', profile_file.exists(), '', 'ontbreekt')
+    rep.check('Seed: profiel/.policy.jsonld aanwezig', (ctx.pod_dir / 'profiel' / '.policy.jsonld').exists(), '', 'ontbreekt')
+    if ctx.seeded:
+        values = expected_scenario_values(read_profile(ctx))
+        rep.check('Seed: demoprofiel bevat de vier scenariowaarden',
+                  values == {ATTR + 'age_category': '35-44', ATTR + 'postal_area': '5611',
+                             ATTR + 'vehicle_type': 'auto',
+                             ATTR + 'claims_history': {'claimFreeYears': 5, 'claimsLast3Years': False}},
+                  '', json.dumps(values))
+    r = run_seed()
+    rep.check('Seed: tweede run zonder --force weigert (exit 1)',
+              r.returncode == 1 and 'bestaat al' in (r.stdout + r.stderr),
+              '', f'exit {r.returncode}: {(r.stdout + r.stderr)[-200:]}')
+    rep.check('Seed: geweigerde run laat het profiel ongemoeid', profile_file.exists(), '', 'profiel verdwenen')
+
+
+def phase_profile_fields(ctx: Ctx):
+    """Nieuwe profielvelden (leeftijdscategorie, postcodegebied, schadeverleden) opslaan en teruglezen."""
+    rep = ctx.report
+    profile_file = ctx.pod_dir / 'profiel' / 'profiel.jsonld'
+    original = profile_file.read_text(encoding='utf-8') if profile_file.exists() else None
+    try:
+        r = flask(ctx, 'POST', '/profiel-data', data={
+            'age_category': '45-54', 'postal_area': '1234', 'region': 'Testregio',
+            'vehicle_type': 'motor', 'vehicle_fuel': 'benzine', 'vehicle_year': '2015',
+            'claim_free_years': '7', 'claims_last_3_years': 'ja'})
+        rec = read_profile(ctx)
+        rep.check('Profiel: opslaan schrijft pd:AgeRange, pd:PostalCode en mysolido:claimsHistory',
+                  r.status_code in REDIRECT and rec.get('pd:AgeRange') == '45-54' and rec.get('pd:PostalCode') == '1234'
+                  and rec.get('mysolido:claimsHistory') == {'claimFreeYears': 7, 'claimsLast3Years': True},
+                  '', f'status {r.status_code}, record: {json.dumps(rec)[:300]}')
+        rep.check('Profiel: bestaande velden blijven werken (pd:Vehicle, pd:Location)',
+                  (rec.get('pd:Vehicle') or [{}])[0].get('type') == 'motor' and rec.get('pd:Location') == 'Testregio',
+                  '', json.dumps(rec.get('pd:Vehicle')))
+        r = flask(ctx, 'GET', '/profiel-data')
+        rep.check('Profiel: formulier leest de drie velden terug',
+                  r.status_code == 200 and 'value="45-54" selected' in r.text and 'value="1234"' in r.text
+                  and 'name="claim_free_years"' in r.text and 'value="ja" selected' in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'POST', '/profiel-data', data={'age_category': '45-54', 'postal_area': '12', 'vehicle_type': 'motor'})
+        rec = read_profile(ctx)
+        rep.check('Profiel: ongeldig postcodegebied wordt niet opgeslagen, de rest wel',
+                  'pd:PostalCode' not in rec and rec.get('pd:AgeRange') == '45-54',
+                  '', json.dumps(rec)[:200])
+    finally:
+        if original is not None:
+            profile_file.write_text(original, encoding='utf-8')
+            rep.ok('Profiel: oorspronkelijk profiel teruggezet')
+        elif profile_file.exists():
+            profile_file.unlink()
+            rep.ok('Profiel: testprofiel verwijderd (er was geen profiel)')
+
+
+def phase_intention(ctx: Ctx):
+    """Intentie autoverzekering: vier attributen als snapshot, purpose, noOnwardTransfer, offerMode."""
+    rep = ctx.report
+    idir = ctx.pod_dir / 'intenties'
+    profile_file = ctx.pod_dir / 'profiel' / 'profiel.jsonld'
+    profile = read_profile(ctx)
+    expected = expected_scenario_values(profile)
+    if not all(expected.values()):
+        rep.skip('Intentie: profiel mist scenariowaarden, fase overgeslagen', json.dumps(expected))
+        return
+    r = flask(ctx, 'GET', '/intenties/nieuw')
+    rep.check('Intentie: formulier toont attributen per veld en de MyTerms-velden',
+              r.status_code == 200 and 'name="attributes"' in r.text and 'value="claims_history"' in r.text
+              and 'name="purpose"' in r.text and 'name="no_onward_transfer"' in r.text and 'name="offer_mode"' in r.text,
+              '', f'status {r.status_code}')
+
+    def new_files(before):
+        return [p for p in idir.glob('*.jsonld') if p.name not in before and not p.name.startswith('.')] if idir.exists() else []
+
+    def listing():
+        return {p.name for p in idir.glob('*.jsonld')} if idir.exists() else set()
+
+    created = []
+    try:
+        before = listing()
+        r = flask(ctx, 'POST', '/intenties/nieuw', data={
+            'category': 'autoverzekering', 'description': 'Regressietest: ik zoek een autoverzekering',
+            'validity': '2w', 'attributes': list(SCENARIO_ATTRIBUTES), 'purpose': 'quote_calculation',
+            'no_onward_transfer': '1', 'offer_mode': 'open'})
+        new = new_files(before)
+        rep.check('Intentie: record weggeschreven', r.status_code in REDIRECT and len(new) == 1,
+                  '', f'status {r.status_code}, nieuwe bestanden: {len(new)}')
+        if not new:
+            return
+        created.append(new[0])
+        iid = new[0].stem
+        rec = json.loads(new[0].read_text(encoding='utf-8'))
+        shared = rec.get('mysolido:sharedAttributes') or []
+        got = {a.get('@id'): a.get('value') for a in shared}
+        rep.check('Intentie: sharedAttributes bevat precies de vier attributen met de profielwaarden',
+                  rec.get('@type') == 'mysolido:Intention' and got == expected,
+                  '', f'verwacht {json.dumps(expected)}, gekregen {json.dumps(got)}')
+        stamps = {a.get('capturedAt') for a in shared}
+        rep.check('Intentie: elk attribuut heeft label, valueLabel en hetzelfde capturedAt',
+                  len(stamps) == 1 and all(a.get('label') and a.get('valueLabel') for a in shared),
+                  '', json.dumps(shared)[:300])
+        purpose = rec.get('mysolido:purpose') or {}
+        rep.check('Intentie: purpose quote_calculation (Offerteberekening, dpv:ServiceProvision)',
+                  purpose.get('@id') == 'urn:mysolido:purpose:quote_calculation'
+                  and purpose.get('label') == 'Offerteberekening' and purpose.get('dpv') == 'dpv:ServiceProvision',
+                  '', json.dumps(purpose))
+        rep.check('Intentie: noOnwardTransfer true, offerMode open, geen targetedParty',
+                  rec.get('mysolido:noOnwardTransfer') is True and rec.get('mysolido:offerMode') == 'open'
+                  and 'mysolido:targetedParty' not in rec, '', json.dumps(rec)[:300])
+        rep.check('Intentie: geen mysolido:sharedProfileData meer in nieuwe records',
+                  'mysolido:sharedProfileData' not in rec, '', 'veld aanwezig')
+        try:
+            created_at = datetime.fromisoformat(rec.get('schema:dateCreated'))
+            valid = datetime.fromisoformat(rec.get('schema:validThrough'))
+            rep.check('Intentie: geldigheid 2 weken = 14 dagen', (valid - created_at).days == 14, '', str(valid - created_at))
+        except (TypeError, ValueError) as exc:
+            rep.fail('Intentie: geldigheid 2 weken = 14 dagen', repr(exc))
+        r = flask(ctx, 'GET', f'/intenties/{iid}')
+        rep.check('Intentie: detailpagina toont snapshot met "Vastgelegd op" en de vier attribuut-urn\'s',
+                  r.status_code == 200 and 'Vastgelegd op' in r.text
+                  and all(f'data-attribute="{ATTR}{k}"' in r.text for k in SCENARIO_ATTRIBUTES)
+                  and 'Offerteberekening' in r.text,
+                  '', f'status {r.status_code}')
+        # Snapshot boven verwijzing: profiel wijzigen mag de detailpagina niet veranderen
+        original = profile_file.read_text(encoding='utf-8')
+        try:
+            changed = dict(profile)
+            changed['pd:AgeRange'] = '65+' if profile.get('pd:AgeRange') != '65+' else '18-24'
+            profile_file.write_text(json.dumps(changed, indent=2, ensure_ascii=False), encoding='utf-8')
+            r = flask(ctx, 'GET', f'/intenties/{iid}')
+            rep.check('Intentie: detailpagina toont het snapshot, niet het gewijzigde profiel',
+                      r.status_code == 200 and profile['pd:AgeRange'] in r.text and changed['pd:AgeRange'] not in r.text,
+                      '', f'status {r.status_code}')
+        finally:
+            profile_file.write_text(original, encoding='utf-8')
+
+        # Gericht aanbod: naam verplicht, wordt opgeslagen als targetedParty
+        before = listing()
+        r = flask(ctx, 'POST', '/intenties/nieuw', data={
+            'category': 'autoverzekering', 'description': 'Regressietest gericht zonder naam',
+            'validity': '1w', 'attributes': ['vehicle_type'], 'offer_mode': 'targeted', 'targeted_party': ''})
+        rep.check('Intentie: gericht aanbod zonder naam wordt geweigerd', r.status_code in REDIRECT and not new_files(before),
+                  '', f'status {r.status_code}, nieuwe bestanden: {len(new_files(before))}')
+        r = flask(ctx, 'POST', '/intenties/nieuw', data={
+            'category': 'autoverzekering', 'description': 'Regressietest gericht aanbod',
+            'validity': '1w', 'attributes': ['vehicle_type'], 'offer_mode': 'targeted',
+            'targeted_party': 'Verzekeraar X'})
+        new = new_files(before)
+        if rep.check('Intentie: gericht aanbod weggeschreven', len(new) == 1, '', f'status {r.status_code}'):
+            created.append(new[0])
+            rec2 = json.loads(new[0].read_text(encoding='utf-8'))
+            rep.check('Intentie: offerMode targeted met targetedParty, noOnwardTransfer false zonder vinkje',
+                      rec2.get('mysolido:offerMode') == 'targeted'
+                      and rec2.get('mysolido:targetedParty') == {'name': 'Verzekeraar X'}
+                      and rec2.get('mysolido:noOnwardTransfer') is False
+                      and [a['@id'] for a in rec2.get('mysolido:sharedAttributes', [])] == [ATTR + 'vehicle_type'],
+                      '', json.dumps(rec2)[:300])
+
+        # Oud record (sharedProfileData per groep) blijft leesbaar
+        legacy_id = f'regressietest-legacy-{ctx.run_id}'
+        legacy_file = idir / f'{legacy_id}.jsonld'
+        legacy_file.write_text(json.dumps({
+            '@type': 'mysolido:Intention', '@id': f'urn:mysolido:intention:{legacy_id}',
+            'mysolido:category': 'autoverzekering', 'schema:description': 'Regressietest oud record',
+            'mysolido:status': 'concept', 'schema:dateCreated': '2026-04-03T10:00:00+00:00',
+            'schema:validThrough': '2026-05-03T10:00:00+00:00',
+            'mysolido:sharedProfileData': {'vehicle': {'included': True, 'data': {'type': 'auto'}},
+                                           'insurance': {'included': False}}}, indent=2), encoding='utf-8')
+        created.append(legacy_file)
+        r = flask(ctx, 'GET', f'/intenties/{legacy_id}')
+        rep.check('Intentie: oud record met sharedProfileData blijft leesbaar (groepsweergave)',
+                  r.status_code == 200 and 'Oudere intentie' in r.text and 'Voertuigen' in r.text,
+                  '', f'status {r.status_code}')
+    finally:
+        for f in created:
+            if f.exists():
+                r = flask(ctx, 'POST', f'/intenties/{f.stem}/delete')
+                if f.exists():
+                    f.unlink()
+        rep.check('Intentie: testrecords opgeruimd', not any(f.exists() for f in created), '', 'bestanden bestaan nog')
+
+
 # --- main --------------------------------------------------------------------------------
 
 def main():
@@ -971,7 +1213,8 @@ def main():
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description='MySolido regression test against a running CSS + Flask stack.')
     parser.add_argument('--scenario', choices=['U', 'N'], default='U', help='U = upgrade path (default), N = new installation')
-    parser.add_argument('--phase', choices=['all', 'bridge', 'persist'], default='all')
+    parser.add_argument('--phase', choices=['all', 'bridge', 'persist', 'demo'], default='all',
+                        help='demo = alleen seed, profielvelden en intentie (MyTerms-demo)')
     parser.add_argument('--out', help='write results as JSON to this file')
     parser.add_argument('--keep', action='store_true', help='do not remove test data afterwards')
     parser.add_argument('--keep-persist', action='store_true',
@@ -992,6 +1235,10 @@ def main():
         run_phase(ctx, 'Bridge read-only modus', phase_bridge_mode, args.bridge_password)
     elif args.phase == 'persist':
         run_phase(ctx, 'Persistentie van ACL en policy na herstart', phase_persist_check, args.keep_persist)
+    elif args.phase == 'demo':
+        run_phase(ctx, 'Demodata (seed_demo.py)', phase_seed)
+        run_phase(ctx, 'Profielvelden MyTerms-demo', phase_profile_fields)
+        run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
     else:
         run_phase(ctx, 'Preflight', phase_preflight)
         account = run_phase(ctx, 'Accountcreatie en test-Pod (CSS account-API)', phase_account)
@@ -1002,6 +1249,9 @@ def main():
         run_phase(ctx, 'Deellinks', phase_share_link)
         run_phase(ctx, 'ODRL-beleid', phase_policy)
         run_phase(ctx, 'Toestemmingen en consentrequests', phase_consent_request)
+        run_phase(ctx, 'Demodata (seed_demo.py)', phase_seed)
+        run_phase(ctx, 'Profielvelden MyTerms-demo', phase_profile_fields)
+        run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
         run_phase(ctx, 'Backup en restore', phase_backup_restore, content)
         run_phase(ctx, 'Flask /debug (HTTP-laag)', phase_debug)
         run_phase(ctx, 'Probes 7.2.0-changelog', phase_probes)
