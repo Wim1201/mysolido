@@ -96,7 +96,7 @@
             </tr>
             <tr>
                 <th>{{ t.consent_detail_created }} / {{ t.consent_detail_modified }}</th>
-                <td>{{ consent.get('dct:created', '') }} / {{ consent.get('dct:modified', '') }}</td>
+                <td>{{ consent.get('dct:created', '')|nl_date }} {{ consent.get('dct:created', '')[11:19] }} / {{ consent.get('dct:modified', '')|nl_date }} {{ consent.get('dct:modified', '')[11:19] }} <span style="color: var(--color-text-muted); font-size: 0.8rem;">(UTC)</span></td>
             </tr>
         </table>
         {% else %}
@@ -125,17 +125,17 @@
             </tr>
             <tr>
                 <th>{{ t.consent_detail_created }}</th>
-                <td>{{ consent.get('dct:created', '')[:19].replace('T', ' ') }}</td>
+                <td>{{ consent.get('dct:created', '')|nl_date }} {{ consent.get('dct:created', '')[11:16] }}</td>
             </tr>
             <tr>
                 <th>{{ t.consent_detail_modified }}</th>
-                <td>{{ consent.get('dct:modified', '')[:19].replace('T', ' ') }}</td>
+                <td>{{ consent.get('dct:modified', '')|nl_date }} {{ consent.get('dct:modified', '')[11:16] }}</td>
             </tr>
             {% set expiry = consent.get('dpv:hasExpiry', {}) %}
             {% if expiry and expiry is mapping and expiry.get('dpv:hasExpiryTime') %}
             <tr>
                 <th>{{ t.consent_detail_valid_until }}</th>
-                <td>{{ expiry.get('dpv:hasExpiryTime', '')[:10] }}</td>
+                <td>{{ expiry.get('dpv:hasExpiryTime', '')|nl_date }}</td>
             </tr>
             {% endif %}
             <tr>

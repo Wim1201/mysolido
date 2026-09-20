@@ -71,6 +71,8 @@
             {% endfor %}
         {% endwith %}
         {% block content %}{% endblock %}
+        {# versieregel (subtaak 5): commit-hash en modus, ook op de telefoon af te lezen #}
+        <p class="app-version" id="app-version" style="text-align: center; font-size: 0.75rem; color: var(--color-text-muted); margin: 24px 0 8px;">MySolido {{ app_version }} &middot; {{ app_mode }}</p>
     </main>
 
     <nav class="bottom-nav">

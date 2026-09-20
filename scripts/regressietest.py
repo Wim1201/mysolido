@@ -1853,6 +1853,232 @@ def phase_consent_record(ctx: Ctx):
         rep.check('Consentrecord: testintenties, verzoeken, Agreements, responses, consentrecords en fixtures opgeruimd', not leftovers, '', str(leftovers))
 
 
+def _git_short_hash() -> str:
+    try:
+        out = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=ROOT, capture_output=True, text=True, timeout=5)
+        return out.stdout.strip() if out.returncode == 0 else ''
+    except OSError:
+        return ''
+
+
+def _nl_date(iso: str) -> str:
+    try:
+        return datetime.fromisoformat(str(iso)[:10]).strftime('%d-%m-%Y')
+    except (TypeError, ValueError):
+        return ''
+
+
+def _make_accepted_case(ctx: Ctx, anon: requests.Session, description: str):
+    """Open intentie aanmaken, activeren en laten accepteren; geeft (intentie-file, verzoek-file, consent-id)."""
+    idir = ctx.pod_dir / 'intenties'
+    vdir = ctx.pod_dir / 'verzoeken'
+    before = {p.name for p in idir.glob('*.jsonld')} if idir.exists() else set()
+    flask(ctx, 'POST', '/intenties/nieuw', data={'category': 'autoverzekering', 'description': description,
+                                                 'validity': '2w', 'attributes': list(SCENARIO_ATTRIBUTES),
+                                                 'purpose': 'quote_calculation', 'no_onward_transfer': '1', 'offer_mode': 'open'})
+    new = [p for p in idir.glob('*.jsonld') if p.name not in before and not p.name.startswith('.')
+           and not p.name.endswith('.policy.jsonld')]
+    if len(new) != 1:
+        return None, None, ''
+    intention_file = new[0]
+    flask(ctx, 'POST', f'/intenties/{intention_file.stem}/activate')
+    before_v = {p.name for p in vdir.glob('*.jsonld')} if vdir.exists() else set()
+    anon.post(f'{ctx.flask_base}/verzoek/intentie/{intention_file.stem}',
+              data={'name': 'Jan Tester', 'organization': 'Verzekeraar X BV', 'email': 'jan@verzekeraar-x.test', 'accept_terms': 'yes'},
+              timeout=TIMEOUT, allow_redirects=False)
+    new_v = [p for p in vdir.glob('*.jsonld') if p.name not in before_v and not p.name.startswith('.')
+             and not p.name.endswith('.agreement.jsonld')]
+    if len(new_v) != 1:
+        return intention_file, None, ''
+    req = json.loads(new_v[0].read_text(encoding='utf-8'))
+    return intention_file, new_v[0], str(req.get('mysolido:consent', '')).rsplit(':', 1)[-1]
+
+
+def _cleanup_case(ctx: Ctx, intention_file, request_file, consent_id):
+    if consent_id:
+        p = ctx.pod_dir / 'toestemmingen' / f'{consent_id}.jsonld'
+        if p.exists():
+            p.unlink()
+    if request_file:
+        for p in (request_file, request_file.with_name(request_file.stem + '.agreement.jsonld'),
+                  request_file.with_name(request_file.stem + '_response.json')):
+            if p.exists():
+                p.unlink()
+    if intention_file:
+        for p in (intention_file, intention_file.with_name(intention_file.stem + '.policy.jsonld')):
+            if p.exists():
+                p.unlink()
+
+
+def phase_finishing(ctx: Ctx):
+    """Afronding (subtaak 5): versieregel, aanbodlink, datumnotatie dd-mm-jjjj, naamveld, Agreement-uid na intrekken."""
+    rep = ctx.report
+    anon = requests.Session()
+    git_hash = _git_short_hash()
+    r = flask(ctx, 'GET', '/')
+    rep.check('Afronding: versieregel in de voettekst met commit-hash en "lokaal"',
+              r.status_code == 200 and 'id="app-version"' in r.text and 'lokaal' in r.text and (not git_hash or git_hash in r.text),
+              git_hash, f'status {r.status_code}')
+    profile = read_profile(ctx)
+    if not all(expected_scenario_values(profile).values()):
+        rep.skip('Afronding: profiel mist scenariowaarden, rest overgeslagen')
+        return
+    intention_file = request_file = None
+    cid = ''
+    try:
+        intention_file, request_file, cid = _make_accepted_case(ctx, anon, 'Regressietest afronding')
+        if not rep.check('Afronding: testketen (intentie, acceptatie, consentrecord) aangemaakt',
+                         intention_file is not None and request_file is not None and bool(cid), '', 'keten onvolledig'):
+            return
+        iid, rid = intention_file.stem, request_file.stem
+        rec = json.loads(intention_file.read_text(encoding='utf-8'))
+        req = json.loads(request_file.read_text(encoding='utf-8'))
+        r = flask(ctx, 'GET', f'/intenties/{iid}')
+        rep.check('Afronding: aanbodlink met volledige URL en kopieerknop op de actieve intentie',
+                  r.status_code == 200 and 'id="offer-link"' in r.text and f'{ctx.flask_base}/verzoek/intentie/{iid}' in r.text
+                  and 'id="offer-link-copy"' in r.text, '', f'status {r.status_code}')
+        rep.check('Afronding: intentiedetail toont Aangemaakt en Geldig tot als dd-mm-jjjj',
+                  _nl_date(rec.get('schema:dateCreated')) in r.text and _nl_date(rec.get('schema:validThrough')) in r.text
+                  and rec.get('schema:dateCreated', '')[:10] not in r.text.replace(_nl_date(rec.get('schema:dateCreated')), ''),
+                  '', 'datum niet gevonden')
+        r = flask(ctx, 'GET', '/intenties')
+        rep.check('Afronding: intentielijst toont datums als dd-mm-jjjj',
+                  r.status_code == 200 and _nl_date(rec.get('schema:validThrough')) in r.text and _nl_date(rec.get('schema:dateCreated')) in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/verzoeken/{rid}')
+        rep.check('Afronding: verzoekdetail toont de persoon in het naamveld en de datum als dd-mm-jjjj',
+                  r.status_code == 200 and 'Jan Tester' in r.text and _nl_date(req.get('schema:dateCreated')) in r.text
+                  and _nl_date(req.get('mysolido:validUntil')) in r.text, '', f'status {r.status_code}')
+        rep.check('Afronding: schema:name van het verzoek is de persoon, rdfs:label de organisatie',
+                  req.get('mysolido:requester', {}).get('schema:name') == 'Jan Tester'
+                  and (req.get('mysolido:party') or {}).get('rdfs:label') == 'Verzekeraar X BV', '', json.dumps(req.get('mysolido:requester')))
+        r = flask(ctx, 'GET', '/verzoeken')
+        rep.check('Afronding: verzoeklijst toont de datum als dd-mm-jjjj', r.status_code == 200 and _nl_date(req.get('schema:dateCreated')) in r.text,
+                  '', f'status {r.status_code}')
+        r = anon.get(f"{ctx.flask_base}{req.get('mysolido:responseLink')}", timeout=TIMEOUT)
+        rep.check('Afronding: responspagina toont "geldig tot" als dd-mm-jjjj',
+                  r.status_code == 200 and _nl_date(req.get('mysolido:validUntil')) in r.text, '', f'status {r.status_code}')
+        con = json.loads((ctx.pod_dir / 'toestemmingen' / f'{cid}.jsonld').read_text(encoding='utf-8'))
+        r = flask(ctx, 'GET', '/consent')
+        rep.check('Afronding: consentlijst toont aanmaakdatum en geldigheid als dd-mm-jjjj',
+                  r.status_code == 200 and _nl_date(con.get('dct:created')) in r.text
+                  and _nl_date(con['dpv:hasStorageCondition']['mysolido:validUntil']) in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/consent/{cid}')
+        rep.check('Afronding: consentdetail toont datums als dd-mm-jjjj', r.status_code == 200 and _nl_date(con.get('dct:created')) in r.text,
+                  '', f'status {r.status_code}')
+        rep.check('Afronding: consentrecord gebruikt +00:00-notatie zonder Z en de id-datum van vandaag (UTC)',
+                  str(con.get('dct:created', '')).endswith('+00:00') and cid.startswith(datetime.utcnow().strftime('%Y%m%d')),
+                  '', f"{con.get('dct:created')} / {cid}")
+        flask(ctx, 'POST', f'/consent/{cid}/withdraw')
+        r = anon.get(f"{ctx.flask_base}{req.get('mysolido:responseLink')}", timeout=TIMEOUT)
+        rep.check('Afronding: responspagina na intrekken toont de Agreement-uid',
+                  r.status_code == 200 and 'Toestemming ingetrokken op' in r.text and req.get('mysolido:agreement', '') in r.text,
+                  '', f'status {r.status_code}')
+        rep.info('Afronding: REQUEST_RATE_LIMIT uit .env', 'alleen bij opstart gelezen; niet in deze run getest')
+    finally:
+        _cleanup_case(ctx, intention_file, request_file, cid)
+        rep.check('Afronding: testketen opgeruimd',
+                  not any(p.exists() for p in [x for x in (intention_file, request_file) if x]
+                          + ([ctx.pod_dir / 'toestemmingen' / f'{cid}.jsonld'] if cid else [])), '', 'bestanden bestaan nog')
+
+
+BRIDGE_TEST_PORT = 5001
+
+
+def phase_bridge_local(ctx: Ctx):
+    """Bridge-modus lokaal (subtaak 5): tweede proces met --bridge op poort 5001 tegen dezelfde Pod."""
+    import bcrypt
+    rep = ctx.report
+    bridge_base = f'http://127.0.0.1:{BRIDGE_TEST_PORT}'
+    try:
+        requests.get(bridge_base + '/', timeout=2)
+        rep.skip('Bridge lokaal: poort 5001 is al bezet, fase overgeslagen')
+        return
+    except requests.RequestException:
+        pass
+    anon = requests.Session()
+    intention_file = request_file = None
+    cid = ''
+    proc = None
+    log_path = Path(os.environ.get('TEMP', str(ROOT))) / f'mysolido-bridge-test-{ctx.run_id}.log'
+    try:
+        intention_file, request_file, cid = _make_accepted_case(ctx, anon, 'Regressietest Bridge lokaal')
+        if not rep.check('Bridge lokaal: testketen op de lokale app aangemaakt',
+                         intention_file is not None and request_file is not None and bool(cid), '', 'keten onvolledig'):
+            return
+        iid, rid = intention_file.stem, request_file.stem
+        password = 'bridge-' + secrets.token_hex(6)
+        env = dict(os.environ)
+        env.update({'MYSOLIDO_PORT': str(BRIDGE_TEST_PORT),
+                    'BRIDGE_PASSWORD': bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+                    'PYTHONIOENCODING': 'utf-8', 'FLASK_DEBUG': 'false'})
+        log = open(log_path, 'w', encoding='utf-8')
+        proc = subprocess.Popen([sys.executable, 'app.py', '--bridge'], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+        up = False
+        for _ in range(30):
+            time.sleep(1)
+            try:
+                r = requests.get(bridge_base + '/', timeout=2, allow_redirects=False)
+                up = True
+                break
+            except requests.RequestException:
+                if proc.poll() is not None:
+                    break
+        if not rep.check('Bridge lokaal: tweede proces gestart met --bridge op poort 5001', up, '', f'niet bereikbaar; log {log_path}'):
+            return
+        rep.check('Bridge lokaal: zonder login redirect naar bridge-login',
+                  r.status_code in REDIRECT and 'bridge-login' in r.headers.get('Location', ''), '', f'status {r.status_code}')
+        s = requests.Session()
+        r = s.post(bridge_base + '/bridge-login', data={'password': password}, timeout=TIMEOUT, allow_redirects=False)
+        rep.check('Bridge lokaal: inloggen met het Bridge-wachtwoord', r.status_code in REDIRECT, '', f'status {r.status_code}')
+        r = s.get(f'{bridge_base}/intenties/{iid}', timeout=TIMEOUT)
+        rep.check('Bridge lokaal: intentiedetail met Offer-kaart en "Geaccepteerd door", zonder knoppen',
+                  r.status_code == 200 and 'Voorwaarden (ODRL-aanbod)' in r.text and 'Geaccepteerd door' in r.text
+                  and f'/intenties/{iid}/withdraw' not in r.text and f'/intenties/{iid}/activate' not in r.text
+                  and 'Voorwaarden opstellen' not in r.text and 'id="offer-link"' in r.text,
+                  '', f'status {r.status_code}')
+        r = s.get(f'{bridge_base}/consent/{cid}', timeout=TIMEOUT)
+        rep.check('Bridge lokaal: consentdetail met 27560-tabel, zonder Intrekken',
+                  r.status_code == 200 and 'ISO/IEC TS 27560' in r.text and f'/consent/{cid}/withdraw' not in r.text
+                  and f'/verzoeken/{rid}"' not in r.text, '', f'status {r.status_code}')
+        r = requests.get(f'{bridge_base}/verzoek/intentie/{iid}', timeout=TIMEOUT)
+        rep.check('Bridge lokaal: acceptatieformulier toont voorwaarden zonder formulier, met Bridge-melding (zonder login)',
+                  r.status_code == 200 and f'urn:mysolido:policy:intention:{iid}' in r.text and 'name="accept_terms"' not in r.text
+                  and 'alleen lezen' in r.text, '', f'status {r.status_code}')
+        vdir = ctx.pod_dir / 'verzoeken'
+        before = {p.name for p in vdir.glob('*.jsonld')}
+        r = requests.post(f'{bridge_base}/verzoek/intentie/{iid}', data={'name': 'X', 'email': 'x@y.test', 'accept_terms': 'yes'},
+                          timeout=TIMEOUT, allow_redirects=False)
+        rep.check('Bridge lokaal: POST accepteren geweigerd, geen nieuw verzoek',
+                  r.status_code in REDIRECT and {p.name for p in vdir.glob('*.jsonld')} == before, '', f'status {r.status_code}')
+        r = s.get(f'{bridge_base}/verzoeken', timeout=TIMEOUT)
+        rep.check('Bridge lokaal: /verzoeken geeft 403', r.status_code == 403, '', f'status {r.status_code}')
+        r1 = s.get(f'{bridge_base}/intenties/{iid}/policy.jsonld', timeout=TIMEOUT)
+        r2 = s.get(f'{bridge_base}/verzoeken/{rid}/agreement.jsonld', timeout=TIMEOUT)
+        rep.check('Bridge lokaal: policy.jsonld en agreement.jsonld als application/ld+json',
+                  r1.status_code == 200 and 'ld+json' in r1.headers.get('Content-Type', '')
+                  and r2.status_code == 200 and 'ld+json' in r2.headers.get('Content-Type', ''),
+                  '', f'status {r1.status_code}/{r2.status_code}')
+        r = s.get(bridge_base + '/', timeout=TIMEOUT)
+        git_hash = _git_short_hash()
+        rep.check('Bridge lokaal: versieregel met "Bridge"', r.status_code == 200 and 'id="app-version"' in r.text
+                  and 'Bridge' in r.text.split('id="app-version"')[1][:400] and (not git_hash or git_hash in r.text),
+                  git_hash, f'status {r.status_code}')
+    finally:
+        if proc is not None:
+            proc.kill()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+            try:
+                requests.get(bridge_base + '/', timeout=2)
+                rep.fail('Bridge lokaal: tweede proces gestopt', 'poort 5001 antwoordt nog')
+            except requests.RequestException:
+                rep.ok('Bridge lokaal: tweede proces gestopt')
+        _cleanup_case(ctx, intention_file, request_file, cid)
+
+
 # --- main --------------------------------------------------------------------------------
 
 def main():
@@ -1889,6 +2115,8 @@ def main():
         run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
         run_phase(ctx, 'Acceptatie en Agreement', phase_acceptance)
         run_phase(ctx, 'Consentrecord (27560)', phase_consent_record)
+        run_phase(ctx, 'Afronding (versieregel, aanbodlink, datums)', phase_finishing)
+        run_phase(ctx, 'Bridge-modus lokaal (tweede proces, poort 5001)', phase_bridge_local)
     else:
         run_phase(ctx, 'Preflight', phase_preflight)
         account = run_phase(ctx, 'Accountcreatie en test-Pod (CSS account-API)', phase_account)
@@ -1905,6 +2133,8 @@ def main():
         run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
         run_phase(ctx, 'Acceptatie en Agreement', phase_acceptance)
         run_phase(ctx, 'Consentrecord (27560)', phase_consent_record)
+        run_phase(ctx, 'Afronding (versieregel, aanbodlink, datums)', phase_finishing)
+        run_phase(ctx, 'Bridge-modus lokaal (tweede proces, poort 5001)', phase_bridge_local)
         run_phase(ctx, 'Backup en restore', phase_backup_restore, content)
         run_phase(ctx, 'Flask /debug (HTTP-laag)', phase_debug)
         run_phase(ctx, 'Probes 7.2.0-changelog', phase_probes)

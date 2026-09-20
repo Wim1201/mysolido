@@ -22,7 +22,7 @@
         <div class="consent-item consent-{{ c._status.class }}">
             <div class="consent-item-header">
                 <span class="consent-status-badge {{ c._status.class }}">{{ c._status.icon }} {{ c._status.label }}</span>
-                <span class="consent-date">{{ c.get('dct:created', '')[:10] }}</span>
+                <span class="consent-date">{{ c._created_date }}</span>
             </div>
             <div class="consent-item-body">
                 <h3 class="consent-title">{{ c.get('dct:title', t.consent_no_title) }}</h3>

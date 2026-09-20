@@ -27,7 +27,7 @@ MySolido is open source software that runs a personal data vault (Solid Pod) on 
 - **Dashboard** — Statistics: file count, storage size, folders, active share links
 - **Bridge** — Access your vault from anywhere, on your phone, as a read-only mirror
 - **ODRL policies** — Machine-readable sharing rules per folder (W3C Recommendation). Control who can do what: owner only, read allowed, or temporary sharing
-- **Consent management** — Record who has access to your data and why, compliant with ISO/IEC TS 27560:2023 and W3C Data Privacy Vocabulary
+- **Consent management** — Record who has access to your data and why. Intention-based consents are recorded per ISO/IEC TS 27560:2023 and the W3C Data Privacy Vocabulary
 - **Watermarks** — Automatic watermark on PDFs and images when viewed via share links. The original stays untouched
 - **Profile module** — Store structured personal attributes (housing, family, vehicles, insurance, work, health) as JSON-LD with W3C Data Privacy Vocabulary
 - **Intention module** — Create anonymous intentions ("I'm looking for car insurance") linked to your profile data. Foundation for the Intention Economy
@@ -210,7 +210,7 @@ MySolido offers a new way to reach clients — with their permission.
 2. Your client sees the request in their MySolido vault
 3. They choose exactly which data to share (e.g. vehicle details, current policies)
 4. You receive a temporary, secure link to the approved data
-5. Every consent is registered according to ISO 27560 — legally stronger than cookie banners
+5. Every consent that arises from an intention is registered according to ISO 27560 — legally stronger than cookie banners
 
 The data cannot be resold (enforced via ODRL policy). Watermarks make any leak traceable.
 
@@ -223,7 +223,7 @@ The data cannot be resold (enforced via ODRL policy). Watermarks make any leak t
 ### Available
 
 * ODRL policy engine — sharing rules per folder (W3C ODRL 2.2)
-* Consent management — consent records compliant with ISO/IEC TS 27560:2023
+* Consent management — intention-based consent records compliant with ISO/IEC TS 27560:2023
 * Watermarks on share links — automatic watermark on PDFs and images
 * macOS installer (.dmg) and Windows installer (.exe)
 * Bridge — always reachable via bridge.mysolido.com
@@ -285,7 +285,7 @@ MySolido uses the same standard as [Athumi](https://athumi.be) (Flemish governme
 |-------|-----|
 | **Technical** | Watermarks on shared documents. Traceable if leaked. No download button. |
 | **Legal** | ODRL policies: machine-readable rules. "Read only, do not distribute, valid until date X." Enforceable. |
-| **Registration** | Every consent recorded per ISO 27560 + W3C DPV. Burden of proof on the requester. |
+| **Registration** | Consent given through an intention is recorded per ISO 27560 + W3C DPV. Burden of proof on the requester. |
 
 Cookie banners offer zero protection. MySolido offers three layers.
 
@@ -306,7 +306,7 @@ Export regular backups (ZIP) via the settings. With the Bridge, you automaticall
 macOS is supported with a `.dmg` installer and `start-mysolido.sh` launcher script. Linux users can follow the manual installation (Python + Node.js).
 
 **Can a party that receives my data resell it?**
-No. The ODRL policy prohibits distribution. Every consent is registered with a specific purpose. Reselling violates the agreement and GDPR. Watermarks make any leak traceable.
+No. The ODRL policy prohibits distribution. Consent given through an intention is registered with a specific purpose. Reselling violates the agreement and GDPR. Watermarks make any leak traceable.
 
 ---
 

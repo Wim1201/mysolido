@@ -50,13 +50,37 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 16px;">
             <div>
                 <div class="detail-label">{{ t.int_created }}</div>
-                <p style="margin: 0;">{{ intention.get('schema:dateCreated', '')[:10] }}</p>
+                <p style="margin: 0;">{{ intention.get('schema:dateCreated', '')|nl_date }}</p>
             </div>
             <div>
                 <div class="detail-label">{{ t.int_valid_through }}</div>
-                <p style="margin: 0;">{{ intention.get('schema:validThrough', '')[:10] }}</p>
+                <p style="margin: 0;">{{ intention.get('schema:validThrough', '')|nl_date }}</p>
             </div>
         </div>
+
+        {# Aanbodlink (subtaak 5): alleen bij een actieve intentie, met kopieerknop #}
+        {% if intention._status == 'actief' and offer_url %}
+        <div style="margin-top: 16px;" id="offer-link">
+            <div class="detail-label">{{ t.int_offer_link }}</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <input type="text" class="form-input" id="offer-link-input" readonly value="{{ offer_url }}" style="flex: 1; min-width: 240px; font-size: 0.85rem;">
+                <button type="button" class="btn btn-compact" id="offer-link-copy" onclick="copyOfferLink()">{{ t.int_copy }}</button>
+            </div>
+            <p class="snapshot-note" style="margin-top: 6px;">{{ t.int_offer_link_hint }}</p>
+        </div>
+        <script>
+        function copyOfferLink() {
+            var input = document.getElementById('offer-link-input');
+            var btn = document.getElementById('offer-link-copy');
+            var done = function() { btn.textContent = {{ t.int_copied|tojson }}; setTimeout(function() { btn.textContent = {{ t.int_copy|tojson }}; }, 2000); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(input.value).then(done, function() { input.select(); document.execCommand('copy'); done(); });
+            } else {
+                input.select(); document.execCommand('copy'); done();
+            }
+        }
+        </script>
+        {% endif %}
     </div>
 
     {# === MyTerms-voorwaarden (alleen aanwezig in records sinds 20-09-2026) === #}

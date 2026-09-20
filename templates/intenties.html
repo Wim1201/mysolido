@@ -43,7 +43,7 @@
                     <div class="consent-meta">
                         <span>{{ intent._description[:100] }}{% if intent._description|length > 100 %}...{% endif %}</span>
                         {% if intent.get('schema:validThrough') %}
-                        <span>{{ t.int_valid_until }} {{ intent['schema:validThrough'][:10] }}</span>
+                        <span>{{ t.int_valid_until }} {{ intent['schema:validThrough']|nl_date }}</span>
                         {% endif %}
                     </div>
                 </div>

@@ -27,7 +27,7 @@ MySolido is open source software die een persoonlijke datakluis (Solid Pod) op j
 - **Dashboard** — Statistieken: aantal bestanden, opslaggrootte, mappen, actieve deellinks
 - **Bridge** — Je kluis bereikbaar via internet, op je telefoon, als read-only spiegel
 - **ODRL policies** — Machine-leesbare deelregels per map (W3C Recommendation). Bepaal per map wie wat mag: alleen eigenaar, lezen toegestaan, of tijdelijk delen
-- **Toestemmingen** — Leg vast wie toegang heeft tot jouw gegevens en waarom, conform ISO/IEC TS 27560:2023 en W3C Data Privacy Vocabulary
+- **Toestemmingen** — Leg vast wie toegang heeft tot jouw gegevens en waarom. Intentiegebonden toestemmingen worden vastgelegd conform ISO/IEC TS 27560:2023 en W3C Data Privacy Vocabulary
 - **Watermerken** — Automatisch watermerk op PDF's en afbeeldingen bij deellinks. Origineel blijft onaangeroerd
 - **Profielmodule** — Sla gestructureerde persoonlijke gegevens op (woonsituatie, gezin, voertuigen, verzekeringen, werk, gezondheid) als JSON-LD met W3C Data Privacy Vocabulary
 - **Intentiemodule** — Maak anonieme intenties aan ("Ik zoek een autoverzekering") gekoppeld aan je profieldata. Basis voor de Intention Economy
@@ -210,7 +210,7 @@ MySolido biedt een nieuwe manier om klanten te bereiken — met hun toestemming.
 2. Uw klant ziet het verzoek in zijn MySolido-kluis
 3. De klant kiest precies welke gegevens hij deelt (bijv. voertuiggegevens, huidige polissen)
 4. U ontvangt een tijdelijke, beveiligde link naar de goedgekeurde data
-5. Elke toestemming wordt geregistreerd conform ISO 27560 — juridisch sterker dan cookiebanners
+5. Elke toestemming die via een intentie tot stand komt, wordt geregistreerd conform ISO/IEC TS 27560 — juridisch sterker dan cookiebanners
 
 De gegevens mogen niet worden doorverkocht (afgedwongen via ODRL policy). Watermerken maken elk lek traceerbaar.
 
@@ -223,7 +223,7 @@ De gegevens mogen niet worden doorverkocht (afgedwongen via ODRL policy). Waterm
 ### Beschikbaar
 
 * ODRL policy engine — deelregels per map (W3C ODRL 2.2)
-* Consent-module — toestemmingen conform ISO/IEC TS 27560:2023
+* Consent-module — intentiegebonden toestemmingen conform ISO/IEC TS 27560:2023
 * Watermerken op deellinks — automatisch watermerk op PDF's en afbeeldingen
 * macOS installer (.dmg) en Windows installer (.exe)
 * Bridge — altijd bereikbaar via bridge.mysolido.com
@@ -282,7 +282,7 @@ MySolido is getest met CSS 7.2.0; andere versies worden niet ondersteund.
 |------|-----|
 | **Technisch** | Watermerken op gedeelde documenten. Traceerbaar als het lekt. Geen downloadknop. |
 | **Juridisch** | ODRL policies: machine-leesbare regels. "Alleen lezen, niet doorsturen, geldig tot datum X." Afdwingbaar. |
-| **Registratie** | Elke toestemming vastgelegd conform ISO 27560 + W3C DPV. Bewijslast bij de aanvrager. |
+| **Registratie** | Toestemming via een intentie wordt vastgelegd conform ISO 27560 + W3C DPV. Bewijslast bij de aanvrager. |
 
 Cookiebanners bieden nul bescherming. MySolido biedt drie lagen.
 
@@ -303,7 +303,7 @@ Exporteer regelmatig een backup (ZIP) via de instellingen. Met de Bridge heb je 
 macOS wordt ondersteund met een `.dmg` installer en `start-mysolido.sh` launcher script. Linux-gebruikers kunnen de handmatige installatie volgen (Python + Node.js).
 
 **Kan een partij die mijn gegevens ontvangt deze doorverkopen?**
-Nee. De ODRL policy verbiedt distributie. Elke toestemming wordt geregistreerd met een specifiek doel. Doorverkopen is een overtreding van de afspraak en de AVG. Watermerken maken elk lek traceerbaar.
+Nee. De ODRL policy verbiedt distributie. Toestemming die via een intentie tot stand komt, wordt geregistreerd met een specifiek doel. Doorverkopen is een overtreding van de afspraak en de AVG. Watermerken maken elk lek traceerbaar.
 
 ---
 

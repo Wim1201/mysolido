@@ -67,6 +67,8 @@ Draai beide scenario's op de huidige CSS-versie (nulmeting) en beide op de nieuw
 | 13d | Intentiepolicy | Na aanmaken staat `intenties/<uuid>.policy.jsonld` naast het record: `odrl:Offer`, uid `urn:mysolido:policy:intention:<uuid>`, `assigner` = WEBID, één permission `use` met de vier attribuut-urn's in recordvolgorde, constraints `purpose eq` en `dateTime lteq validThrough`, prohibition `distribute`+`transfer` bij doorleververbod en afwezig zonder, assignee alleen bij gericht aanbod met dezelfde `@id` als `targetedParty`; record bevat `mysolido:policy`; detailpagina toont de Nederlandse samenvatting (vier labels, doel, doorleverzin), de ruwe JSON-LD en "Vastgelegd op dd-mm-jjjj"; `GET /intenties/<uuid>/policy.jsonld` geeft `application/ld+json`; intentie zonder attributen geweigerd; "Voorwaarden opstellen" maakt een ontbrekende Offer aan; policybestand niet in listing, zoekresultaten of intentieoverzicht; verwijderen van de intentie neemt de Offer mee; opruimen |
 | 13e | Acceptatie en Agreement | Open intentie aanmaken en activeren; `/verzoek/intentie/<uuid>` toont zin, JSON-LD en vier labels zonder waarden; POST zonder vinkje geweigerd; POST met vinkje schrijft verzoek met `intention`, `acceptedPolicy`, `acceptedAt` (hele seconden), `acceptedPolicyHash` (klopt met sha256 van het bestand), `party`, status `geaccepteerd`, `agreement`, `responseLink`, `validUntil` = `validThrough`; `verzoeken/<uuid>.agreement.jsonld` met `@type` Agreement, uid, assigner, assignee op permission én prohibition, regels gelijk aan de Offer, `mysolido:offer`/`request`/`acceptedAt`/`offerHash`; `_response.json` met precies de vier attributen; responspagina toont zin, Agreement-uid en vier waarden, niet brandstof of bouwjaar; statuspagina geaccepteerd; intentie heeft `acceptedBy`, detailpagina "Geaccepteerd door", verwijderen geblokkeerd; eigenaarsdetail met hash en Agreement-link; `GET /verzoeken/<uuid>/agreement.jsonld` ld+json; concept-intentie: voorwaarden zonder formulier, POST geweigerd; gericht aanbod: status `wacht-op-bevestiging` zonder Agreement, na Goedkeuren `geaccepteerd` met assignee = `targetedParty.@id`, tweede goedkeuring geweigerd; `.agreement.jsonld` niet in listing, zoeken of verzoekenoverzicht; opruimen (ook Agreements en responses) |
 | 13f | Consentrecord (27560) | Na een open acceptatie: verzoek heeft `mysolido:consent` en `toestemmingen/<id>.jsonld` bestaat; kop (`dpv:ConsentRecord`, `dct:conformsTo` ISO/IEC TS 27560:2023, schemaversie, `dct:identifier`, `hasDataSubject` = WEBID); `hasPurpose` met urn, `dpv:ServiceProvision` en label; `hasLegalBasis` `dpv:ExplicitlyExpressedConsent`; `hasPersonalData` precies vier met urn, pd-term, label en waarde; `hasDataController` = partij-@id met organisatie als label, contactpersoon en e-mail; `hasStorageCondition` met `validUntil` = `validThrough` en 14 dagen; `hasRecipient` leeg, `onwardTransfer` prohibited met Agreement-verwijzing, `loc:NL`; status `dpv:ConsentGiven`, één event given door de partij, `isImplementedByEntity`; vijf koppelingen en `eu-gdpr:A7-3`; consentlijst en -detail tonen het record; eigenaarsdetail linkt ernaar; intrekken → `dpv:ConsentWithdrawn`, tweede event door WEBID, `dct:modified`, verzoek `ingetrokken`, respons- en statuspagina "Toestemming ingetrokken op" zonder gegevens, intentiepagina "(toestemming ingetrokken op", Agreement ongewijzigd; gericht aanbod: record pas na bevestiging, label = naam zonder organisatie, onwardTransfer permitted; fixture met oude statusterm leest terug als ConsentGiven/Actief; fixture met verstreken `hasExpiry` toont Verlopen; opruimen (ook consentrecords en fixtures) |
+| 13g | Afronding | Versieregel in de voettekst (commit-hash + "lokaal"); aanbodlink met volledige URL en kopieerknop op een actieve intentie; datums als dd-mm-jjjj op intentielijst en -detail, verzoeklijst en -detail, responspagina, consentlijst en -detail; naamveld in het verzoekdetail toont de persoon; consentrecord met `+00:00`-notatie; responspagina na intrekken toont de Agreement-uid; opruimen |
+| 13h | Bridge-modus lokaal | Start zelf `python app.py --bridge` als tweede proces op poort 5001 (`MYSOLIDO_PORT=5001`, eigen `BRIDGE_PASSWORD`-hash in de procesomgeving, dezelfde Pod) en stopt het weer. Na Bridge-login: intentiedetail met Offer-kaart, "Geaccepteerd door" en aanbodlink zonder knoppen; consentdetail met 27560-tabel zonder Intrekken en zonder verzoeklink; `/verzoek/intentie/<uuid>` zonder login toont voorwaarden zonder formulier met de Bridge-melding, POST geweigerd; `/verzoeken` 403; `policy.jsonld` en `agreement.jsonld` als ld+json; versieregel met "Bridge". Overgeslagen als poort 5001 bezet is |
 | 14 | Backup | Zip-export bevat testbestand; dotfiles/ACL's/deellinkregister in zip (info) |
 | 15 | Restore | Bestand verwijderd, uit zip teruggezet, via CSS weer leesbaar |
 | 16 | HTTP-laag | `/debug` leest de Pod-root via CSS (de root is publiek, dus dit bewijst geen authenticatie) |
@@ -90,16 +92,18 @@ vergelijking, geen oordeel).
 
 ## Geautomatiseerd, aparte run: demodata, profielvelden en intentie (MyTerms-demo)
 
-`python scripts/regressietest.py --phase demo` draait alleen de onderdelen 13a tot en met 13f
+`python scripts/regressietest.py --phase demo` draait alleen de onderdelen 13a tot en met 13h
 tegen de lopende CSS en Flask, zonder testaccount of testmap. Handig na wijzigingen aan
 `PROFILE_ATTRIBUTES`, het profielformulier, het intentieformulier, de intentiepolicy, de
-acceptatie of het consentrecord.
+acceptatie, het consentrecord of de Bridge-weergave. Onderdeel 13h start zelf een tweede
+Flask-proces op poort 5001 en stopt het weer; die poort moet vrij zijn.
 
-Let op de verzoeklimiet: Flask staat per IP tien POSTs per uur toe op `/verzoek` en
-`/verzoek/intentie/<uuid>` (`is_rate_limited()`, teller in het geheugen van het proces). De
-fasen 13 (generiek verzoek), 13e en 13f doen samen negen van zulke POSTs. Draai de demo-fase en
-de volledige run daarom niet binnen een uur achter elkaar tegen dezelfde Flask; herstart Flask
-tussen twee runs, anders faalt een latere acceptatie met een redirect ("te veel verzoeken"). Let op: als de Pod nog
+Let op de verzoeklimiet: Flask staat per IP standaard tien POSTs per uur toe op `/verzoek` en
+`/verzoek/intentie/<uuid>` (`is_rate_limited()`, teller in het geheugen van het proces;
+instelbaar met `REQUEST_RATE_LIMIT` in `.env`). De fasen 13, 13e, 13f, 13g en 13h doen samen
+elf van zulke POSTs. Start Flask voor een testrun daarom met een ruimere limiet
+(`REQUEST_RATE_LIMIT=100 python app.py`) of herstart Flask tussen twee runs, anders faalt een
+latere acceptatie met een redirect ("te veel verzoeken"). Let op: als de Pod nog
 geen `profiel/profiel.jsonld` heeft, vult deze run de Pod met de demodata van
 `scripts/seed_demo.py` en laat die staan.
 

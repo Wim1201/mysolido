@@ -82,6 +82,39 @@ DEMO_FILES = {
 
 PROFILE_PATH = 'profiel/profiel.jsonld'
 
+# --reset (subtaak 5): schone startstand voor de demo. Alleen deze mappen en bestanden.
+RESET_FOLDERS = ('intenties', 'verzoeken', 'toestemmingen')
+RUNTIME_FILES = ('audit_log.json', 'notifications.json', 'trash.json', 'shares.json')
+
+
+def reset_plan(pod_dir: str):
+    """Wat --reset gaat verwijderen (Pod) en leegmaken (projectmap). Niets buiten deze lijst."""
+    pod_files = []
+    for folder in RESET_FOLDERS:
+        folder_path = os.path.join(pod_dir, folder)
+        if os.path.isdir(folder_path):
+            for name in sorted(os.listdir(folder_path)):
+                path = os.path.join(folder_path, name)
+                if os.path.isfile(path):
+                    pod_files.append(path)
+    runtime_files = [str(ROOT / name) for name in RUNTIME_FILES if (ROOT / name).is_file()]
+    return pod_files, runtime_files
+
+
+def do_reset(pod_files, runtime_files):
+    """Voer het plan uit: records, policies, agreements en responses weg; runtime-bestanden leeg."""
+    for path in pod_files:
+        os.remove(path)
+    for path in runtime_files:
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                current = json.load(f)
+        except (ValueError, OSError):
+            current = []
+        empty = {} if isinstance(current, dict) else []
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(empty, f)
+
 
 def build_demo_profile() -> dict:
     """Bouw het profiel-JSON-LD uitsluitend via PROFILE_ATTRIBUTES (zelfde vorm als profiel_data_save)."""
@@ -117,11 +150,39 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Vul een lege MySolido-Pod met demodata (MyTerms-demo).')
     parser.add_argument('--force', action='store_true', help='overschrijf een bestaand profiel en de voorbeeldbestanden')
     parser.add_argument('--skip-css-check', action='store_true', help='controleer niet of CSS op CSS_BASE_URL antwoordt')
+    parser.add_argument('--reset', action='store_true',
+                        help='schone demostand: verwijder de inhoud van intenties/, verzoeken/ en toestemmingen/, '
+                             'zet het profiel opnieuw (impliceert --force) en maak de runtime-bestanden in de projectmap leeg; '
+                             'vereist --yes')
+    parser.add_argument('--yes', action='store_true', help='bevestig --reset zonder navraag')
     args = parser.parse_args()
 
     pod_dir = check_environment(args.skip_css_check)
     print(f"Pod-map: {pod_dir}")
     print(f"Pod-URL: {os.getenv('SOLID_POD_URL', mysolido.SOLID_POD_URL)}")
+
+    if args.reset:
+        pod_files, runtime_files = reset_plan(pod_dir)
+        print()
+        print("--reset gaat verwijderen (Pod):")
+        for path in pod_files:
+            print(f"  {os.path.relpath(path, pod_dir)}")
+        if not pod_files:
+            print("  (niets: de drie mappen zijn leeg of bestaan niet)")
+        print("--reset gaat leegmaken (projectmap):")
+        for path in runtime_files:
+            print(f"  {os.path.basename(path)}")
+        if not runtime_files:
+            print("  (geen runtime-bestanden aanwezig)")
+        print(f"--reset zet daarna {PROFILE_PATH} opnieuw (als --force).")
+        if not args.yes:
+            print()
+            print("[GEWEIGERD] --reset vereist --yes. Er is niets gewijzigd.")
+            sys.exit(1)
+        do_reset(pod_files, runtime_files)
+        args.force = True
+        print(f"[OK] {len(pod_files)} bestanden verwijderd, {len(runtime_files)} runtime-bestanden leeggemaakt.")
+        print()
 
     if mysolido.pod_exists(PROFILE_PATH) and not args.force:
         print(f"[GEWEIGERD] {PROFILE_PATH} bestaat al. Gebruik --force om het demoprofiel te overschrijven.")
@@ -169,7 +230,11 @@ def main() -> None:
         value = mysolido.profile_attribute_value(profile, key)
         print(f"  {mysolido.attribute_urn(key):<45} {mysolido.attribute_value_label(key, value)}")
     print()
-    print("Niet aangeraakt: intenties/, verzoeken/, toestemmingen/ en alle overige bestaande bestanden.")
+    if args.reset:
+        print("Schone demostand: intenties/, verzoeken/ en toestemmingen/ zijn leeg; de mappolicies daarin maakt de app "
+              "opnieuw aan bij het eerste record. Logboek, prullenbak en deelregister zijn leeg.")
+    else:
+        print("Niet aangeraakt: intenties/, verzoeken/, toestemmingen/ en alle overige bestaande bestanden.")
 
 
 if __name__ == '__main__':

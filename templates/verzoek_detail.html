@@ -50,7 +50,8 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 16px;">
             <div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_name }}</div>
-                <p style="margin: 0;">{{ requester.get('schema:name', t.req_unknown) }}</p>
+                {# de persoon: contactName van de partij (subtaak 5); oudere records: schema:name #}
+                <p style="margin: 0;">{{ (req.get('mysolido:party') or {}).get('mysolido:contactName') or requester.get('schema:name', t.req_unknown) }}</p>
             </div>
             <div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_organization }}</div>
@@ -66,7 +67,7 @@
             </div>
             <div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_date }}</div>
-                <p style="margin: 0;">{{ req.get('schema:dateCreated', '')[:10] }}</p>
+                <p style="margin: 0;">{{ req.get('schema:dateCreated', '')|nl_date }}</p>
             </div>
         </div>
 
@@ -152,7 +153,7 @@
         {% if req.get('mysolido:validUntil') %}
         <div style="margin-top: 12px;">
             <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_valid_through }}</div>
-            <p style="margin: 0;">{{ req['mysolido:validUntil'][:10] }}</p>
+            <p style="margin: 0;">{{ req['mysolido:validUntil']|nl_date }}</p>
         </div>
         {% endif %}
         {% if req.get('mysolido:responseLink') %}
@@ -267,7 +268,7 @@
         {% if req.get('mysolido:validUntil') %}
         <div style="margin-top: 12px;">
             <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_valid_through }}</div>
-            <p style="margin: 0;">{{ req['mysolido:validUntil'][:10] }}</p>
+            <p style="margin: 0;">{{ req['mysolido:validUntil']|nl_date }}</p>
         </div>
         {% endif %}
         {% if req.get('mysolido:responseLink') %}

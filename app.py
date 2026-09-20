@@ -54,6 +54,26 @@ OWNER_WEBID = WEBID
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMP_DIR = os.path.join(PROJECT_DIR, 'temp')
 
+# === VERSIEREGEL (MyTerms-demo, subtaak 5) ===
+# Korte commit-hash bij opstart, met VERSION als terugval als git ontbreekt; in de voettekst
+# van elke pagina samen met "Bridge" of "lokaal", zodat op de telefoon te zien is welke code draait.
+VERSION = '1.4.0-myterms'
+
+
+def _git_short_hash():
+    try:
+        import subprocess as _sp
+        out = _sp.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=PROJECT_DIR,
+                      capture_output=True, text=True, timeout=5)
+        return out.stdout.strip() if out.returncode == 0 and out.stdout.strip() else ''
+    except Exception:
+        return ''
+
+
+APP_VERSION = _git_short_hash() or VERSION
+APP_MODE = 'Bridge' if BRIDGE_MODE else 'lokaal'
+APP_PORT = int(os.getenv('MYSOLIDO_PORT', '5000'))   # tweede proces (bijv. --bridge naast lokaal) op een andere poort
+
 # Ensure temp directory exists
 os.makedirs(TEMP_DIR, exist_ok=True)
 
@@ -831,6 +851,8 @@ def inject_globals():
         'bridge_sync_status': get_bridge_sync_status(),
         't': get_translations(lang),
         'current_lang': lang,
+        'app_version': APP_VERSION,   # voettekst (subtaak 5)
+        'app_mode': APP_MODE,
     }
 
 
@@ -2577,6 +2599,12 @@ def format_date_nl_iso(value):
         return value or ''
 
 
+@app.template_filter('nl_date')
+def nl_date_filter(value):
+    """Jinja-filter: ISO-datum/tijd -> dd-mm-jjjj (demo-pagina's, subtaak 5)."""
+    return format_date_nl_iso(value)
+
+
 def _join_nl(items):
     items = [i for i in items if i]
     if len(items) <= 1:
@@ -2780,10 +2808,13 @@ CONSENT_RECORD_SCHEMA_VERSION = "1.0"
 
 
 def _days_between(start_iso, end_iso):
+    """Duur in hele dagen, naar boven afgerond: acceptatie om 10:00:05 tot validThrough om 10:00:00
+    veertien dagen later is 14 dagen, niet 13 (subtaak 5)."""
     try:
+        import math
         start = datetime.fromisoformat(str(start_iso))
         end = datetime.fromisoformat(str(end_iso))
-        return max(0, (end - start).days)
+        return max(0, math.ceil((end - start).total_seconds() / 86400))
     except (TypeError, ValueError):
         return None
 
@@ -3080,7 +3111,7 @@ def get_consent_stats():
 def generate_consent_id():
     """Generate a unique consent ID: urn:mysolido:consent:YYYYMMDD-NNN"""
     consent_dir = get_consent_dir()
-    date_str = datetime.utcnow().strftime('%Y%m%d')
+    date_str = datetime.now(timezone.utc).strftime('%Y%m%d')   # tijdzonebewust (subtaak 5)
     existing = []
     if consent_dir and os.path.isdir(consent_dir):
         for fname in os.listdir(consent_dir):
@@ -3112,7 +3143,8 @@ def consent_list():
             c['_purpose'] = purpose.get('rdfs:label') or purpose.get('dct:description', purpose.get('@type', 'Onbekend'))
         else:
             c['_purpose'] = str(purpose)
-        c['_expiry_date'] = consent_expiry_time(c)[:10]
+        c['_expiry_date'] = format_date_nl_iso(consent_expiry_time(c)) if consent_expiry_time(c) else ''
+        c['_created_date'] = format_date_nl_iso(c.get('dct:created', ''))   # dd-mm-jjjj (subtaak 5)
         c['_category'] = c.get('mysolido:intentionCategoryLabel', '')   # intentiegebonden record (4b)
         enriched.append(c)
 
@@ -3140,7 +3172,7 @@ def consent_new():
             return redirect(url_for('consent_new'))
 
         consent_id = generate_consent_id()
-        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        now = utc_now_iso_seconds()   # was datetime.utcnow() met Z-notatie (subtaak 5)
         purpose_info = PURPOSE_MAP.get(purpose_key, PURPOSE_MAP['other'])
         category_info = DATA_CATEGORY_MAP.get(category_key, DATA_CATEGORY_MAP['other'])
 
@@ -4036,7 +4068,7 @@ def intenties_overview():
         intent['_icon'] = cat_info['icon']
         intent['_category_label'] = cat_info['label']
         intent['_status'] = intent.get('mysolido:status', 'concept')
-        intent['_date'] = intent.get('schema:dateCreated', '')[:10]
+        intent['_date'] = format_date_nl_iso(intent.get('schema:dateCreated', ''))   # dd-mm-jjjj (subtaak 5)
         intent['_description'] = intent.get('schema:description', '')
 
         if status_filter == 'alle' or intent['_status'] == status_filter:
@@ -4193,6 +4225,14 @@ def intentie_detail(intention_id):
     # Gesloten Agreements (subtaak 4a): "Geaccepteerd door <partij> op <datum>"
     accepted_by = accepted_requests_for(record)
 
+    # Aanbodlink (subtaak 5): de volledige URL van het acceptatieformulier, lokaal met de
+    # host van dit verzoek, op de Bridge met SHARE_BASE_URL uit .env
+    if BRIDGE_MODE:
+        offer_base = os.getenv('SHARE_BASE_URL', '').strip().rstrip('/') or request.host_url.rstrip('/')
+    else:
+        offer_base = request.host_url.rstrip('/')
+    offer_url = offer_base + url_for('verzoek_intentie', intention_id=intention_id)
+
     return render_template('intentie_detail.html',
         intention=record,
         shared_attributes=shared_attributes or [],
@@ -4202,6 +4242,7 @@ def intentie_detail(intention_id):
         policy=policy,
         policy_summary=policy_summary,
         accepted_by=accepted_by,
+        offer_url=offer_url,
         read_only=BRIDGE_MODE,
     )
 
@@ -4354,10 +4395,15 @@ APPROVAL_VALIDITY = {
 
 # Simple in-memory rate limiter: {ip: [timestamp, ...]}
 _request_rate_limit = {}
+# Instelbaar via .env (REQUEST_RATE_LIMIT, standaard 10 per uur per IP), zodat een
+# demo-oefenmiddag met veel acceptaties vanaf één laptop niet vastloopt (subtaak 5)
+REQUEST_RATE_LIMIT = int(os.getenv('REQUEST_RATE_LIMIT', '10') or 10)
 
 
-def is_rate_limited(ip, max_requests=10, window_seconds=3600):
+def is_rate_limited(ip, max_requests=None, window_seconds=3600):
     """Check and enforce rate limit: max requests per window per IP"""
+    if max_requests is None:
+        max_requests = REQUEST_RATE_LIMIT
     now = time.time()
     timestamps = _request_rate_limit.get(ip, [])
     # Remove old timestamps
@@ -4595,8 +4641,10 @@ def verzoek_response(status_token):
 
     if status == REQUEST_STATUS_WITHDRAWN:
         # Toestemming ingetrokken (subtaak 4b): geen gegevens meer, alleen de intrekdatum
+        # en (subtaak 5) de Agreement-uid als verwijzing naar het bewijs
         return render_template('verzoek_response.html', found=True, expired=False, withdrawn=True,
-                               withdrawn_at=format_date_nl_iso(record.get('mysolido:withdrawnAt', '')))
+                               withdrawn_at=format_date_nl_iso(record.get('mysolido:withdrawnAt', '')),
+                               agreement_uid=record.get('mysolido:agreement', ''))
 
     if status not in REQUEST_STATUSES_WITH_RESPONSE:
         return render_template('verzoek_response.html', found=False), 404
@@ -4609,7 +4657,7 @@ def verzoek_response(status_token):
                 exp_dt = exp_dt.replace(tzinfo=timezone.utc)
             if exp_dt < datetime.now(timezone.utc):
                 return render_template('verzoek_response.html', found=True, expired=True,
-                                       valid_until=valid_until[:10])
+                                       valid_until=format_date_nl_iso(valid_until))
         except (ValueError, TypeError):
             pass
 
@@ -4638,7 +4686,7 @@ def verzoek_response(status_token):
         response_data=response_data,
         agreement=agreement,
         agreement_summary=agreement_summary,
-        valid_until=valid_until[:10] if valid_until else '',
+        valid_until=format_date_nl_iso(valid_until) if valid_until else '',
     )
 
 
@@ -4659,7 +4707,7 @@ def verzoeken_overview():
         req['_name'] = requester.get('schema:name', 'Onbekend')
         req['_organization'] = requester.get('schema:worksFor', '')
         req['_category_label'] = req.get('mysolido:categoryLabel', 'Anders')
-        req['_date'] = req.get('schema:dateCreated', '')[:10]
+        req['_date'] = format_date_nl_iso(req.get('schema:dateCreated', ''))   # dd-mm-jjjj (subtaak 5)
         req['_requested_data'] = req.get('mysolido:requestedData', [])
         if req.get('mysolido:intention'):
             # intentiegebonden verzoek (subtaak 4a): attribuut-urn's als labels tonen
@@ -4905,7 +4953,7 @@ def _build_acceptance_request(intention, policy, party, request_id, status_token
         "mysolido:status": REQUEST_STATUS_AWAITING,
         "schema:dateCreated": utc_now_iso_seconds(),
         "mysolido:requester": {
-            "schema:name": party['rdfs:label'],
+            "schema:name": party.get('mysolido:contactName') or party['rdfs:label'],   # de persoon (subtaak 5)
             "schema:worksFor": party['mysolido:organisation'],
             "schema:email": party['mysolido:contact'],
         },
@@ -5228,10 +5276,10 @@ if __name__ == '__main__':
             print(f"  Wachtwoord: beveiligd met bcrypt")
         else:
             print("  [WAARSCHUWING] Geen BRIDGE_PASSWORD of CSS_PASSWORD ingesteld!")
-        print(f"  Start op http://127.0.0.1:5000")
+        print(f"  Start op http://127.0.0.1:{APP_PORT}  (versie {APP_VERSION})")
         print("  ========================")
         print()
-        app.run(port=5000, debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
+        app.run(port=APP_PORT, debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
     else:
         print("  === MySolido ===")
 
@@ -5251,8 +5299,8 @@ if __name__ == '__main__':
 
         print()
         print(f"  Pod: {os.getenv('SOLID_POD_URL')}")
-        print(f"  Start op http://localhost:5000")
+        print(f"  Start op http://localhost:{APP_PORT}  (versie {APP_VERSION})")
         print("  ================")
         print()
 
-        app.run(port=5000, debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
+        app.run(port=APP_PORT, debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
