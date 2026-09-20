@@ -5,10 +5,21 @@
 {% block content %}
     <div class="card" style="text-align: center; padding: 40px 20px;">
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9989;</div>
+        {% if accepted %}
+        {# intentiegebonden acceptatie (subtaak 4a) #}
+        <h2 style="font-size: 1.3rem; margin-bottom: 12px;">{{ t.req_int_accepted_title }}</h2>
+        <p style="color: var(--color-text-muted); max-width: 500px; margin: 0 auto 20px;">
+            {% if awaiting %}{{ t.req_int_awaiting_desc }}{% else %}{{ t.req_int_accepted_desc }}{% endif %}
+        </p>
+        {% if response_link %}
+        <p style="margin: 0 auto 20px;"><a href="{{ response_link }}" class="btn btn-primary">{{ t.req_status_view_btn }}</a></p>
+        {% endif %}
+        {% else %}
         <h2 style="font-size: 1.3rem; margin-bottom: 12px;">{{ t.req_confirm_title }}</h2>
         <p style="color: var(--color-text-muted); max-width: 500px; margin: 0 auto 20px;">
             {{ t.req_confirm_desc }}
         </p>
+        {% endif %}
 
         <div style="background: var(--color-bg-hover); border: 1px solid var(--color-border); border-radius: 8px; padding: 16px; margin: 20px auto; max-width: 500px;">
             <p style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 8px;">{{ t.req_confirm_save_link }}</p>

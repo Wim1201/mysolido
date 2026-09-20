@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t.req_int_title }} - MySolido{% endblock %}
+
+{% block content %}
+    <style>
+    .verzoek-intro {
+        background: var(--color-surface);
+        border-radius: var(--radius-md);
+        padding: 20px;
+        box-shadow: var(--shadow-card);
+        margin-bottom: 20px;
+    }
+    .verzoek-intro h2 { font-size: 1.15rem; margin-bottom: 8px; }
+    .verzoek-intro p { font-size: 0.9rem; color: var(--color-text-muted); margin: 0; }
+    .attr-pill {
+        display: inline-block;
+        background: var(--color-bg-hover);
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        padding: 4px 12px;
+        margin: 0 6px 6px 0;
+        font-size: 0.9rem;
+    }
+    .agree-group {
+        background: var(--color-bg-hover);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        padding: 14px;
+        margin-top: 16px;
+    }
+    .agree-group label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.9rem; }
+    .agree-group input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+    .terms-label { font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px; display: block; }
+    .notice { font-size: 0.9rem; color: var(--color-text-muted); margin: 8px 0 0; }
+    </style>
+
+    {% if not found %}
+    <div class="card" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 2.5rem; margin-bottom: 16px;">&#10067;</div>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_int_not_found }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_status_not_found_desc }}</p>
+    </div>
+    {% else %}
+
+    <div class="verzoek-intro">
+        <h2>{{ t.req_int_title }}: {{ intention.get('mysolido:categoryLabel', '') }}</h2>
+        <p>{{ t.req_int_intro }}</p>
+    </div>
+
+    {# === Voorwaarden (Offer) === #}
+    <div class="card" style="margin-bottom: 20px;" id="offer-terms">
+        <h3>{{ t.req_int_terms }}</h3>
+        {% if policy %}
+        <p style="margin: 8px 0 12px;" class="policy-summary-nl">{{ policy_summary }}</p>
+        <details class="policy-raw">
+            <summary>{{ t.policy_raw }}</summary>
+            <pre><code>{{ policy | tojson(indent=2) }}</code></pre>
+        </details>
+        <p class="notice"><code>{{ policy.get('uid', '') }}</code> &middot; {{ t.int_valid_through|lower }} {{ valid_through }}</p>
+        {% else %}
+        <p class="notice">{{ t.req_int_no_terms }}</p>
+        {% endif %}
+    </div>
+
+    {# === Attributen: labels zonder waarden === #}
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>{{ t.req_int_attributes }}</h3>
+        <div style="margin-top: 10px;">
+            {% for label in attribute_labels %}
+            <span class="attr-pill" data-attribute-label>{{ label }}</span>
+            {% endfor %}
+        </div>
+        <p class="notice">{{ t.req_int_no_values }}</p>
+    </div>
+
+    {% if acceptable %}
+    {# === Acceptatie === #}
+    <form action="{{ url_for('verzoek_intentie', intention_id=intention_id) }}" method="post">
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>{{ t.req_your_details }}</h3>
+            {% if offer_mode == 'targeted' %}
+            <p class="notice">{{ t.req_int_targeted_note.format(name=targeted_party) }}</p>
+            {% endif %}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 12px;">
+                <div style="display: flex; flex-direction: column;">
+                    <label for="name" class="terms-label">{{ t.req_your_name }} <span style="color: var(--color-danger);">*</span></label>
+                    <input type="text" name="name" id="name" class="form-input" required placeholder="{{ t.req_your_name_placeholder }}">
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <label for="organization" class="terms-label">{{ t.req_your_org }}</label>
+                    <input type="text" name="organization" id="organization" class="form-input" placeholder="{{ t.req_your_org_placeholder }}">
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; margin-top: 12px;">
+                <label for="email" class="terms-label">{{ t.req_your_email }} <span style="color: var(--color-danger);">*</span></label>
+                <input type="email" name="email" id="email" class="form-input" required placeholder="{{ t.req_your_email_placeholder }}">
+            </div>
+
+            <div class="agree-group">
+                <label>
+                    <input type="checkbox" name="accept_terms" value="yes" required>
+                    <span>{{ t.req_int_accept_label.format(uid=policy.get('uid', '')) }}</span>
+                </label>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 24px 0;">
+            <button type="submit" class="btn btn-primary" style="padding: 10px 40px; font-size: 1rem;">{{ t.req_int_submit }}</button>
+            <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 8px;">{{ t.req_submit_note }}</p>
+        </div>
+    </form>
+    {% else %}
+    <div class="card" style="margin-bottom: 20px;">
+        {% if bridge_mode %}
+        <p class="notice" style="margin: 0;">{{ t.req_int_bridge }}</p>
+        {% elif not policy %}
+        <p class="notice" style="margin: 0;">{{ t.req_int_no_terms }}</p>
+        {% else %}
+        <p class="notice" style="margin: 0;">{{ t.req_int_not_active.format(status=status) }}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+{% endblock %}

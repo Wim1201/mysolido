@@ -114,6 +114,22 @@
         {% endif %}
     </div>
 
+    {# === Gesloten Agreements (mysolido:acceptedBy, subtaak 4a) === #}
+    {% if accepted_by %}
+    <div class="card" style="margin-bottom: 20px;" id="accepted-by">
+        <h3>{{ t.int_accepted_by_title }}</h3>
+        {% for item in accepted_by %}
+        <div class="snapshot-row" data-request="{{ item.request_id }}">
+            <span class="snapshot-key">{{ t.int_accepted_by_line.format(party=item.party, date=item.accepted_at) }}{% if item.organisation %} ({{ item.organisation }}){% endif %}</span>
+            <span class="snapshot-value">
+                {% if not read_only %}<a href="{{ url_for('verzoek_detail_owner', request_id=item.request_id) }}">{{ t.req_view_title }}</a>{% else %}<code style="font-size: 0.8rem;">{{ item.agreement }}</code>{% endif %}
+            </span>
+        </div>
+        {% endfor %}
+        <p class="snapshot-note" style="margin-top: 8px;">{{ t.int_accepted_by_note }}</p>
+    </div>
+    {% endif %}
+
     {# === Snapshot van de gedeelde attributen (mysolido:sharedAttributes) === #}
     {% if legacy_shared is none %}
     <div class="card" style="margin-bottom: 20px;">
@@ -164,20 +180,24 @@
             <form action="{{ url_for('intentie_activate', intention_id=intention._id) }}" method="post" style="display:inline;">
                 <button type="submit" class="btn btn-primary">{{ t.int_activate }}</button>
             </form>
+            {% if not accepted_by %}
             <form action="{{ url_for('intentie_delete', intention_id=intention._id) }}" method="post" style="display:inline;"
                   onsubmit="return confirm('{{ t.int_confirm_delete }}')">
                 <button type="submit" class="btn btn-danger">{{ t.consent_delete }}</button>
             </form>
+            {% endif %}
             {% elif intention._status == 'actief' %}
             <form action="{{ url_for('intentie_withdraw', intention_id=intention._id) }}" method="post" style="display:inline;"
                   onsubmit="return confirm('{{ t.int_confirm_withdraw }}')">
                 <button type="submit" class="btn" style="background: var(--color-secondary);">{{ t.consent_withdraw }}</button>
             </form>
             {% elif intention._status in ['ingetrokken', 'verlopen'] %}
+            {% if not accepted_by %}
             <form action="{{ url_for('intentie_delete', intention_id=intention._id) }}" method="post" style="display:inline;"
                   onsubmit="return confirm('{{ t.int_confirm_delete }}')">
                 <button type="submit" class="btn btn-danger">{{ t.consent_delete }}</button>
             </form>
+            {% endif %}
             {% endif %}
         </div>
     </div>

@@ -18,11 +18,18 @@
         <p style="color: var(--color-text-muted);">{{ t.req_status_received_desc }}</p>
         <span class="badge badge-nieuw" style="margin-top: 12px; display: inline-block;">{{ t.req_status_pending }}</span>
 
-        {% elif status == 'goedgekeurd' %}
+        {% elif status == 'wacht-op-bevestiging' %}
+        {# gericht aanbod: acceptatie geregistreerd, eigenaar bevestigt nog (subtaak 4a) #}
+        <div style="font-size: 2.5rem; margin-bottom: 16px;">&#128172;</div>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_awaiting }}</h2>
+        <p style="color: var(--color-text-muted);">{{ t.req_status_awaiting_desc }}</p>
+        <span class="badge badge-wacht-op-bevestiging" style="margin-top: 12px; display: inline-block;">{{ t.req_awaiting }}</span>
+
+        {% elif status in ['goedgekeurd', 'geaccepteerd'] %}
         <div style="font-size: 2.5rem; margin-bottom: 16px;">&#9989;</div>
-        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{{ t.req_approved }}</h2>
-        <p style="color: var(--color-text-muted);">{{ t.req_status_approved_desc }}</p>
-        <span class="badge badge-goedgekeurd" style="margin-top: 12px; display: inline-block;">{{ t.req_approved }}</span>
+        <h2 style="font-size: 1.2rem; margin-bottom: 8px;">{% if status == 'geaccepteerd' %}{{ t.req_accepted }}{% else %}{{ t.req_approved }}{% endif %}</h2>
+        <p style="color: var(--color-text-muted);">{% if status == 'geaccepteerd' %}{{ t.req_status_accepted_desc }}{% else %}{{ t.req_status_approved_desc }}{% endif %}</p>
+        <span class="badge badge-{{ status }}" style="margin-top: 12px; display: inline-block;">{% if status == 'geaccepteerd' %}{{ t.req_accepted }}{% else %}{{ t.req_approved }}{% endif %}</span>
 
         {% if response_link %}
         <div style="background: var(--color-bg-hover); border: 1px solid var(--color-border); border-radius: 8px; padding: 16px; margin: 20px auto; max-width: 500px;">

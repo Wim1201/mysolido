@@ -240,8 +240,8 @@ def list_folder_filesystem(relative_path=''):
                 'modified': datetime.fromtimestamp(os.path.getmtime(full_path)).strftime('%d %b %Y'),
             })
         else:
-            # Skip metadata bestanden en ODRL-policies naast records (<uuid>.policy.jsonld)
-            if entry.endswith('.acl') or entry.endswith('.meta') or entry.endswith('.policy.jsonld'):
+            # Skip metadata bestanden en ODRL-documenten naast records (<uuid>.policy.jsonld, <uuid>.agreement.jsonld)
+            if entry.endswith(('.acl', '.meta', '.policy.jsonld', '.agreement.jsonld')):
                 continue
 
             stat = os.stat(full_path)
@@ -274,7 +274,7 @@ def search_pod_filesystem(query, relative_path='', depth=0, max_depth=5):
     pod_url = os.getenv('SOLID_POD_URL', SOLID_POD_URL or 'http://127.0.0.1:3000/mysolido/')
 
     for entry in os.listdir(search_path):
-        if entry.startswith('.') or entry.endswith('.acl') or entry.endswith('.meta') or entry.endswith('.policy.jsonld'):
+        if entry.startswith('.') or entry.endswith(('.acl', '.meta', '.policy.jsonld', '.agreement.jsonld')):
             continue
 
         full_path = os.path.join(search_path, entry)
@@ -330,7 +330,7 @@ def get_pod_stats_filesystem():
                 countable = []
             total_folders += len(countable)
         for f in files:
-            if not f.startswith('.') and not f.endswith('.acl') and not f.endswith('.meta') and not f.endswith('.policy.jsonld'):
+            if not f.startswith('.') and not f.endswith(('.acl', '.meta', '.policy.jsonld', '.agreement.jsonld')):
                 filepath = os.path.join(root, f)
                 size = os.path.getsize(filepath)
                 total_size += size
@@ -747,6 +747,7 @@ def check_bridge_auth():
     public_routes = [
         'bridge_login', 'view_shared_file', 'static',
         'verzoek_formulier', 'verzoek_submit', 'verzoek_status', 'verzoek_response',
+        'verzoek_intentie',   # intentiegebonden formulier (subtaak 4a): voorwaarden lezen; accepteren blokkeert de route zelf
         'crash_report_receive',
     ]
 
@@ -2638,6 +2639,185 @@ def intention_policy_summary_nl(policy, record):
     return sentence + '.'
 
 
+# === ACCEPTATIE EN AGREEMENT (MyTerms-demo, subtaak 4a) ===
+# De wederpartij accepteert de Offer van een actieve intentie via /verzoek/intentie/<uuid>.
+# conclude_agreement() is het sluitmoment: bij offerMode open direct bij acceptatie, bij
+# targeted pas na bevestiging door de eigenaar in verzoek_approve(). Eén functie, twee
+# aanroepplekken. Vorm en namen: docs/mysolido_notitie_datamodel-myterms_20-09-2026.md (§3).
+# In 4b komt het consentrecord als één toevoeging in conclude_agreement().
+
+AGREEMENT_UID_PREFIX = 'urn:mysolido:agreement:'
+REQUEST_STATUS_ACCEPTED = 'geaccepteerd'
+REQUEST_STATUS_AWAITING = 'wacht-op-bevestiging'
+REQUEST_STATUSES_WITH_RESPONSE = ('goedgekeurd', REQUEST_STATUS_ACCEPTED)
+
+
+def agreement_uid(request_id):
+    return f'{AGREEMENT_UID_PREFIX}{request_id}'
+
+
+def agreement_relpath(request_id):
+    return f'verzoeken/{request_id}.agreement.jsonld'
+
+
+def request_response_relpath(request_id):
+    return f'verzoeken/{request_id}_response.json'
+
+
+def utc_now_iso_seconds():
+    """ISO-8601 UTC zonder microseconden, bijv. 2026-09-20T12:34:56+00:00."""
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def sha256_of_pod_file(relative_path):
+    """'sha256:<hex>' van een bestand in de Pod, of None als het ontbreekt."""
+    path = safe_pod_path(relative_path)
+    if not path or not os.path.isfile(path):
+        return None
+    import hashlib
+    with open(path, 'rb') as f:
+        return 'sha256:' + hashlib.sha256(f.read()).hexdigest()
+
+
+def save_pod_json(relative_path, data):
+    """Schrijf een record als JSON (indent 2) via pod_write; '_'-sleutels worden weggelaten."""
+    clean = {k: v for k, v in data.items() if not str(k).startswith('_')}
+    return pod_write(relative_path, _json.dumps(clean, indent=2, ensure_ascii=False))
+
+
+def load_pod_json(relative_path):
+    """Lees een JSON-bestand uit de Pod; None als het ontbreekt of onleesbaar is."""
+    path = safe_pod_path(relative_path)
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return _json.load(f)
+    except (ValueError, IOError):
+        return None
+
+
+def load_intention_record(intention_id):
+    return load_pod_json(f'intenties/{intention_id}.jsonld')
+
+
+def load_request_record(request_id):
+    return load_pod_json(f'verzoeken/{request_id}.jsonld')
+
+
+def load_agreement(request_id):
+    return load_pod_json(agreement_relpath(request_id))
+
+
+def attribute_label_from_urn(urn):
+    key = str(urn)[len(ATTRIBUTE_URN_PREFIX):] if str(urn).startswith(ATTRIBUTE_URN_PREFIX) else None
+    attr = PROFILE_ATTRIBUTES.get(key) if key else None
+    return attr['label'] if attr else str(urn)
+
+
+def _rule_with_assignee(rule, assignee):
+    """Kopie van een ODRL-regel met de partij als assignee (target, assignee, rest)."""
+    out = {}
+    if 'target' in rule:
+        out['target'] = _json.loads(_json.dumps(rule['target']))
+    out['assignee'] = dict(assignee)
+    for key, value in rule.items():
+        if key in ('target', 'assignee'):
+            continue
+        out[key] = _json.loads(_json.dumps(value))
+    return out
+
+
+def build_agreement(offer, request_record, party):
+    """odrl:Agreement: de Offer letterlijk gekopieerd, met de partij als assignee op elke regel."""
+    request_id = str(request_record.get('@id', '')).rsplit(':', 1)[-1]
+    assignee = {"@id": party.get('@id', ''), "rdfs:label": party.get('rdfs:label', '')}
+    agreement = {
+        "@context": list(INTENTION_POLICY_CONTEXT),
+        "@type": "Agreement",
+        "uid": agreement_uid(request_id),
+        "profile": "http://www.w3.org/ns/odrl/2/core",
+        "assigner": os.getenv('WEBID', WEBID),
+        "permission": [_rule_with_assignee(p, assignee) for p in offer.get('permission', [])],
+    }
+    if offer.get('prohibition'):
+        agreement["prohibition"] = [_rule_with_assignee(p, assignee) for p in offer['prohibition']]
+    agreement["mysolido:offer"] = offer.get('uid', '')
+    agreement["mysolido:request"] = request_record.get('@id', '')
+    agreement["mysolido:acceptedAt"] = request_record.get('mysolido:acceptedAt', '')
+    agreement["mysolido:offerHash"] = request_record.get('mysolido:acceptedPolicyHash', '')
+    return agreement
+
+
+def build_response_data(intention_record, agreement):
+    """Inhoud van <uuid>_response.json: uitsluitend de sharedAttributes van de intentie."""
+    return {
+        "mysolido:intention": intention_record.get('@id', ''),
+        "mysolido:agreement": agreement.get('uid', ''),
+        "mysolido:validUntil": intention_record.get('schema:validThrough', ''),
+        "attributes": [
+            {"@id": a.get('@id', ''), "label": a.get('label', ''), "valueLabel": a.get('valueLabel', '')}
+            for a in intention_record.get('mysolido:sharedAttributes', [])
+        ],
+    }
+
+
+def conclude_agreement(request_record, intention_record):
+    """Sluitmoment: Agreement en response schrijven, verzoek en intentie bijwerken.
+
+    Verwacht een verzoekrecord met mysolido:party, acceptedPolicy, acceptedAt en
+    acceptedPolicyHash, en een intentierecord met een bestaande Offer. Schrijft beide
+    records terug en geeft de Agreement terug.
+    """
+    request_id = str(request_record.get('@id', '')).rsplit(':', 1)[-1]
+    intention_id = intention_id_from_record(intention_record)
+    offer = load_intention_policy(intention_id) or build_intention_policy(intention_record)
+    party = request_record.get('mysolido:party') or {}
+
+    agreement = build_agreement(offer, request_record, party)
+    save_pod_json(agreement_relpath(request_id), agreement)
+
+    response_data = build_response_data(intention_record, agreement)
+    save_pod_json(request_response_relpath(request_id), response_data)
+
+    request_record['mysolido:status'] = REQUEST_STATUS_ACCEPTED
+    request_record['mysolido:agreement'] = agreement['uid']
+    request_record['mysolido:approvedData'] = [a['@id'] for a in response_data['attributes']]
+    request_record['mysolido:responseLink'] = f"/verzoek/response/{request_record.get('mysolido:statusToken', '')}"
+    request_record['mysolido:validUntil'] = intention_record.get('schema:validThrough', '')
+    save_pod_json(f'verzoeken/{request_id}.jsonld', request_record)
+
+    accepted_by = intention_record.setdefault('mysolido:acceptedBy', [])
+    if request_record.get('@id') not in accepted_by:
+        accepted_by.append(request_record.get('@id'))
+    save_pod_json(f'intenties/{intention_id}.jsonld', intention_record)
+
+    log_action('request_accept', {'id': request_id, 'intention': intention_id,
+                                  'party': party.get('@id', ''), 'policy': offer.get('uid', '')})
+    log_action('agreement_create', {'id': request_id, 'agreement': agreement['uid'],
+                                    'offer_hash': request_record.get('mysolido:acceptedPolicyHash', '')})
+    # 4b: hier komt het consentrecord (één aanroep met request_record, intention_record, agreement)
+    return agreement
+
+
+def accepted_requests_for(intention_record):
+    """Weergavelijst voor 'Geaccepteerd door' op de intentiepagina."""
+    items = []
+    for request_uri in intention_record.get('mysolido:acceptedBy', []) or []:
+        request_id = str(request_uri).rsplit(':', 1)[-1]
+        record = load_request_record(request_id) or {}
+        party = record.get('mysolido:party') or {}
+        items.append({
+            'request_id': request_id,
+            'party': party.get('rdfs:label') or record.get('mysolido:requester', {}).get('schema:name', '?'),
+            'organisation': party.get('mysolido:organisation', ''),
+            'accepted_at': format_date_nl_iso(record.get('mysolido:acceptedAt', '')),
+            'agreement': record.get('mysolido:agreement', ''),
+            'status': record.get('mysolido:status', ''),
+        })
+    return items
+
+
 # === CONSENT MODULE ===
 
 PURPOSE_MAP = {
@@ -3680,7 +3860,7 @@ def intentie_new():
         cat_info = INTENTION_CATEGORIES.get(category, INTENTION_CATEGORIES['anders'])
         val_info = VALIDITY_OPTIONS.get(validity, VALIDITY_OPTIONS['1m'])
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(microsecond=0)   # hele seconden (subtaak 4a)
         valid_through = now + timedelta(days=val_info['days'])
         intention_id = str(uuid.uuid4())
 
@@ -3803,6 +3983,9 @@ def intentie_detail(intention_id):
     policy = load_intention_policy(intention_id)
     policy_summary = intention_policy_summary_nl(policy, record) if policy else ''
 
+    # Gesloten Agreements (subtaak 4a): "Geaccepteerd door <partij> op <datum>"
+    accepted_by = accepted_requests_for(record)
+
     return render_template('intentie_detail.html',
         intention=record,
         shared_attributes=shared_attributes or [],
@@ -3811,6 +3994,7 @@ def intentie_detail(intention_id):
         profile_groups=profile_groups,
         policy=policy,
         policy_summary=policy_summary,
+        accepted_by=accepted_by,
         read_only=BRIDGE_MODE,
     )
 
@@ -3927,6 +4111,13 @@ def intentie_delete(intention_id):
         flash_t('flash_intention_not_found', 'error')
         return redirect(url_for('intenties_overview'))
 
+    # Een intentie met gesloten Agreement(s) blijft staan (subtaak 4a)
+    with open(fpath, 'r', encoding='utf-8') as f:
+        existing = _json.load(f)
+    if existing.get('mysolido:acceptedBy'):
+        flash_t('flash_intention_has_agreements', 'error')
+        return redirect(url_for('intentie_detail', intention_id=intention_id))
+
     os.remove(fpath)
     # De Offer naast het record gaat mee (subtaak 3)
     policy_path = safe_pod_path(intention_policy_relpath(intention_id))
@@ -3985,7 +4176,8 @@ def load_all_requests():
 
     requests_list = []
     for fname in os.listdir(verzoeken_dir):
-        if fname.endswith('.jsonld') and not fname.startswith('.'):
+        # <uuid>.agreement.jsonld is de Agreement naast een verzoek, geen verzoek (subtaak 4a)
+        if fname.endswith('.jsonld') and not fname.startswith('.') and not fname.endswith('.agreement.jsonld'):
             fpath = os.path.join(verzoeken_dir, fname)
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
@@ -4015,7 +4207,7 @@ def find_request_by_status_token(token):
         return None, None
 
     for fname in os.listdir(verzoeken_dir):
-        if fname.endswith('.jsonld') and not fname.startswith('.'):
+        if fname.endswith('.jsonld') and not fname.startswith('.') and not fname.endswith('.agreement.jsonld'):
             fpath = os.path.join(verzoeken_dir, fname)
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
@@ -4162,8 +4354,8 @@ def verzoek_status(status_token):
     response_link = record.get('mysolido:responseLink')
     valid_until = record.get('mysolido:validUntil', '')
 
-    # Check if approved response has expired
-    if status == 'goedgekeurd' and valid_until:
+    # Check if approved/accepted response has expired ('geaccepteerd' sinds subtaak 4a)
+    if status in REQUEST_STATUSES_WITH_RESPONSE and valid_until:
         try:
             exp_dt = datetime.fromisoformat(valid_until)
             if exp_dt.tzinfo is None:
@@ -4192,7 +4384,7 @@ def verzoek_response(status_token):
     status = record.get('mysolido:status', 'nieuw')
     valid_until = record.get('mysolido:validUntil', '')
 
-    if status != 'goedgekeurd':
+    if status not in REQUEST_STATUSES_WITH_RESPONSE:
         return render_template('verzoek_response.html', found=False), 404
 
     # Check expiry
@@ -4216,10 +4408,22 @@ def verzoek_response(status_token):
     with open(response_path, 'r', encoding='utf-8') as f:
         response_data = _json.load(f)
 
+    # Intentiegebonden verzoek (subtaak 4a): uitsluitend de vastgelegde attributen,
+    # met de samenvattingszin van de Agreement en de Agreement-uid erboven
+    agreement = None
+    agreement_summary = ''
+    if 'attributes' in response_data:
+        agreement = load_agreement(request_id)
+        intention_id = str(record.get('mysolido:intention', '')).rsplit(':', 1)[-1]
+        intention_record = load_intention_record(intention_id) or {}
+        agreement_summary = intention_policy_summary_nl(agreement, intention_record) if agreement else ''
+
     return render_template('verzoek_response.html',
         found=True,
         expired=False,
         response_data=response_data,
+        agreement=agreement,
+        agreement_summary=agreement_summary,
         valid_until=valid_until[:10] if valid_until else '',
     )
 
@@ -4243,6 +4447,9 @@ def verzoeken_overview():
         req['_category_label'] = req.get('mysolido:categoryLabel', 'Anders')
         req['_date'] = req.get('schema:dateCreated', '')[:10]
         req['_requested_data'] = req.get('mysolido:requestedData', [])
+        if req.get('mysolido:intention'):
+            # intentiegebonden verzoek (subtaak 4a): attribuut-urn's als labels tonen
+            req['_requested_data'] = [attribute_label_from_urn(u) for u in req['_requested_data']]
 
     return render_template('verzoeken.html', requests=requests_list)
 
@@ -4273,10 +4480,34 @@ def verzoek_detail_owner(request_id):
     profile = load_profile_data()
     profile_groups = extract_profile_groups(profile)
 
+    # Intentiegebonden verzoek (subtaak 4a): voorwaarden, partij, tijdstip, hash, Agreement
+    acceptance = None
+    if record.get('mysolido:intention'):
+        intention_id = str(record['mysolido:intention']).rsplit(':', 1)[-1]
+        intention_record = load_intention_record(intention_id) or {}
+        agreement = load_agreement(request_id)
+        offer = load_intention_policy(intention_id)
+        acceptance = {
+            'intention_id': intention_id,
+            'intention_label': intention_record.get('mysolido:categoryLabel', ''),
+            'intention_status': intention_record.get('mysolido:status', ''),
+            'offer_mode': intention_record.get('mysolido:offerMode', 'open'),
+            'targeted_party': (intention_record.get('mysolido:targetedParty') or {}).get('name', ''),
+            'summary': intention_policy_summary_nl(agreement or offer, intention_record) if (agreement or offer) else '',
+            'party': record.get('mysolido:party') or {},
+            'accepted_at': format_date_nl_iso(record.get('mysolido:acceptedAt', '')),
+            'accepted_at_raw': record.get('mysolido:acceptedAt', ''),
+            'accepted_policy': record.get('mysolido:acceptedPolicy', ''),
+            'policy_hash': record.get('mysolido:acceptedPolicyHash', ''),
+            'agreement': agreement,
+            'attributes': [attribute_label_from_urn(u) for u in record.get('mysolido:requestedData', [])],
+        }
+
     return render_template('verzoek_detail.html',
         req=record,
         profile_groups=profile_groups,
         approval_validity=APPROVAL_VALIDITY,
+        acceptance=acceptance,
     )
 
 
@@ -4299,6 +4530,12 @@ def verzoek_approve(request_id):
     try:
         with open(fpath, 'r', encoding='utf-8') as f:
             record = _json.load(f)
+
+        # Intentiegebonden verzoek bij een gericht aanbod (subtaak 4a): de eigenaar bevestigt
+        # dat dit de benoemde partij is; dan pas ontstaat de Agreement. Verzoeken zonder
+        # intentie volgen het bestaande pad hieronder.
+        if record.get('mysolido:intention'):
+            return confirm_targeted_acceptance(record, request_id)
 
         # Get approved data groups from form
         approved_groups = request.form.getlist('approved_data')
@@ -4392,6 +4629,175 @@ def verzoek_reject(request_id):
     flash_t('flash_request_rejected', 'success', name=requester_name)
     log_action('request_reject', {'id': request_id, 'requester': requester_name})
     return redirect(url_for('verzoeken_overview'))
+
+
+# === ACCEPTATIE VIA INTENTIE: routes (MyTerms-demo, subtaak 4a) ===
+# Publiek formulier aan een intentie: voorwaarden lezen (ook op de Bridge), accepteren
+# alleen lokaal en alleen bij een actieve intentie. Het generieke /verzoek blijft bestaan.
+
+def _intention_form_context(intention_id):
+    """Alles wat het intentiegebonden formulier nodig heeft; None als de intentie ontbreekt."""
+    record = load_intention_record(intention_id)
+    if not record:
+        return None
+    policy = load_intention_policy(intention_id)
+    return {
+        'intention': record,
+        'intention_id': intention_id,
+        'status': record.get('mysolido:status', 'concept'),
+        'policy': policy,
+        'policy_summary': intention_policy_summary_nl(policy, record) if policy else '',
+        'attribute_labels': [a.get('label', '') for a in record.get('mysolido:sharedAttributes', [])],
+        'offer_mode': record.get('mysolido:offerMode', 'open'),
+        'targeted_party': (record.get('mysolido:targetedParty') or {}).get('name', ''),
+        'valid_through': format_date_nl_iso(record.get('schema:validThrough', '')),
+    }
+
+
+def _acceptance_party(intention, name, organization, email):
+    """Partij-object voor het verzoek: nieuw id bij open aanbod, het benoemde id bij gericht aanbod."""
+    if intention.get('mysolido:offerMode') == 'targeted':
+        party_id = (intention.get('mysolido:targetedParty') or {}).get('@id') or generate_party_id()
+    else:
+        party_id = generate_party_id()
+    return {"@id": party_id, "rdfs:label": name, "mysolido:organisation": organization, "mysolido:contact": email}
+
+
+def _build_acceptance_request(intention, policy, party, request_id, status_token):
+    """Verzoekrecord (mysolido:ConsentRequest) voor een acceptatie van een intentie-Offer."""
+    intention_id = intention_id_from_record(intention)
+    return {
+        "@context": {
+            "mysolido": "https://mysolido.com/vocab#",
+            "dpv": "https://w3id.org/dpv#",
+            "schema": "https://schema.org/",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#"
+        },
+        "@type": "mysolido:ConsentRequest",
+        "@id": f"urn:mysolido:request:{request_id}",
+        "mysolido:statusToken": status_token,
+        "mysolido:status": REQUEST_STATUS_AWAITING,
+        "schema:dateCreated": utc_now_iso_seconds(),
+        "mysolido:requester": {
+            "schema:name": party['rdfs:label'],
+            "schema:worksFor": party['mysolido:organisation'],
+            "schema:email": party['mysolido:contact'],
+        },
+        "mysolido:category": intention.get('mysolido:category', 'anders'),
+        "mysolido:categoryLabel": intention.get('mysolido:categoryLabel', ''),
+        "mysolido:requestedData": [a.get('@id') for a in intention.get('mysolido:sharedAttributes', [])],
+        "mysolido:purpose": (intention.get('mysolido:purpose') or {}).get('label', ''),
+        "mysolido:agreedToTerms": True,
+        "mysolido:intention": intention.get('@id', ''),
+        "mysolido:acceptedPolicy": policy.get('uid', ''),
+        "mysolido:acceptedAt": utc_now_iso_seconds(),
+        "mysolido:acceptedPolicyHash": sha256_of_pod_file(intention_policy_relpath(intention_id)),
+        "mysolido:party": party,
+        "mysolido:approvedData": None,
+        "mysolido:responseLink": None,
+        "mysolido:validUntil": None,
+        "mysolido:rejectionReason": None,
+    }
+
+
+@app.route('/verzoek/intentie/<intention_id>', methods=['GET', 'POST'])
+def verzoek_intentie(intention_id):
+    """Voorwaarden van een intentie lezen en accepteren (publiek; accepteren alleen lokaal)."""
+    ctx = _intention_form_context(intention_id)
+    if ctx is None:
+        return render_template('verzoek_intentie.html', found=False), 404
+
+    acceptable = ctx['status'] == 'actief' and ctx['policy'] is not None and not BRIDGE_MODE
+
+    if request.method == 'GET':
+        return render_template('verzoek_intentie.html', found=True, acceptable=acceptable,
+                               bridge_mode=BRIDGE_MODE, **ctx)
+
+    # POST: accepteren
+    if BRIDGE_MODE:
+        flash_t('flash_bridge_accept_blocked', 'error')
+        return redirect(url_for('verzoek_intentie', intention_id=intention_id))
+    if ctx['policy'] is None:
+        flash_t('flash_no_terms', 'error')
+        return redirect(url_for('verzoek_intentie', intention_id=intention_id))
+    if ctx['status'] != 'actief':
+        flash_t('flash_intention_not_active', 'error')
+        return redirect(url_for('verzoek_intentie', intention_id=intention_id))
+
+    client_ip = request.remote_addr or 'unknown'
+    if is_rate_limited(client_ip):
+        flash_t('flash_rate_limit', 'error')
+        return redirect(url_for('verzoek_intentie', intention_id=intention_id))
+
+    name = sanitize_input(request.form.get('name', ''))
+    organization = sanitize_input(request.form.get('organization', ''))
+    email = sanitize_input(request.form.get('email', ''))
+    accepted = request.form.get('accept_terms') == 'yes'
+
+    if not name or not email:
+        flash_t('flash_required_fields', 'error')
+        return redirect(url_for('verzoek_intentie', intention_id=intention_id))
+    if '@' not in email or '.' not in email:
+        flash_t('flash_invalid_email', 'error')
+        return redirect(url_for('verzoek_intentie', intention_id=intention_id))
+    if not accepted:
+        flash_t('flash_accept_terms_required', 'error')
+        return redirect(url_for('verzoek_intentie', intention_id=intention_id))
+
+    intention = ctx['intention']
+    request_id = str(uuid.uuid4())
+    status_token = str(uuid.uuid4())
+    party = _acceptance_party(intention, name, organization, email)
+    record = _build_acceptance_request(intention, ctx['policy'], party, request_id, status_token)
+
+    pod_mkdir('verzoeken')
+    ensure_verzoeken_policy()
+    if intention.get('mysolido:offerMode') == 'targeted':
+        # Registreren; de eigenaar bevestigt in verzoek_approve() dat dit de benoemde partij is
+        save_pod_json(f'verzoeken/{request_id}.jsonld', record)
+        log_action('request_accept_pending', {'id': request_id, 'intention': intention_id, 'party': party['@id']})
+        return render_template('verzoek_bevestiging.html', status_token=status_token,
+                               accepted=True, awaiting=True, response_link=None)
+
+    conclude_agreement(record, intention)
+    return render_template('verzoek_bevestiging.html', status_token=status_token,
+                           accepted=True, awaiting=False, response_link=record.get('mysolido:responseLink'))
+
+
+def confirm_targeted_acceptance(record, request_id):
+    """Eigenaar bevestigt een gericht aanbod (aangeroepen vanuit verzoek_approve)."""
+    if record.get('mysolido:status') != REQUEST_STATUS_AWAITING:
+        flash_t('flash_request_already_handled', 'error')
+        return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+    intention_id = str(record.get('mysolido:intention', '')).rsplit(':', 1)[-1]
+    intention = load_intention_record(intention_id)
+    if not intention:
+        flash_t('flash_intention_not_found', 'error')
+        return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+    if intention.get('mysolido:offerMode') != 'targeted':
+        flash_t('flash_request_already_handled', 'error')
+        return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+    if intention.get('mysolido:status') != 'actief':
+        flash_t('flash_intention_not_active', 'error')
+        return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+
+    conclude_agreement(record, intention)
+    party_label = (record.get('mysolido:party') or {}).get('rdfs:label', '')
+    flash_t('flash_request_confirmed', 'success', name=party_label)
+    log_action('request_approve', {'id': request_id, 'requester': party_label,
+                                   'agreement': record.get('mysolido:agreement', '')})
+    return redirect(url_for('verzoek_detail_owner', request_id=request_id))
+
+
+@app.route('/verzoeken/<request_id>/agreement.jsonld')
+def verzoek_agreement_file(request_id):
+    """De Agreement van een verzoek als application/ld+json (eigenaarslogin; ook in Bridge-modus)."""
+    path = safe_pod_path(agreement_relpath(request_id))
+    if not path or not os.path.isfile(path):
+        abort(404)
+    with open(path, 'r', encoding='utf-8') as f:
+        return Response(f.read(), mimetype='application/ld+json')
 
 
 # === Crash report endpoints (Bridge) ===

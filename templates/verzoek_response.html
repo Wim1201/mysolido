@@ -17,6 +17,41 @@
         <p style="color: var(--color-text-muted);">{{ t.req_resp_expired_desc }} {{ valid_until }}.</p>
     </div>
 
+    {% elif response_data.get('attributes') is not none %}
+    {# === Intentiegebonden acceptatie (subtaak 4a): uitsluitend de vastgelegde waarden === #}
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h2 style="font-size: 1.15rem;">{{ t.req_resp_title }}</h2>
+            <span class="badge badge-geaccepteerd">{{ t.req_accepted }}</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 4px;">
+            {{ t.req_resp_shared_via }} MySolido &mdash; {{ t.req_resp_valid_until }} {{ valid_until }}
+        </p>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;" id="agreement-terms">
+        <h3 style="font-size: 1rem;">{{ t.req_resp_terms }}</h3>
+        {% if agreement_summary %}<p style="margin: 8px 0 8px;">{{ agreement_summary }}</p>{% endif %}
+        <p style="font-size: 0.85rem; color: var(--color-text-muted); margin: 0;">
+            {{ t.req_resp_agreement }}: <code>{{ response_data.get('mysolido:agreement', '') }}</code>
+        </p>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+        {% for attr in response_data.get('attributes', []) %}
+        <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--color-border);" data-attribute="{{ attr.get('@id', '') }}">
+            <span style="font-weight: 600;">{{ attr.get('label', '') }}</span>
+            <span>{{ attr.get('valueLabel', '') }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="text-align: center; margin: 24px 0;">
+        <p style="font-size: 0.8rem; color: var(--color-text-muted);">
+            {{ t.req_resp_shared_via }} <strong>MySolido</strong> &mdash; een persoonlijke datakluis.
+        </p>
+    </div>
+
     {% else %}
     <div class="card" style="margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">

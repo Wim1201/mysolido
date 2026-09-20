@@ -36,6 +36,8 @@
             <span class="badge badge-{{ req._status }}">
                 {% if req._status == 'nieuw' %}{{ t.req_new }}
                 {% elif req._status == 'goedgekeurd' %}{{ t.req_approved }}
+                {% elif req._status == 'geaccepteerd' %}{{ t.req_accepted }}
+                {% elif req._status == 'wacht-op-bevestiging' %}{{ t.req_awaiting }}
                 {% elif req._status == 'afgewezen' %}{{ t.req_rejected }}
                 {% elif req._status == 'verlopen' %}{{ t.req_expired }}
                 {% else %}{{ req._status|capitalize }}{% endif %}
@@ -83,7 +85,98 @@
         </div>
     </div>
 
-    {% if req._status == 'nieuw' %}
+    {% if acceptance %}
+    {# === Intentiegebonden verzoek (subtaak 4a): voorwaarden, partij, tijdstip, hash, Agreement === #}
+    <div class="card" style="margin-bottom: 20px;" id="acceptance">
+        <h3>{{ t.req_acceptance_title }}</h3>
+        <p style="margin: 8px 0 12px;">{{ acceptance.summary }}</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px;">
+            <div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_new_title|replace('Nieuwe intentie', 'Intentie') }}</div>
+                <p style="margin: 0;"><a href="{{ url_for('intentie_detail', intention_id=acceptance.intention_id) }}">{{ acceptance.intention_label }}</a>
+                    <span class="badge badge-{{ acceptance.intention_status }}">{{ acceptance.intention_status|capitalize }}</span></p>
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_party }}</div>
+                <p style="margin: 0;">{{ acceptance.party.get('rdfs:label', '') }}{% if acceptance.party.get('mysolido:organisation') %} ({{ acceptance.party['mysolido:organisation'] }}){% endif %}<br>
+                    <code style="font-size: 0.8rem;">{{ acceptance.party.get('@id', '') }}</code></p>
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_accepted_at }}</div>
+                <p style="margin: 0;">{{ acceptance.accepted_at }} <span style="color: var(--color-text-muted); font-size: 0.85rem;">({{ acceptance.accepted_at_raw }})</span></p>
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_accepted_policy }}</div>
+                <p style="margin: 0; word-break: break-all;"><code style="font-size: 0.8rem;">{{ acceptance.accepted_policy }}</code></p>
+            </div>
+            <div style="grid-column: 1 / -1;">
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_policy_hash }}</div>
+                <p style="margin: 0; word-break: break-all;"><code style="font-size: 0.8rem;">{{ acceptance.policy_hash }}</code></p>
+            </div>
+            <div style="grid-column: 1 / -1;">
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_agreement }}</div>
+                {% if acceptance.agreement %}
+                <p style="margin: 0; word-break: break-all;"><code style="font-size: 0.8rem;">{{ acceptance.agreement.get('uid', '') }}</code> &middot;
+                    <a href="{{ url_for('verzoek_agreement_file', request_id=req._id) }}">{{ t.req_agreement_file }}</a></p>
+                {% else %}
+                <p style="margin: 0; color: var(--color-text-muted);">{{ t.req_agreement_pending }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div style="margin-top: 12px;">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_shared_data }}</div>
+            <p style="margin: 0;">
+                {% for label in acceptance.attributes %}
+                <span class="badge badge-{{ 'geaccepteerd' if acceptance.agreement else 'concept' }}" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">{{ label }}</span>
+                {% endfor %}
+            </p>
+        </div>
+        {% if req.get('mysolido:validUntil') %}
+        <div style="margin-top: 12px;">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.int_valid_through }}</div>
+            <p style="margin: 0;">{{ req['mysolido:validUntil'][:10] }}</p>
+        </div>
+        {% endif %}
+        {% if req.get('mysolido:responseLink') %}
+        <div style="margin-top: 12px;">
+            <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_response_link }}</div>
+            <a href="{{ req['mysolido:responseLink'] }}" style="word-break: break-all; font-size: 0.9rem;">{{ req['mysolido:responseLink'] }}</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if req._status == 'wacht-op-bevestiging' %}
+    {# Gericht aanbod: de eigenaar bevestigt met de bestaande Goedkeuren-route #}
+    <form action="{{ url_for('verzoek_approve', request_id=req._id) }}" method="post">
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>{{ t.req_approve }}</h3>
+            <p style="font-size: 0.9rem; margin: 8px 0 12px;">{{ t.req_confirm_party.format(name=acceptance.targeted_party) }}</p>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="submit" class="btn btn-primary">{{ t.req_confirm_btn }}</button>
+                <button type="button" class="btn btn-danger" onclick="document.getElementById('reject-form').style.display='block'; this.style.display='none';">{{ t.req_reject_btn }}</button>
+            </div>
+        </div>
+    </form>
+    <form id="reject-form" action="{{ url_for('verzoek_reject', request_id=req._id) }}" method="post" style="display: none;">
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>{{ t.req_reject_title }}</h3>
+            <div style="display: flex; flex-direction: column; margin-top: 8px;">
+                <label for="reason" style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_reject_reason }}</label>
+                <textarea name="reason" id="reason" class="form-input" rows="2" placeholder="{{ t.req_reject_placeholder }}" style="resize: vertical; font-family: inherit;"></textarea>
+            </div>
+            <button type="submit" class="btn btn-danger" style="margin-top: 12px;">{{ t.req_reject_submit }}</button>
+        </div>
+    </form>
+    {% elif req._status == 'afgewezen' %}
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>{{ t.req_rejected_title }}</h3>
+        {% if req.get('mysolido:rejectionReason') %}
+        <p style="margin-top: 8px;">{{ t.req_rejected_reason }} {{ req['mysolido:rejectionReason'] }}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% elif req._status == 'nieuw' %}
     {# === APPROVAL FORM === #}
     <form action="{{ url_for('verzoek_approve', request_id=req._id) }}" method="post">
         <div class="card" style="margin-bottom: 20px;">

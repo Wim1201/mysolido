@@ -1696,3 +1696,17 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
 [data-theme="dark"] .badge-nieuw { background: #1a2e4a; color: #6db3f2; }
 [data-theme="dark"] .badge-goedgekeurd { background: #1e3a2a; color: #75d89a; }
 [data-theme="dark"] .badge-afgewezen { background: #3a1e20; color: #e07a7a; }
+
+/* MyTerms-acceptatie (subtaak 4a): geaccepteerd = gesloten Agreement, wacht-op-bevestiging = gericht aanbod */
+.badge-geaccepteerd {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-wacht-op-bevestiging {
+    background: #fff3cd;
+    color: #856404;
+}
+
+[data-theme="dark"] .badge-geaccepteerd { background: #1e3a2a; color: #75d89a; }
+[data-theme="dark"] .badge-wacht-op-bevestiging { background: #3a3020; color: #e0c36a; }

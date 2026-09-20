@@ -1375,6 +1375,221 @@ def phase_intention_policy(ctx: Ctx):
                   not any(p.exists() for f in created for p in (f, policy_file(f))), '', 'bestanden bestaan nog')
 
 
+def phase_acceptance(ctx: Ctx):
+    """Acceptatie en Agreement (subtaak 4a): open aanbod, concept, gericht aanbod, leesroute, listing."""
+    import hashlib
+    rep = ctx.report
+    idir = ctx.pod_dir / 'intenties'
+    vdir = ctx.pod_dir / 'verzoeken'
+    profile = read_profile(ctx)
+    expected = expected_scenario_values(profile)
+    if not all(expected.values()):
+        rep.skip('Acceptatie: profiel mist scenariowaarden, fase overgeslagen', json.dumps(expected))
+        return
+    anon = requests.Session()
+
+    def listing(folder):
+        return {p.name for p in folder.glob('*.jsonld')} if folder.exists() else set()
+
+    def new_records(folder, before):
+        return [p for p in folder.glob('*.jsonld') if p.name not in before and not p.name.startswith('.')
+                and not p.name.endswith(('.policy.jsonld', '.agreement.jsonld'))] if folder.exists() else []
+
+    def create_intention(data):
+        before = listing(idir)
+        r = flask(ctx, 'POST', '/intenties/nieuw', data=data)
+        new = new_records(idir, before)
+        return (new[0] if len(new) == 1 and r.status_code in REDIRECT else None)
+
+    def accept(iid, data):
+        before = listing(vdir)
+        r = anon.post(f'{ctx.flask_base}/verzoek/intentie/{iid}', data=data, timeout=TIMEOUT, allow_redirects=False)
+        return r, new_records(vdir, before)
+
+    def files_for(req_file: Path):
+        return (req_file, req_file.with_name(req_file.stem + '.agreement.jsonld'),
+                req_file.with_name(req_file.stem + '_response.json'))
+
+    intentions, request_files = [], []
+    try:
+        # 1. Open aanbod aanmaken en activeren
+        open_file = create_intention({'category': 'autoverzekering', 'description': 'Regressietest acceptatie open',
+                                      'validity': '2w', 'attributes': list(SCENARIO_ATTRIBUTES),
+                                      'purpose': 'quote_calculation', 'no_onward_transfer': '1', 'offer_mode': 'open'})
+        if not rep.check('Acceptatie: open intentie aangemaakt', open_file is not None, '', 'geen record'):
+            return
+        intentions.append(open_file)
+        iid = open_file.stem
+        flask(ctx, 'POST', f'/intenties/{iid}/activate')
+        rec = json.loads(open_file.read_text(encoding='utf-8'))
+        rep.check('Acceptatie: intentie geactiveerd', rec.get('mysolido:status') == 'actief', '', rec.get('mysolido:status'))
+        policy_file = open_file.with_name(f'{iid}.policy.jsonld')
+        policy_hash = 'sha256:' + hashlib.sha256(policy_file.read_bytes()).hexdigest()
+        uid = f'urn:mysolido:policy:intention:{iid}'
+
+        # 2. Formulier: zin, JSON, vier labels zonder waarden
+        r = anon.get(f'{ctx.flask_base}/verzoek/intentie/{iid}', timeout=TIMEOUT)
+        labels_ok = all(l in r.text for l in ('Leeftijdscategorie', 'Postcodegebied', 'Voertuigtype', 'Schadeverleden'))
+        values_absent = all(v not in r.text for v in ('35-44', '5611', 'Schadevrije jaren: 5'))
+        rep.check('Acceptatie: formulier toont samenvattingszin, JSON-LD en vier labels zonder waarden',
+                  r.status_code == 200 and 'Iedereen die deze voorwaarden accepteert' in r.text and uid in r.text
+                  and labels_ok and values_absent and 'name="accept_terms"' in r.text,
+                  '', f'status {r.status_code}, labels {labels_ok}, waarden afwezig {values_absent}')
+
+        # 3. Zonder vinkje geweigerd
+        r, new = accept(iid, {'name': 'Verzekeraar X', 'organization': 'Verzekeraar X BV', 'email': 'offerte@verzekeraar-x.test'})
+        rep.check('Acceptatie: zonder vinkje geweigerd, geen verzoek', r.status_code in REDIRECT and not new,
+                  '', f'status {r.status_code}, nieuwe bestanden: {len(new)}')
+
+        # 4. Met vinkje: verzoek, Agreement, response
+        r, new = accept(iid, {'name': 'Verzekeraar X', 'organization': 'Verzekeraar X BV',
+                              'email': 'offerte@verzekeraar-x.test', 'accept_terms': 'yes'})
+        if not rep.check('Acceptatie: verzoekrecord geschreven bij acceptatie', r.status_code == 200 and len(new) == 1,
+                         '', f'status {r.status_code}, nieuwe bestanden: {len(new)}'):
+            return
+        req_file = new[0]
+        request_files.append(req_file)
+        rid = req_file.stem
+        req = json.loads(req_file.read_text(encoding='utf-8'))
+        party = req.get('mysolido:party') or {}
+        rep.check('Acceptatie: verzoek bevat intention, acceptedPolicy, acceptedAt (hele seconden), hash en party',
+                  req.get('mysolido:intention') == rec.get('@id') and req.get('mysolido:acceptedPolicy') == uid
+                  and req.get('mysolido:acceptedPolicyHash') == policy_hash
+                  and '.' not in str(req.get('mysolido:acceptedAt', '')).split('+')[0]
+                  and str(party.get('@id', '')).startswith('urn:mysolido:party:') and party.get('rdfs:label') == 'Verzekeraar X'
+                  and party.get('mysolido:organisation') == 'Verzekeraar X BV' and party.get('mysolido:contact') == 'offerte@verzekeraar-x.test',
+                  '', json.dumps({k: req.get(k) for k in ('mysolido:intention', 'mysolido:acceptedPolicy', 'mysolido:acceptedAt',
+                                                          'mysolido:acceptedPolicyHash', 'mysolido:party')}))
+        rep.check('Acceptatie: status geaccepteerd, agreement-uid, responseLink en validUntil = validThrough',
+                  req.get('mysolido:status') == 'geaccepteerd' and req.get('mysolido:agreement') == f'urn:mysolido:agreement:{rid}'
+                  and req.get('mysolido:responseLink') == f"/verzoek/response/{req.get('mysolido:statusToken')}"
+                  and req.get('mysolido:validUntil') == rec.get('schema:validThrough'),
+                  '', json.dumps({k: req.get(k) for k in ('mysolido:status', 'mysolido:agreement', 'mysolido:validUntil')}))
+        _, agr_file, resp_file = files_for(req_file)
+        offer = json.loads(policy_file.read_text(encoding='utf-8'))
+        agr = json.loads(agr_file.read_text(encoding='utf-8')) if agr_file.exists() else {}
+
+        def strip_assignee(rules):
+            return [{k: v for k, v in r.items() if k != 'assignee'} for r in rules]
+        assignee_ok = all(r.get('assignee', {}).get('@id') == party.get('@id') and r.get('assignee', {}).get('rdfs:label') == 'Verzekeraar X'
+                          for r in agr.get('permission', []) + agr.get('prohibition', []))
+        rep.check('Acceptatie: Agreement met @type, uid, assigner, assignee op permission én prohibition',
+                  agr.get('@type') == 'Agreement' and agr.get('uid') == f'urn:mysolido:agreement:{rid}'
+                  and agr.get('assigner') == ctx.webid and assignee_ok and agr.get('prohibition'),
+                  '', json.dumps(agr)[:300])
+        rep.check('Acceptatie: permission en prohibition gelijk aan de Offer (op assignee na)',
+                  strip_assignee(agr.get('permission', [])) == offer.get('permission')
+                  and strip_assignee(agr.get('prohibition', [])) == offer.get('prohibition'),
+                  '', 'regels wijken af')
+        rep.check('Acceptatie: Agreement bevat mysolido:offer, request, acceptedAt en offerHash',
+                  agr.get('mysolido:offer') == uid and agr.get('mysolido:request') == req.get('@id')
+                  and agr.get('mysolido:acceptedAt') == req.get('mysolido:acceptedAt') and agr.get('mysolido:offerHash') == policy_hash,
+                  '', json.dumps({k: agr.get(k) for k in ('mysolido:offer', 'mysolido:request', 'mysolido:offerHash')}))
+        resp = json.loads(resp_file.read_text(encoding='utf-8')) if resp_file.exists() else {}
+        attrs = resp.get('attributes', [])
+        rep.check('Acceptatie: response.json bevat precies de vier attributen met label en valueLabel',
+                  [a.get('@id') for a in attrs] == [ATTR + k for k in SCENARIO_ATTRIBUTES]
+                  and all(a.get('label') and a.get('valueLabel') for a in attrs) and 'fuel' not in json.dumps(resp),
+                  '', json.dumps(resp)[:300])
+        r = anon.get(f"{ctx.flask_base}{req.get('mysolido:responseLink')}", timeout=TIMEOUT)
+        rep.check('Acceptatie: responspagina toont zin, Agreement-uid en de vier waarden, niet brandstof of bouwjaar',
+                  r.status_code == 200 and 'Verzekeraar X mag' in r.text and f'urn:mysolido:agreement:{rid}' in r.text
+                  and all(v in r.text for v in ('35-44', '5611', 'Auto', 'Schadevrije jaren: 5'))
+                  and 'Benzine' not in r.text and '2019' not in r.text,
+                  '', f'status {r.status_code}')
+        r = anon.get(f"{ctx.flask_base}/verzoek/status/{req.get('mysolido:statusToken')}", timeout=TIMEOUT)
+        rep.check('Acceptatie: statuspagina toont geaccepteerd met link naar de gegevens',
+                  r.status_code == 200 and 'badge-geaccepteerd' in r.text and req.get('mysolido:responseLink') in r.text,
+                  '', f'status {r.status_code}')
+        rec = json.loads(open_file.read_text(encoding='utf-8'))
+        rep.check('Acceptatie: intentierecord heeft acceptedBy met het verzoek', rec.get('mysolido:acceptedBy') == [req.get('@id')],
+                  '', json.dumps(rec.get('mysolido:acceptedBy')))
+        r = flask(ctx, 'GET', f'/intenties/{iid}')
+        rep.check('Acceptatie: detailpagina toont "Geaccepteerd door Verzekeraar X"',
+                  r.status_code == 200 and 'Geaccepteerd door' in r.text and 'Verzekeraar X op' in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'POST', f'/intenties/{iid}/delete')
+        rep.check('Acceptatie: verwijderen van een geaccepteerde intentie geblokkeerd',
+                  r.status_code in REDIRECT and open_file.exists() and policy_file.exists(), '', f'status {r.status_code}, bestaat {open_file.exists()}')
+        r = flask(ctx, 'GET', f'/verzoeken/{rid}')
+        rep.check('Acceptatie: eigenaarsdetail toont partij, tijdstip, hash en Agreement-link',
+                  r.status_code == 200 and policy_hash in r.text and party.get('@id') in r.text and f'/verzoeken/{rid}/agreement.jsonld' in r.text,
+                  '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/verzoeken/{rid}/agreement.jsonld')
+        rep.check('Acceptatie: GET /verzoeken/<uuid>/agreement.jsonld geeft application/ld+json',
+                  r.status_code == 200 and 'application/ld+json' in r.headers.get('Content-Type', '')
+                  and r.json().get('uid') == f'urn:mysolido:agreement:{rid}',
+                  r.headers.get('Content-Type', ''), f'status {r.status_code}')
+
+        # 5. Concept-intentie: voorwaarden lezen, niet accepteren
+        concept_file = create_intention({'category': 'autoverzekering', 'description': 'Regressietest acceptatie concept',
+                                         'validity': '1w', 'attributes': ['vehicle_type'], 'purpose': 'quote_calculation', 'offer_mode': 'open'})
+        if rep.check('Acceptatie: concept-intentie aangemaakt', concept_file is not None, '', 'geen record'):
+            intentions.append(concept_file)
+            cid = concept_file.stem
+            r = anon.get(f'{ctx.flask_base}/verzoek/intentie/{cid}', timeout=TIMEOUT)
+            rep.check('Acceptatie: concept toont voorwaarden maar geen acceptatieformulier',
+                      r.status_code == 200 and f'urn:mysolido:policy:intention:{cid}' in r.text and 'name="accept_terms"' not in r.text
+                      and 'niet actief' in r.text, '', f'status {r.status_code}')
+            r, new = accept(cid, {'name': 'Test', 'email': 'test@example.test', 'accept_terms': 'yes'})
+            rep.check('Acceptatie: POST op concept geweigerd', r.status_code in REDIRECT and not new, '', f'status {r.status_code}, nieuw {len(new)}')
+
+        # 6. Gericht aanbod: wacht op bevestiging, daarna Agreement via verzoek_approve
+        targeted_file = create_intention({'category': 'autoverzekering', 'description': 'Regressietest acceptatie gericht',
+                                          'validity': '1w', 'attributes': ['vehicle_type', 'postal_area'], 'purpose': 'quote_calculation',
+                                          'no_onward_transfer': '1', 'offer_mode': 'targeted', 'targeted_party': 'Verzekeraar Y'})
+        if rep.check('Acceptatie: gerichte intentie aangemaakt', targeted_file is not None, '', 'geen record'):
+            intentions.append(targeted_file)
+            tid = targeted_file.stem
+            flask(ctx, 'POST', f'/intenties/{tid}/activate')
+            trec = json.loads(targeted_file.read_text(encoding='utf-8'))
+            r, new = accept(tid, {'name': 'Verzekeraar Y', 'email': 'y@verzekeraar-y.test', 'accept_terms': 'yes'})
+            if rep.check('Acceptatie: gericht aanbod: verzoek geregistreerd', r.status_code == 200 and len(new) == 1, '', f'status {r.status_code}'):
+                treq_file = new[0]
+                request_files.append(treq_file)
+                trid = treq_file.stem
+                treq = json.loads(treq_file.read_text(encoding='utf-8'))
+                _, tagr_file, tresp_file = files_for(treq_file)
+                rep.check('Acceptatie: gericht: status wacht-op-bevestiging, partij-id = targetedParty.@id, nog geen Agreement',
+                          treq.get('mysolido:status') == 'wacht-op-bevestiging' and not tagr_file.exists() and not tresp_file.exists()
+                          and (treq.get('mysolido:party') or {}).get('@id') == (trec.get('mysolido:targetedParty') or {}).get('@id')
+                          and 'wacht op bevestiging' in r.text.lower(),
+                          '', json.dumps({k: treq.get(k) for k in ('mysolido:status', 'mysolido:party')}))
+                r = flask(ctx, 'GET', f'/verzoeken/{trid}')
+                rep.check('Acceptatie: gericht: eigenaarsdetail toont bevestigknop', r.status_code == 200 and 'Bevestigen' in r.text, '', f'status {r.status_code}')
+                r = flask(ctx, 'POST', f'/verzoeken/{trid}/approve')
+                treq = json.loads(treq_file.read_text(encoding='utf-8'))
+                tagr = json.loads(tagr_file.read_text(encoding='utf-8')) if tagr_file.exists() else {}
+                rep.check('Acceptatie: gericht: na goedkeuren status geaccepteerd en Agreement met assignee = targetedParty.@id',
+                          r.status_code in REDIRECT and treq.get('mysolido:status') == 'geaccepteerd' and tresp_file.exists()
+                          and (tagr.get('permission') or [{}])[0].get('assignee', {}).get('@id') == (trec.get('mysolido:targetedParty') or {}).get('@id')
+                          and (tagr.get('permission') or [{}])[0].get('assignee', {}).get('rdfs:label') == 'Verzekeraar Y',
+                          '', json.dumps(tagr)[:300])
+                r = flask(ctx, 'POST', f'/verzoeken/{trid}/approve')
+                rep.check('Acceptatie: gericht: tweede goedkeuring wordt geweigerd (al afgehandeld)', r.status_code in REDIRECT, '', f'status {r.status_code}')
+
+        # 7. Listing, zoeken, overzichten
+        r = flask(ctx, 'GET', '/browse/verzoeken')
+        rep.check('Acceptatie: .agreement.jsonld niet in de kluislisting', r.status_code == 200 and '.agreement.jsonld' not in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', '/search', params={'q': 'agreement'})
+        rep.check('Acceptatie: .agreement.jsonld niet in zoekresultaten', r.status_code == 200 and '.agreement.jsonld' not in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', '/verzoeken')
+        rep.check('Acceptatie: Agreement niet als verzoek in het overzicht; verzoeken tonen labels',
+                  r.status_code == 200 and '.agreement' not in r.text and 'Leeftijdscategorie' in r.text, '', f'status {r.status_code}')
+    finally:
+        for f in request_files:
+            for p in files_for(f):
+                if p.exists():
+                    p.unlink()
+        for f in intentions:
+            flask(ctx, 'POST', f'/intenties/{f.stem}/delete')   # geblokkeerd bij acceptedBy, dan handmatig
+            for p in (f, f.with_name(f.stem + '.policy.jsonld')):
+                if p.exists():
+                    p.unlink()
+        leftovers = [p for f in intentions for p in (f, f.with_name(f.stem + '.policy.jsonld')) if p.exists()]
+        leftovers += [p for f in request_files for p in files_for(f) if p.exists()]
+        rep.check('Acceptatie: testintenties, verzoeken, Agreements en responses opgeruimd', not leftovers, '', str(leftovers))
+
+
 # --- main --------------------------------------------------------------------------------
 
 def main():
@@ -1409,6 +1624,7 @@ def main():
         run_phase(ctx, 'Profielvelden MyTerms-demo', phase_profile_fields)
         run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
         run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
+        run_phase(ctx, 'Acceptatie en Agreement', phase_acceptance)
     else:
         run_phase(ctx, 'Preflight', phase_preflight)
         account = run_phase(ctx, 'Accountcreatie en test-Pod (CSS account-API)', phase_account)
@@ -1423,6 +1639,7 @@ def main():
         run_phase(ctx, 'Profielvelden MyTerms-demo', phase_profile_fields)
         run_phase(ctx, 'Intentie met per-veldselectie', phase_intention)
         run_phase(ctx, 'Intentiepolicy (ODRL-Offer)', phase_intention_policy)
+        run_phase(ctx, 'Acceptatie en Agreement', phase_acceptance)
         run_phase(ctx, 'Backup en restore', phase_backup_restore, content)
         run_phase(ctx, 'Flask /debug (HTTP-laag)', phase_debug)
         run_phase(ctx, 'Probes 7.2.0-changelog', phase_probes)
