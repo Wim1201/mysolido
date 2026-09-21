@@ -1,6 +1,6 @@
 {% extends "base_public.html" %}
 
-{% block title %}{{ t.req_resp_title }} - MySolido{% endblock %}
+{% block title %}{% if withdrawn %}{{ t.req_withdrawn }}{% else %}{{ t.req_resp_title }}{% endif %} - MySolido{% endblock %}
 
 {% block content %}
     {% if not found %}

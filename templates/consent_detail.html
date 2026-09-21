@@ -54,7 +54,7 @@
             </tr>
             <tr>
                 <th>{{ t.consent_27560_validity }}</th>
-                <td>{{ t.consent_detail_valid_until|lower }} {{ expiry_date }}{% if storage.get('dpv:hasDuration', {}).get('mysolido:days') is not none %} &middot; {{ storage['dpv:hasDuration']['mysolido:days'] }} {{ t.consent_27560_days }}{% endif %}</td>
+                <td>{{ t.consent_detail_valid_until|lower }} {{ expiry_date }} &middot; {{ t.consent_27560_end_of_offer }}</td>
             </tr>
             <tr>
                 <th>{{ t.consent_27560_onward }}</th>
@@ -68,8 +68,9 @@
                 <th>{{ t.consent_27560_events }}</th>
                 <td>
                     {% for ev in consent.get('mysolido:events', []) %}
-                    <div data-event="{{ ev.get('@type', '') }}">{% if ev.get('@type') == 'withdrawn' %}{{ t.consent_27560_event_withdrawn }}{% else %}{{ t.consent_27560_event_given }}{% endif %}: {{ ev.get('at', '') }} <span style="color: var(--color-text-muted); font-size: 0.8rem;">({{ ev.get('by', '') }})</span></div>
+                    <div data-event="{{ ev.get('@type', '') }}">{% if ev.get('@type') == 'withdrawn' %}{{ t.consent_27560_event_withdrawn }}{% else %}{{ t.consent_27560_event_given }}{% endif %}: {{ ev.get('at', '')|nl_datetime }} <span style="color: var(--color-text-muted); font-size: 0.8rem;">({{ ev.get('by', '') }})</span></div>
                     {% endfor %}
+                    <div style="color: var(--color-text-muted); font-size: 0.8rem;">({{ t.time_local_note }})</div>
                 </td>
             </tr>
             <tr>
@@ -96,7 +97,7 @@
             </tr>
             <tr>
                 <th>{{ t.consent_detail_created }} / {{ t.consent_detail_modified }}</th>
-                <td>{{ consent.get('dct:created', '')|nl_date }} {{ consent.get('dct:created', '')[11:19] }} / {{ consent.get('dct:modified', '')|nl_date }} {{ consent.get('dct:modified', '')[11:19] }} <span style="color: var(--color-text-muted); font-size: 0.8rem;">(UTC)</span></td>
+                <td>{{ consent.get('dct:created', '')|nl_datetime }} / {{ consent.get('dct:modified', '')|nl_datetime }} <span style="color: var(--color-text-muted); font-size: 0.8rem;">({{ t.time_local_note }})</span></td>
             </tr>
         </table>
         {% else %}
@@ -125,11 +126,11 @@
             </tr>
             <tr>
                 <th>{{ t.consent_detail_created }}</th>
-                <td>{{ consent.get('dct:created', '')|nl_date }} {{ consent.get('dct:created', '')[11:16] }}</td>
+                <td>{{ consent.get('dct:created', '')|nl_datetime }}</td>
             </tr>
             <tr>
                 <th>{{ t.consent_detail_modified }}</th>
-                <td>{{ consent.get('dct:modified', '')|nl_date }} {{ consent.get('dct:modified', '')[11:16] }}</td>
+                <td>{{ consent.get('dct:modified', '')|nl_datetime }}</td>
             </tr>
             {% set expiry = consent.get('dpv:hasExpiry', {}) %}
             {% if expiry and expiry is mapping and expiry.get('dpv:hasExpiryTime') %}
@@ -166,15 +167,21 @@
                 <button type="submit" class="btn" style="background: var(--color-secondary);">{{ t.consent_withdraw }}</button>
             </form>
             {% endif %}
+            {% if consent.get('mysolido:agreement') %}
+            {# B5 (21-09-2026): op dit record rust een Agreement; intrekken kan, verwijderen niet #}
+            <p style="font-size: 0.85rem; color: var(--color-text-muted); margin: 0; align-self: center;" id="consent-agreement-note">{{ t.consent_has_agreement_note }}</p>
+            {% else %}
             <form action="{{ url_for('consent_delete', consent_id=consent._id) }}" method="post" onsubmit="return confirm('{{ t.consent_confirm_delete_detail }}')">
                 <button type="submit" class="btn btn-danger">{{ t.consent_delete }}</button>
             </form>
+            {% endif %}
         </div>
         {% endif %}
 
         <details class="policy-raw">
             <summary>{{ t.consent_detail_raw }}</summary>
-            <pre><code>{{ consent | tojson(indent=2) }}</code></pre>
+            {# B6 (21-09-2026): het bestand zoals het in de Pod staat, zonder weergavesleutels (_id, _status) #}
+            <pre><code>{{ raw_json }}</code></pre>
         </details>
     </div>
 {% endblock %}

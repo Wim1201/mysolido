@@ -1697,11 +1697,11 @@ def phase_consent_record(ctx: Ctx):
                   and ctrl.get('mysolido:contact') == 'offerte@verzekeraar-x.test',
                   '', json.dumps(ctrl))
         storage = con.get('dpv:hasStorageCondition') or {}
-        rep.check('Consentrecord: hasStorageCondition met validUntil = validThrough en 14 dagen',
+        rep.check('Consentrecord (B4): hasStorageCondition noemt alleen validUntil = validThrough van de intentie, geen hasDuration',
                   storage.get('@type') == 'dpv:StorageDuration' and storage.get('mysolido:validUntil') == rec.get('schema:validThrough')
-                  and (storage.get('dpv:hasDuration') or {}).get('mysolido:days') == 14
-                  and (storage.get('dpv:hasDuration') or {}).get('mysolido:iso8601') == 'P14D',
-                  '', json.dumps(storage))
+                  and 'dpv:hasDuration' not in storage, '', json.dumps(storage))
+        rep.check('Consentrecord (B6): geschreven bestand bevat geen weergavesleutels (_status, _id, _filename)',
+                  not [k for k in con if str(k).startswith('_')], '', json.dumps([k for k in con if str(k).startswith('_')]))
         rep.check('Consentrecord: hasRecipient leeg, onwardTransfer prohibited met verwijzing naar de Agreement, jurisdictie loc:NL',
                   con.get('dpv:hasRecipient') == [] and con.get('mysolido:onwardTransfer') == 'prohibited'
                   and con.get('mysolido:onwardTransferProhibition') == req.get('mysolido:agreement')
@@ -1732,9 +1732,30 @@ def phase_consent_record(ctx: Ctx):
                   and all(f'data-attribute="{ATTR}{k}"' in r.text for k in SCENARIO_ATTRIBUTES) and '5611' in r.text
                   and f'/verzoeken/{rid}/agreement.jsonld' in r.text and f'/intenties/{iid}' in r.text and 'data-event="given"' in r.text,
                   '', f'status {r.status_code}')
+        rep.check('Consentrecord (B4): detailpagina noemt de einddatum van het aanbod, niet "dagen vanaf acceptatie"',
+                  'einddatum van het aanbod' in r.text and 'vanaf acceptatie' not in r.text, '', f'status {r.status_code}')
+        rep.check('Consentrecord (B6): ruwe weergave toont het bestand zonder _status en _id',
+                  '_status' not in r.text.split('class="policy-raw"')[-1] and '_filename' not in r.text
+                  and 'dct:conformsTo' in r.text.split('class="policy-raw"')[-1], '', f'status {r.status_code}')
+        rep.check('Consentrecord (B5): detailpagina zonder knop Verwijderen, met uitleg over de Agreement en met Intrekken',
+                  f'/consent/{cid}/delete' not in r.text and 'id="consent-agreement-note"' in r.text and f'/consent/{cid}/withdraw' in r.text,
+                  '', f'status {r.status_code}')
+        rep.check('Consentrecord: tijden op de detailpagina in Nederlandse tijd (dd-mm-jjjj HH:MM), records in UTC',
+                  re.search(r'data-event="given">[^<]*\d{2}-\d{2}-\d{4} \d{2}:\d{2} ', r.text) is not None and 'Nederlandse tijd' in r.text
+                  and '(UTC)</span>' not in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', '/consent')
+        rep.check('Consentrecord (B5): consentlijst zonder knop Verwijderen voor een record met Agreement',
+                  r.status_code == 200 and f'/consent/{cid}/delete' not in r.text and f'/consent/{cid}/withdraw' in r.text, '', f'status {r.status_code}')
+        r = flask(ctx, 'POST', f'/consent/{cid}/delete')
+        rep.check('Consentrecord (B5): route weigert verwijderen van een record met Agreement; bestand blijft bestaan',
+                  r.status_code in REDIRECT and cfile.exists() and f'/consent/{cid}' in r.headers.get('Location', ''),
+                  '', f'status {r.status_code}, bestaat {cfile.exists()}')
         r = flask(ctx, 'GET', f'/verzoeken/{rid}')
         rep.check('Consentrecord: eigenaarsdetail van het verzoek linkt naar het consentrecord en toont de gedeelde waarden',
                   r.status_code == 200 and f'/consent/{cid}' in r.text and '5611' in r.text, '', f'status {r.status_code}')
+        rep.check('Consentrecord: acceptatietijd op het eigenaarsdetail in Nederlandse tijd, met de UTC-waarde uit het record ernaast',
+                  re.search(r'id="accepted-at-local">\d{2}-\d{2}-\d{4} \d{2}:\d{2}<', r.text) is not None
+                  and str(req.get('mysolido:acceptedAt', '')) in r.text, '', f'status {r.status_code}')
 
         # 2. Toestemming intrekken
         created_stamp = con.get('dct:created')
@@ -1754,6 +1775,8 @@ def phase_consent_record(ctx: Ctx):
         rep.check('Consentrecord: responspagina toont "Toestemming ingetrokken op" en geen gegevens meer',
                   r.status_code == 200 and 'Toestemming ingetrokken op' in r.text and '5611' not in r.text and '35-44' not in r.text,
                   '', f'status {r.status_code}')
+        rep.check('Consentrecord: tabtitel van de responspagina na intrekken is "Toestemming ingetrokken"',
+                  '<title>Toestemming ingetrokken - MySolido</title>' in r.text, '', f'status {r.status_code}')
         r = anon.get(f"{ctx.flask_base}/verzoek/status/{req.get('mysolido:statusToken')}", timeout=TIMEOUT)
         rep.check('Consentrecord: statuspagina toont "Toestemming ingetrokken op" zonder link naar gegevens',
                   r.status_code == 200 and 'Toestemming ingetrokken op' in r.text and req.get('mysolido:responseLink') not in r.text,
@@ -1768,6 +1791,9 @@ def phase_consent_record(ctx: Ctx):
         agr = json.loads(agr_file.read_text(encoding='utf-8')) if agr_file.exists() else {}
         rep.check('Consentrecord: Agreement blijft ongewijzigd bestaan na intrekken',
                   agr.get('@type') == 'Agreement' and 'mysolido:withdrawn' not in json.dumps(agr), '', 'Agreement ontbreekt of gewijzigd')
+        r = flask(ctx, 'POST', f'/consent/{cid}/delete')
+        rep.check('Consentrecord (B5): ook een ingetrokken record met Agreement is niet te verwijderen',
+                  r.status_code in REDIRECT and cfile.exists(), '', f'status {r.status_code}, bestaat {cfile.exists()}')
 
         # 3. Gericht aanbod: record na bevestiging, label = naam zonder organisatie
         targeted_file = create_intention({'category': 'autoverzekering', 'description': 'Regressietest consent gericht',
@@ -1820,7 +1846,8 @@ def phase_consent_record(ctx: Ctx):
         fixtures.append(expired)
         r = flask(ctx, 'GET', f'/consent/{legacy.stem}')
         rep.check('Consentrecord: oude statusterm dpv:ConsentStatusGiven leest terug als ConsentGiven / Actief',
-                  r.status_code == 200 and 'ConsentGiven' in r.text and 'ConsentStatusGiven' not in r.text and 'Actief' in r.text,
+                  r.status_code == 200 and 'ConsentGiven' in r.text and 'ConsentStatusGiven' not in r.text.split('class="policy-raw"')[0]
+                  and 'Actief' in r.text,   # de ruwe weergave toont het bestand zoals het is (B6), dus mét de oude term
                   '', f'status {r.status_code}')
         r = flask(ctx, 'GET', f'/consent/{expired.stem}')
         rep.check('Consentrecord: verstreken hasExpiry toont Verlopen (afgeleid, niet geschreven)',
@@ -1868,7 +1895,8 @@ def _nl_date(iso: str) -> str:
         return ''
 
 
-def _make_accepted_case(ctx: Ctx, anon: requests.Session, description: str):
+def _make_accepted_case(ctx: Ctx, anon: requests.Session, description: str,
+                        name: str = 'Jan Tester', organization: str = 'Verzekeraar X BV'):
     """Open intentie aanmaken, activeren en laten accepteren; geeft (intentie-file, verzoek-file, consent-id)."""
     idir = ctx.pod_dir / 'intenties'
     vdir = ctx.pod_dir / 'verzoeken'
@@ -1884,7 +1912,7 @@ def _make_accepted_case(ctx: Ctx, anon: requests.Session, description: str):
     flask(ctx, 'POST', f'/intenties/{intention_file.stem}/activate')
     before_v = {p.name for p in vdir.glob('*.jsonld')} if vdir.exists() else set()
     anon.post(f'{ctx.flask_base}/verzoek/intentie/{intention_file.stem}',
-              data={'name': 'Jan Tester', 'organization': 'Verzekeraar X BV', 'email': 'jan@verzekeraar-x.test', 'accept_terms': 'yes'},
+              data={'name': name, 'organization': organization, 'email': 'jan@verzekeraar-x.test', 'accept_terms': 'yes'},
               timeout=TIMEOUT, allow_redirects=False)
     new_v = [p for p in vdir.glob('*.jsonld') if p.name not in before_v and not p.name.startswith('.')
              and not p.name.endswith('.agreement.jsonld')]
@@ -1919,6 +1947,27 @@ def phase_finishing(ctx: Ctx):
     rep.check('Afronding: versieregel in de voettekst met commit-hash en "lokaal"',
               r.status_code == 200 and 'id="app-version"' in r.text and 'lokaal' in r.text and (not git_hash or git_hash in r.text),
               git_hash, f'status {r.status_code}')
+    # Ronde 2 (21-09-2026): B1-opmaak, formulierstijl, B2/B8-knoppen, B7-tekst, foutpagina
+    css = (ROOT / 'static' / 'css' / 'style.css').read_text(encoding='utf-8')
+    rep.check('Afronding (B1): alleen de bel-badge is absoluut gepositioneerd, .badge zelf position: static',
+              '.bell-link .badge {' in css and re.search(r'\n\.badge \{[^}]*position: static', css) is not None
+              and re.search(r'\n\.badge \{[^}]*position: absolute', css) is None, '', 'badge-regels in style.css afwijkend')
+    rep.check('Afronding: gedeelde .form-input-stijl in style.css (acceptatieformulier)', re.search(r'\n\.form-input \{', css) is not None,
+              '', '.form-input ontbreekt')
+    r = flask(ctx, 'GET', '/profile')
+    rep.check('Afronding (B2/B8): profiel lokaal met knoppen Toestemmingen én Inkomende verzoeken, en het pod-adres',
+              r.status_code == 200 and 'id="btn-consent"' in r.text and 'id="btn-requests"' in r.text and f'Pod: {ctx.pod_url}' in r.text,
+              '', f'status {r.status_code}')
+    if 'id="sync-status"' in r.text:
+        rep.check('Afronding (B7): auto-sync-tekst volgt BRIDGE_AUTO_SYNC en belooft geen sync "na elke wijziging"',
+                  'id="sync-auto"' in r.text and 'na elke wijziging' not in r.text
+                  and (('Aan —' in r.text) == (ctx.env.get('BRIDGE_AUTO_SYNC', 'false').lower() == 'true')),
+                  '', 'tekst of vlag afwijkend')
+    else:
+        rep.info('Afronding (B7): Bridge-sync niet geconfigureerd op deze pc; tekstcontrole overgeslagen')
+    r = flask(ctx, 'GET', f'/bestaat-niet-{ctx.run_id}')
+    rep.check('Afronding (B8): 404 lokaal in het Nederlands, in de gewone opmaak',
+              r.status_code == 404 and 'Pagina niet gevonden' in r.text and 'id="app-version"' in r.text, '', f'status {r.status_code}')
     profile = read_profile(ctx)
     if not all(expected_scenario_values(profile).values()):
         rep.skip('Afronding: profiel mist scenariowaarden, rest overgeslagen')
@@ -2154,6 +2203,26 @@ def phase_bridge_local(ctx: Ctx):
                   r.status_code in REDIRECT and {p.name for p in vdir.glob('*.jsonld')} == before, '', f'status {r.status_code}')
         r = s.get(f'{bridge_base}/verzoeken', timeout=TIMEOUT)
         rep.check('Bridge lokaal: /verzoeken geeft 403', r.status_code == 403, '', f'status {r.status_code}')
+        rep.check('Bridge lokaal (B8): de 403 is Nederlands en in de gewone opmaak',
+                  r.status_code == 403 and 'Geen toegang' in r.text and 'class="header-nav"' in r.text and 'Forbidden' not in r.text,
+                  '', f'status {r.status_code}')
+        r = s.get(f'{bridge_base}/bestaat-niet-{ctx.run_id}', timeout=TIMEOUT)
+        rep.check('Bridge lokaal (B8): 404 met sessie Nederlands en in de gewone opmaak',
+                  r.status_code == 404 and 'Pagina niet gevonden' in r.text and 'id="app-version"' in r.text, '', f'status {r.status_code}')
+        r = s.get(f'{bridge_base}/profile', timeout=TIMEOUT)
+        rep.check('Bridge lokaal (B2/B8): profiel met knop Toestemmingen, zonder Inkomende verzoeken en zonder intern pod-adres',
+                  r.status_code == 200 and 'id="btn-consent"' in r.text and 'id="btn-requests"' not in r.text and f'Pod: {ctx.pod_url}' not in r.text,
+                  '', f'status {r.status_code}')
+        r = s.get(bridge_base + '/', timeout=TIMEOUT)
+        rep.check('Bridge lokaal: dashboard zonder intern pod-adres', r.status_code == 200 and f'Pod: {ctx.pod_url}' not in r.text, '', f'status {r.status_code}')
+        r = s.get(f'{bridge_base}/intenties/{iid}', timeout=TIMEOUT)
+        rep.check('Bridge lokaal (B9): aanbodlink-hint zegt dat accepteren via de lokale kluis loopt',
+                  r.status_code == 200 and 'id="offer-link-hint"' in r.text and 'niet via de Bridge' in r.text and 'en accepteert ze' not in r.text,
+                  '', f'status {r.status_code}')
+        r = requests.get(f'{bridge_base}/verzoek/intentie/{iid}', timeout=TIMEOUT)
+        rep.check('Bridge lokaal (B9): kopzin van de voorwaardenpagina noemt de lokale kluis, niet "op dit moment niet mogelijk"',
+                  r.status_code == 200 and 'accepteren gebeurt via de lokale kluis van de eigenaar' in r.text
+                  and 'op dit moment niet mogelijk' not in r.text, '', f'status {r.status_code}')
         r1 = s.get(f'{bridge_base}/intenties/{iid}/policy.jsonld', timeout=TIMEOUT)
         r2 = s.get(f'{bridge_base}/verzoeken/{rid}/agreement.jsonld', timeout=TIMEOUT)
         rep.check('Bridge lokaal: policy.jsonld en agreement.jsonld als application/ld+json',
@@ -2207,6 +2276,9 @@ def phase_bridge_local(ctx: Ctx):
         r = s.get(f'{bridge_base}/intenties/{iid}/policy.jsonld', timeout=TIMEOUT, allow_redirects=False)
         rep.check('Bridge lokaal: Offer-JSON na intrekken met eigenaarssessie als application/ld+json',
                   r.status_code == 200 and 'ld+json' in r.headers.get('Content-Type', ''), '', f'status {r.status_code}')
+        r = flask(ctx, 'GET', f'/intenties/{iid}')
+        rep.check('Afronding: geen kaart Acties op een ingetrokken intentie met Agreement (lokaal)',
+                  r.status_code == 200 and 'id="intention-actions"' not in r.text and 'id="accepted-by"' in r.text, '', f'status {r.status_code}')
     finally:
         if proc is not None:
             proc.kill()
@@ -2222,6 +2294,368 @@ def phase_bridge_local(ctx: Ctx):
         _cleanup_case(ctx, intention_file, request_file, cid)
         _cleanup_case(ctx, concept_file, None, '')
 
+# --- Visuele regressietest (ronde 2b, 21-09-2026) --------------------------------------------
+# Playwright (Python) is alleen een ontwikkelafhankelijkheid (requirements-dev.txt). Ontbreekt hij,
+# dan slaat de fase zichzelf over met één regel en telt niet als gefaald.
+# Desktop = Chromium 1366x768; iPhone = WebKit (Playwright-build op Windows, niet Safari op iOS) met
+# het apparaatprofiel iPhone 13 (390x844, touch, mobiele user-agent). De echte iPhone blijft handmatig.
+
+SCREENSHOT_DIR = ROOT / 'regressietest-schermen'   # staat in .gitignore
+VISUAL_VIEWPORTS = ('desktop', 'iphone')
+
+
+def _start_bridge_process(ctx: Ctx, port: int):
+    """Tweede Flask-proces met --bridge op `port` tegen dezelfde Pod; geeft (proc, wachtwoord, logpad, bereikbaar)."""
+    import bcrypt
+    password = 'bridge-' + secrets.token_hex(6)
+    env = dict(os.environ)
+    env.update({'MYSOLIDO_PORT': str(port), 'BRIDGE_PASSWORD': bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+                'PYTHONIOENCODING': 'utf-8', 'FLASK_DEBUG': 'false'})
+    log_path = Path(os.environ.get('TEMP', str(ROOT))) / f'mysolido-bridge-visueel-{ctx.run_id}.log'
+    log = open(log_path, 'w', encoding='utf-8')
+    proc = subprocess.Popen([sys.executable, 'app.py', '--bridge'], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+    up = False
+    for _ in range(30):
+        time.sleep(1)
+        try:
+            requests.get(f'http://127.0.0.1:{port}/', timeout=2, allow_redirects=False)
+            up = True
+            break
+        except requests.RequestException:
+            if proc.poll() is not None:
+                break
+    return proc, password, log_path, up
+
+
+def _stop_process(proc):
+    if proc is None:
+        return
+    proc.kill()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+# Meting per pagina, in de browser. Geeft schuifbreedte, elementen met een bovenrand boven de pagina,
+# en per badge of hij binnen de omtrek van zijn container ligt (container = closest(containerSelector)).
+VISUAL_MEASURE_JS = """
+(args) => {
+  const [badgeSel, contSel] = args;
+  const vis = el => { const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return false;
+    const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const box = el => { const r = el.getBoundingClientRect();
+    return {top: r.top + scrollY, left: r.left + scrollX, right: r.right + scrollX, bottom: r.bottom + scrollY}; };
+  const de = document.documentElement;
+  const out = {scrollWidth: de.scrollWidth, clientWidth: de.clientWidth, elements: 0, negativeTop: [], badges: [], duplicates: 0};
+  const all = [...document.querySelectorAll('body *')].filter(vis);
+  out.elements = all.length;
+  for (const el of all) { const b = box(el);
+    if (b.top < -0.5) out.negativeTop.push((el.tagName + '.' + (el.className || '')).slice(0, 60) + '@' + Math.round(b.top)); }
+  const seen = new Set();
+  for (const el of document.querySelectorAll(badgeSel)) {
+    if (!vis(el)) continue;
+    const c = el.closest(contSel); const b = box(el); const cb = c ? box(c) : null;
+    const inside = !!cb && b.left >= cb.left - 1 && b.right <= cb.right + 1 && b.top >= cb.top - 1 && b.bottom <= cb.bottom + 1;
+    const key = Math.round(b.left) + ',' + Math.round(b.top);
+    if (seen.has(key)) out.duplicates++;
+    seen.add(key);
+    out.badges.push({text: el.textContent.trim().slice(0, 40), inside: inside, container: !!c,
+                     top: Math.round(b.top), right: Math.round(b.right), containerRight: cb ? Math.round(cb.right) : null});
+  }
+  return out;
+}
+"""
+
+VISUAL_BELL_JS = """
+() => {
+  const badge = document.querySelector('.bell-link .badge'); const svg = document.querySelector('.bell-link svg');
+  if (!badge || !svg) return {found: false};
+  const a = badge.getBoundingClientRect(), b = svg.getBoundingClientRect();
+  const overlap = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  return {found: true, overlap: overlap, text: badge.textContent.trim(), top: Math.round(a.top + scrollY)};
+}
+"""
+
+
+def _visual_pages(d):
+    """Pagina's met per pagina de badge-selector, de container die de omtrek bepaalt, het minimum
+    aantal badges (0 = alleen de algemene regels) en de modus. Lijst staat ook in het verslag van ronde 2b."""
+    return [
+        # label, pad, badge-selector, container, minimum, modus
+        ('intentielijst', '/intenties', 'main .badge', '.consent-item', 2, 'beide'),
+        ('intentiedetail actief', f"/intenties/{d['iid_a']}", 'main .badge', '.card', 1, 'beide'),
+        ('intentiedetail met ingetrokken toestemming', f"/intenties/{d['iid_b']}", 'main .badge', '.card', 2, 'beide'),
+        ('verzoekenlijst', '/verzoeken', 'main .badge', '.consent-item', 2, 'lokaal'),
+        ('verzoekdetail lange naam', f"/verzoeken/{d['rid_a']}", 'main .badge', '.card', 3, 'lokaal'),
+        ('verzoekdetail ingetrokken', f"/verzoeken/{d['rid_b']}", 'main .badge', '.card', 3, 'lokaal'),
+        ('responspagina geaccepteerd', f"/verzoek/response/{d['tok_a']}", 'main .badge', '.card', 1, 'beide'),
+        ('responspagina ingetrokken', f"/verzoek/response/{d['tok_b']}", 'main .badge', '.card', 0, 'beide'),
+        ('statuspagina geaccepteerd', f"/verzoek/status/{d['tok_a']}", 'main .badge', '.card', 1, 'beide'),
+        ('statuspagina ingetrokken', f"/verzoek/status/{d['tok_b']}", 'main .badge', '.card', 1, 'beide'),
+        ('consentlijst', '/consent', 'main .consent-status-badge', '.consent-item', 3, 'lokaal'),
+        ('consentlijst', '/consent', 'main .consent-status-badge', '.consent-item', 2, 'bridge'),
+        ('consentdetail lange titel', f"/consent/{d['cid_a']}", 'main .consent-status-badge', '.consent-detail-card', 1, 'beide'),
+        ('consentdetail ingetrokken', f"/consent/{d['cid_b']}", 'main .consent-status-badge', '.consent-detail-card', 1, 'beide'),
+        ('consentdetail handmatig', f"/consent/{d['cid_manual']}", 'main .consent-status-badge', '.consent-detail-card', 1, 'lokaal'),
+        ('profiel', '/profile', 'main .badge-nieuw', 'a.btn', 1, 'lokaal'),
+        ('profiel', '/profile', 'main .badge', 'a.btn', 0, 'bridge'),
+        ('dashboard', '/', 'main .badge', '.card', 0, 'beide'),
+        ('acceptatieformulier', f"/verzoek/intentie/{d['iid_a']}", 'main .badge', '.card', 0, 'beide'),
+        ('verzoekformulier', '/verzoek', 'main .badge', '.card', 0, 'beide'),
+    ]
+
+
+def _slug(text):
+    return re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-')
+
+
+def phase_visual(ctx: Ctx):
+    """Visuele regressietest (ronde 2b): badges binnen hun kaart, geen schuifbalk, niets boven de bovenrand,
+    bel-teller op de bel, teller in de knop, lange titel op 390 px, zelfverversende syncstatus, knoppen op
+    het profiel (lokaal en Bridge), 403 op de Bridge, Verwijderen alleen zonder Agreement, bevestigingspagina."""
+    rep = ctx.report
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        rep.skip('Visueel: Playwright niet geïnstalleerd; pip install -r requirements-dev.txt en python -m playwright install chromium webkit')
+        return
+    try:
+        from importlib.metadata import version as _pkg_version
+        pw_version = _pkg_version('playwright')
+    except Exception:  # noqa: BLE001
+        pw_version = 'onbekend'
+    bridge_port = BRIDGE_TEST_PORT
+    bridge_base = f'http://127.0.0.1:{bridge_port}'
+    try:
+        requests.get(bridge_base + '/', timeout=2)
+        rep.skip(f'Visueel: poort {bridge_port} is al bezet, fase overgeslagen')
+        return
+    except requests.RequestException:
+        pass
+    profile = read_profile(ctx)
+    if not all(expected_scenario_values(profile).values()):
+        rep.skip('Visueel: profiel mist scenariowaarden, fase overgeslagen')
+        return
+
+    SCREENSHOT_DIR.mkdir(exist_ok=True)
+    anon = requests.Session()
+    vdir, cdir = ctx.pod_dir / 'verzoeken', ctx.pod_dir / 'toestemmingen'
+    case_a = case_b = (None, None, '')
+    cid_manual = ''
+    generic_file = None
+    extra_files = []
+    notif_path = ROOT / 'notifications.json'
+    notif_backup = notif_path.read_bytes() if notif_path.exists() else None
+    proc = None
+    try:
+        # --- testdata: A (lange naam, actief), B (toestemming ingetrokken), handmatige toestemming, generiek verzoek, melding ---
+        case_a = _make_accepted_case(ctx, anon, 'Regressietest visueel lange naam',
+                                     name='Johanna Elisabeth van der Meer-Wittebrood',
+                                     organization='Coöperatieve Onderlinge Verzekeringsmaatschappij voor Autobezitters in Zuidoost-Brabant U.A.')
+        case_b = _make_accepted_case(ctx, anon, 'Regressietest visueel ingetrokken')
+        if not rep.check('Visueel: twee testketens aangemaakt (lange naam; in te trekken)',
+                         all(case_a) and all(case_b), '', 'keten onvolledig'):
+            return
+        flask(ctx, 'POST', f'/consent/{case_b[2]}/withdraw')
+        before_c = {p.name for p in cdir.glob('*.jsonld')}
+        flask(ctx, 'POST', '/consent/new', data={'title': f'Regressietest visueel handmatig {ctx.run_id}', 'description': 'Synthetische testdata',
+                                                 'receiver': 'Testorganisatie BV', 'purpose': 'other', 'category': 'other', 'expires': '', 'note': ''})
+        new_c = [p for p in cdir.glob('*.jsonld') if p.name not in before_c]
+        cid_manual = new_c[0].stem if len(new_c) == 1 else ''
+        before_v = {p.name for p in vdir.glob('*.jsonld')}
+        anon.post(f'{ctx.flask_base}/verzoek', data={'name': 'Regressietest Visueel', 'organization': 'Testorganisatie BV', 'email': 'visueel@test.test',
+                                                      'category': 'verzekeringen', 'purpose': 'Visuele regressietest', 'requested_data': ['vehicle'],
+                                                      'agreed_terms': 'yes'}, timeout=TIMEOUT, allow_redirects=False)
+        new_v = [p for p in vdir.glob('*.jsonld') if p.name not in before_v and not p.name.endswith('.agreement.jsonld')]
+        generic_file = new_v[0] if len(new_v) == 1 else None
+        items = json.loads(notif_backup.decode('utf-8')) if notif_backup else []
+        items.insert(0, {'id': f'regressietest{ctx.run_id}', 'type': 'regressietest', 'message': 'Visuele regressietest', 'details': {},
+                         'read': False, 'created_at': datetime.now().isoformat()})
+        notif_path.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding='utf-8')
+        rep.check('Visueel: handmatige toestemming, generiek verzoek (teller) en ongelezen melding (bel) aangemaakt',
+                  bool(cid_manual) and generic_file is not None, '', f'consent {cid_manual!r}, verzoek {generic_file}')
+        req_a = json.loads(case_a[1].read_text(encoding='utf-8'))
+        req_b = json.loads(case_b[1].read_text(encoding='utf-8'))
+        d = {'iid_a': case_a[0].stem, 'iid_b': case_b[0].stem, 'rid_a': case_a[1].stem, 'rid_b': case_b[1].stem,
+             'tok_a': req_a.get('mysolido:statusToken', ''), 'tok_b': req_b.get('mysolido:statusToken', ''),
+             'cid_a': case_a[2], 'cid_b': case_b[2], 'cid_manual': cid_manual}
+        pages = _visual_pages(d)
+
+        proc, password, log_path, up = _start_bridge_process(ctx, bridge_port)
+        if not rep.check(f'Visueel: Bridge-proces op poort {bridge_port} gestart', up, '', f'niet bereikbaar; log {log_path}'):
+            return
+
+        with sync_playwright() as p:
+            browsers = {}
+            for vp in VISUAL_VIEWPORTS:
+                try:
+                    if vp == 'desktop':
+                        browsers[vp] = (p.chromium.launch(headless=True), {'viewport': {'width': 1366, 'height': 768}})
+                    else:
+                        dev = dict(p.devices['iPhone 13'])
+                        dev.pop('default_browser_type', None)
+                        dev['device_scale_factor'] = 1
+                        browsers[vp] = (p.webkit.launch(headless=True), dev)
+                except Exception as exc:  # noqa: BLE001
+                    rep.skip(f'Visueel: browser voor {vp} niet beschikbaar (python -m playwright install chromium webkit)', str(exc).splitlines()[0][:200])
+            if not browsers:
+                return
+            rep.info('Visueel: Playwright ' + pw_version + ', ' + ', '.join(f'{vp} = {b.browser_type.name} {b.version}' for vp, (b, _) in browsers.items()),
+                     'desktop 1366x768; iphone = apparaatprofiel iPhone 13 (390x844) in WebKit op Windows, niet Safari op iOS')
+
+            for vp, (browser, ctx_opts) in browsers.items():
+                for mode, base in (('lokaal', ctx.flask_base), ('bridge', bridge_base)):
+                    context = browser.new_context(**ctx_opts)
+                    page = context.new_page()
+                    if mode == 'bridge':
+                        page.goto(bridge_base + '/bridge-login')
+                        page.fill('input[name="password"]', password)
+                        page.click('button[type="submit"]')
+                        page.wait_for_load_state('load')
+                        rep.check(f'Visueel {mode} {vp}: ingelogd op de Bridge', '/bridge-login' not in page.url, '', page.url)
+                    for label, path, badge_sel, cont_sel, minimum, page_mode in pages:
+                        if page_mode not in ('beide', mode):
+                            continue
+                        resp = page.goto(base + path)
+                        page.wait_for_load_state('load')
+                        res = page.evaluate(VISUAL_MEASURE_JS, [badge_sel, cont_sel])
+                        page.screenshot(path=str(SCREENSHOT_DIR / f'{mode}_{vp}_{_slug(label)}.png'), full_page=True)
+                        badges = res['badges']
+                        problems = []
+                        if resp is None or resp.status != 200:
+                            problems.append(f'status {resp.status if resp else None}')
+                        if res['scrollWidth'] > res['clientWidth']:
+                            problems.append(f"schuifbalk: scrollWidth {res['scrollWidth']} > clientWidth {res['clientWidth']}")
+                        if res['negativeTop']:
+                            problems.append('boven de bovenrand: ' + ', '.join(res['negativeTop'][:5]))
+                        if len(badges) < minimum:
+                            problems.append(f'{len(badges)} badges gevonden, minimaal {minimum} verwacht')
+                        outside = [b for b in badges if not b['inside']]
+                        if outside:
+                            problems.append('buiten de container: ' + '; '.join(f"{b['text']} (rechts {b['right']} > {b['containerRight']})" for b in outside))
+                        if res['duplicates']:
+                            problems.append(f"{res['duplicates']} badges op precies dezelfde plek (gestapeld)")
+                        rep.check(f'Visueel {mode} {vp}: {label}: {len(badges)} badges binnen {cont_sel} (min {minimum}), '
+                                  f"{res['elements']} elementen, breedte {res['scrollWidth']}/{res['clientWidth']}",
+                                  not problems, '', '; '.join(problems))
+                        if label in ('consentdetail lange titel', 'verzoekdetail lange naam') and vp == 'iphone':
+                            rep.check(f'Visueel {mode} {vp}: lange titel + badge ({label}): badge binnen de kaart, geen schuifbalk',
+                                      badges and not outside and res['scrollWidth'] <= res['clientWidth'], '', '; '.join(problems))
+                        if label == 'dashboard' and mode == 'lokaal':
+                            bell = page.evaluate(VISUAL_BELL_JS)
+                            rep.check(f'Visueel {mode} {vp}: tellertje op de bel gevonden en overlapt het belicoon',
+                                      bell.get('found') and bell.get('overlap'), f"teller {bell.get('text')}", json.dumps(bell))
+                        if label == 'profiel':
+                            consent_btn = page.locator('#btn-consent')
+                            requests_btn = page.locator('#btn-requests')
+                            main_text = page.locator('main').inner_text()
+                            if mode == 'lokaal':
+                                rep.check(f'Visueel {mode} {vp}: profiel met zichtbare knoppen Toestemmingen en Inkomende verzoeken, teller in de knop',
+                                          consent_btn.count() == 1 and consent_btn.is_visible() and requests_btn.count() == 1 and requests_btn.is_visible()
+                                          and len(badges) >= 1 and not outside, '', f'consent {consent_btn.count()}, requests {requests_btn.count()}, badges {len(badges)}')
+                            else:
+                                rep.check(f'Visueel {mode} {vp}: Bridge-profiel met knop Toestemmingen, zonder Inkomende verzoeken, zonder pod-adres',
+                                          consent_btn.count() == 1 and consent_btn.is_visible() and requests_btn.count() == 0 and 'Pod: ' not in main_text,
+                                          '', f'consent {consent_btn.count()}, requests {requests_btn.count()}')
+                        if label in ('consentdetail lange titel', 'consentdetail ingetrokken') and mode == 'lokaal':
+                            n_delete = page.locator('form[action$="/delete"]').count()
+                            rep.check(f'Visueel {mode} {vp}: {label}: geen knop Verwijderen, wel de uitleg over de Agreement',
+                                      n_delete == 0 and page.locator('#consent-agreement-note').is_visible(),
+                                      '', f'delete-formulieren {n_delete}')
+                        if label == 'consentdetail handmatig':
+                            n_delete = page.locator('form[action$="/delete"]').count()
+                            rep.check(f'Visueel {mode} {vp}: tegenproef: handmatige toestemming zonder Agreement heeft de knop Verwijderen',
+                                      n_delete == 1 and page.locator('form[action$="/delete"] button').is_visible()
+                                      and page.locator('#consent-agreement-note').count() == 0, '', f'delete-formulieren {n_delete}')
+                    if mode == 'bridge':
+                        resp = page.goto(bridge_base + '/verzoeken')
+                        page.screenshot(path=str(SCREENSHOT_DIR / f'{mode}_{vp}_verzoeken-403.png'), full_page=True)
+                        rep.check(f'Visueel {mode} {vp}: /verzoeken geeft 403 "Geen toegang" in de gewone opmaak',
+                                  resp is not None and resp.status == 403 and 'Geen toegang' in page.locator('main').inner_text()
+                                  and page.locator('nav.header-nav').count() == 1, '', f'status {resp.status if resp else None}')
+                    if mode == 'lokaal' and vp == 'desktop':
+                        # bevestigingspagina na acceptatie (maakt een derde verzoek; opgeruimd in finally)
+                        before_v2 = {p.name for p in vdir.glob('*')}
+                        before_c2 = {p.name for p in cdir.glob('*.jsonld')}
+                        page.goto(f"{base}/verzoek/intentie/{d['iid_a']}")
+                        page.fill('#name', 'Visuele Tester')
+                        page.fill('#organization', 'Testorganisatie BV')
+                        page.fill('#email', 'visueel@test.test')
+                        page.check('input[name="accept_terms"]')
+                        page.click('button[type="submit"]')
+                        page.wait_for_load_state('load')
+                        extra_files.extend(p for p in vdir.glob('*') if p.name not in before_v2)
+                        extra_files.extend(p for p in cdir.glob('*.jsonld') if p.name not in before_c2)
+                        res = page.evaluate(VISUAL_MEASURE_JS, ['main .badge', '.card'])
+                        page.screenshot(path=str(SCREENSHOT_DIR / f'{mode}_{vp}_bevestiging.png'), full_page=True)
+                        content = page.content()
+                        rep.check(f'Visueel {mode} {vp}: bevestigingspagina met tabtitel "Voorwaarden geaccepteerd", zonder navigatie, zonder schuifbalk',
+                                  page.title() == 'Voorwaarden geaccepteerd - MySolido' and not any(m in content for m in NAV_MARKERS)
+                                  and res['scrollWidth'] <= res['clientWidth'], '', f'titel {page.title()!r}')
+                        # zelfverversende syncstatus: statusadres via routing, geen echte sync
+                        calls = {'n': 0}
+
+                        def handle_profile(route):
+                            r = route.fetch()
+                            route.fulfill(response=r, body=r.text().replace('data-running="false"', 'data-running="true"'))
+
+                        def handle_status(route):
+                            calls['n'] += 1
+                            if calls['n'] < 2:
+                                body = {'running': True, 'last_sync': None, 'last_result': None, 'error': None}
+                            else:
+                                body = {'running': False, 'last_sync': '2026-09-21T12:34:56.000000', 'last_result': 'success', 'error': None}
+                            route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+                        page.route('**/profile', handle_profile)
+                        page.route('**/bridge-sync/status', handle_status)
+                        page.goto(base + '/profile')
+                        if page.locator('#sync-status').count() == 1:
+                            try:
+                                page.wait_for_function("document.querySelector('#sync-status').textContent.includes('Gesynchroniseerd')", timeout=15000)
+                                refreshed = True
+                            except Exception:  # noqa: BLE001
+                                refreshed = False
+                            last = page.locator('#sync-last-sync').inner_text().strip()
+                            page.screenshot(path=str(SCREENSHOT_DIR / f'{mode}_{vp}_profiel-sync-ververst.png'), full_page=True)
+                            rep.check('Visueel lokaal desktop: syncstatus ververst zichzelf van "Bezig…" naar "Gesynchroniseerd" met tijdstip, zonder herladen',
+                                      refreshed and last == '21-09-2026 12:34' and calls['n'] >= 2, f"{calls['n']} statusaanroepen, laatste sync {last}",
+                                      f"ververst {refreshed}, laatste sync {last!r}, {calls['n']} aanroepen")
+                        else:
+                            rep.info('Visueel: Bridge-sync niet geconfigureerd op deze pc; zelfverversende status niet gemeten')
+                        page.unroute('**/profile')
+                        page.unroute('**/bridge-sync/status')
+                    context.close()
+            for browser, _ in browsers.values():
+                browser.close()
+        rep.info(f'Visueel: schermafbeeldingen in {SCREENSHOT_DIR} ({len(list(SCREENSHOT_DIR.glob("*.png")))} bestanden)')
+    finally:
+        _stop_process(proc)
+        if proc is not None:
+            try:
+                requests.get(bridge_base + '/', timeout=2)
+                rep.fail('Visueel: Bridge-proces gestopt', f'poort {bridge_port} antwoordt nog')
+            except requests.RequestException:
+                rep.ok('Visueel: Bridge-proces gestopt')
+        if notif_backup is None:
+            if notif_path.exists():
+                notif_path.unlink()
+        else:
+            notif_path.write_bytes(notif_backup)
+        for f in extra_files:
+            if f.exists():
+                f.unlink()
+        if generic_file and generic_file.exists():
+            generic_file.unlink()
+        if cid_manual:
+            p = cdir / f'{cid_manual}.jsonld'
+            if p.exists():
+                p.unlink()
+        _cleanup_case(ctx, *case_a)
+        _cleanup_case(ctx, *case_b)
+
 
 # --- main --------------------------------------------------------------------------------
 
@@ -2230,8 +2664,8 @@ def main():
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description='MySolido regression test against a running CSS + Flask stack.')
     parser.add_argument('--scenario', choices=['U', 'N'], default='U', help='U = upgrade path (default), N = new installation')
-    parser.add_argument('--phase', choices=['all', 'bridge', 'persist', 'demo'], default='all',
-                        help='demo = alleen seed, profielvelden en intentie (MyTerms-demo)')
+    parser.add_argument('--phase', choices=['all', 'bridge', 'persist', 'demo', 'visueel'], default='all',
+                        help='demo = alleen seed, profielvelden en intentie (MyTerms-demo); visueel = Playwright-metingen (ronde 2b)')
     parser.add_argument('--out', help='write results as JSON to this file')
     parser.add_argument('--keep', action='store_true', help='do not remove test data afterwards')
     parser.add_argument('--keep-persist', action='store_true',
@@ -2252,6 +2686,8 @@ def main():
         run_phase(ctx, 'Bridge read-only modus', phase_bridge_mode, args.bridge_password)
     elif args.phase == 'persist':
         run_phase(ctx, 'Persistentie van ACL en policy na herstart', phase_persist_check, args.keep_persist)
+    elif args.phase == 'visueel':
+        run_phase(ctx, 'Visueel (Playwright: Chromium 1366x768, WebKit iPhone 390x844)', phase_visual)
     elif args.phase == 'demo':
         run_phase(ctx, 'Demodata (seed_demo.py)', phase_seed)
         run_phase(ctx, 'Profielvelden MyTerms-demo', phase_profile_fields)

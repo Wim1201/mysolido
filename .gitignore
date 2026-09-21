@@ -64,6 +64,9 @@ temp/
 # Crash reports
 crash-reports/
 
+# Schermafbeeldingen van de visuele regressietest (--phase visueel)
+regressietest-schermen/
+
 # AI vector database
 .chroma/
 

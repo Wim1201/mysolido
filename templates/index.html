@@ -207,7 +207,7 @@
     {% endif %}
     {% endif %}
 
-    <p class="pod-url">Pod: {{ pod_url }}</p>
+    {% if not bridge_mode %}<p class="pod-url">Pod: {{ pod_url }}</p>{% endif %}
 
     {% else %}
     {# === FOLDER BROWSER VIEW === #}
@@ -388,6 +388,6 @@
             </div>
         {% endif %}
     </div>
-    <p class="pod-url">Pod: {{ pod_url }}</p>
+    {% if not bridge_mode %}<p class="pod-url">Pod: {{ pod_url }}</p>{% endif %}
     {% endif %}
 {% endblock %}

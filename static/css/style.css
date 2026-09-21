@@ -144,7 +144,9 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
     align-items: center;
 }
 .bell-link svg { width: 20px; height: 20px; }
-.badge {
+/* Tellertje op de meldingenbel: de enige badge met absolute positionering (B1, 21-09-2026).
+   Statusbadges delen de klasse .badge en horen inline in hun kaart te staan; zie het generieke .badge-blok. */
+.bell-link .badge {
     position: absolute;
     top: -4px;
     right: -6px;
@@ -1108,6 +1110,24 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
     flex-wrap: wrap;
 }
 
+/* Gedeelde formulierstijl (cosmetisch, 21-09-2026): ook de openbare formulieren
+   /verzoek en /verzoek/intentie/<id>, die eerder de browserstijl kregen. */
+.form-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.form-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
 .bridge-password-form .form-input {
     flex: 1;
     min-width: 200px;
@@ -1640,8 +1660,12 @@ html:not([data-theme="dark"]) .icon-moon { display: inline-flex; }
 }
 
 /* --- Intention Badges --- */
+/* Statusbadges staan in de kaart van het item (B1): nooit absoluut positioneren, anders landen ze
+   rechtsboven in de pagina en veroorzaken ze een horizontale schuifbalk. */
 .badge {
     display: inline-block;
+    position: static;
+    vertical-align: middle;
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.75rem;

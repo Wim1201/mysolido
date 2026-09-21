@@ -27,6 +27,7 @@ from share_links import (
 )
 from translations import get_translations, t as translate
 from sync_bridge import (
+    BRIDGE_AUTO_SYNC as bridge_auto_sync_enabled,
     is_configured as bridge_sync_configured,
     get_status as get_bridge_sync_status,
     sync_in_background,
@@ -874,6 +875,7 @@ def inject_globals():
         'bridge_mode': BRIDGE_MODE,
         'bridge_sync_configured': bridge_sync_configured(),
         'bridge_sync_status': get_bridge_sync_status(),
+        'bridge_auto_sync': bridge_auto_sync_enabled,   # B7: eerlijke weergave van de .env-instelling
         't': get_translations(lang),
         'current_lang': lang,
         'app_version': APP_VERSION,   # voettekst (subtaak 5)
@@ -2630,6 +2632,43 @@ def nl_date_filter(value):
     return format_date_nl_iso(value)
 
 
+def _amsterdam_offset(dt_utc):
+    """Terugval zonder tijdzonedatabase: CET (+1) of CEST (+2) volgens de EU-regel
+    (zomertijd van de laatste zondag van maart 01:00 UTC tot de laatste zondag van oktober 01:00 UTC)."""
+    def last_sunday(year, month):
+        d = datetime(year, month, 31 if month in (3, 10) else 30, 1, 0, tzinfo=timezone.utc)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+    summer = last_sunday(dt_utc.year, 3) <= dt_utc < last_sunday(dt_utc.year, 10)
+    return timedelta(hours=2 if summer else 1)
+
+
+def format_datetime_nl(value):
+    """ISO-tijdstip -> 'dd-mm-jjjj HH:MM' in Nederlandse tijd (Europe/Amsterdam).
+
+    Records in de Pod blijven in UTC (+00:00); alleen de weergave rekent om. Een tijdstip zonder
+    tijdzone (zoals last_sync van de Bridge-sync, dat al lokale tijd is) wordt niet verschoven.
+    Onbekende invoer komt ongewijzigd terug.
+    """
+    try:
+        dt = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except (TypeError, ValueError):
+        return value or ''
+    if dt.tzinfo is not None:
+        try:
+            from zoneinfo import ZoneInfo
+            dt = dt.astimezone(ZoneInfo('Europe/Amsterdam'))
+        except Exception:   # geen tijdzonedatabase op dit systeem
+            dt_utc = dt.astimezone(timezone.utc)
+            dt = dt_utc + _amsterdam_offset(dt_utc)
+    return dt.strftime('%d-%m-%Y %H:%M')
+
+
+@app.template_filter('nl_datetime')
+def nl_datetime_filter(value):
+    """Jinja-filter: ISO-tijdstip -> dd-mm-jjjj HH:MM in Nederlandse tijd (21-09-2026)."""
+    return format_datetime_nl(value)
+
+
 def _join_nl(items):
     items = [i for i in items if i]
     if len(items) <= 1:
@@ -2832,18 +2871,6 @@ CONSENT_RECORD_SCHEMA = "ISO/IEC TS 27560:2023"
 CONSENT_RECORD_SCHEMA_VERSION = "1.0"
 
 
-def _days_between(start_iso, end_iso):
-    """Duur in hele dagen, naar boven afgerond: acceptatie om 10:00:05 tot validThrough om 10:00:00
-    veertien dagen later is 14 dagen, niet 13 (subtaak 5)."""
-    try:
-        import math
-        start = datetime.fromisoformat(str(start_iso))
-        end = datetime.fromisoformat(str(end_iso))
-        return max(0, math.ceil((end - start).total_seconds() / 86400))
-    except (TypeError, ValueError):
-        return None
-
-
 def build_consent_record(request_record, intention_record, agreement):
     """Consentrecord in de structuur van ISO/IEC TS 27560 met DPV-vocabulaire (subtaak 4b).
 
@@ -2857,8 +2884,12 @@ def build_consent_record(request_record, intention_record, agreement):
     party = request_record.get('mysolido:party') or {}
     purpose = intention_record.get('mysolido:purpose') or {}
     accepted_at = request_record.get('mysolido:acceptedAt', now)
+    # B4 (besluit 21-09-2026, optie A): de einddatum van het aanbod (schema:validThrough) is leidend.
+    # De Agreement is een letterlijke kopie van de Offer en heeft geen eigen einddatum; het record
+    # noemt alleen mysolido:validUntil. Het eerdere dpv:hasDuration (mysolido:days / iso8601, de
+    # afgeronde duur vanaf acceptatie) is weggelaten: het suggereerde een tweede, afwijkende looptijd
+    # ("14 dagen vanaf acceptatie"). Records van vóór 21-09 kunnen het nog bevatten; lezers negeren het.
     valid_until = intention_record.get('schema:validThrough', '')
-    days = _days_between(accepted_at, valid_until)
     prohibited = bool(intention_record.get('mysolido:noOnwardTransfer'))
 
     personal_data = []
@@ -2903,12 +2934,7 @@ def build_consent_record(request_record, intention_record, agreement):
         },
         "dpv:hasStorageCondition": {
             "@type": "dpv:StorageDuration",
-            "dpv:hasDuration": {
-                "@type": "dpv:TemporalDuration",
-                "mysolido:days": days,
-                "mysolido:iso8601": f"P{days}D" if days is not None else None,
-            },
-            "mysolido:validUntil": valid_until,
+            "mysolido:validUntil": valid_until,   # = schema:validThrough van de intentie (B4)
         },
         "dpv:hasRecipient": [],
         "mysolido:onwardTransfer": "prohibited" if prohibited else "permitted",
@@ -3273,8 +3299,12 @@ def consent_detail(consent_id):
         return redirect(url_for('consent_list'))
 
     with open(fpath, 'r', encoding='utf-8') as f:
-        record = _json.load(f)
+        raw_json = f.read()
+    record = _json.loads(raw_json)
 
+    # Regel (B6, 21-09-2026): opgeslagen records bevatten nooit weergave-informatie. De sleutels met
+    # een underscore (_id, _status) bestaan alleen in het geheugen voor de template; de ruwe weergave
+    # toont raw_json, het bestand zoals het in de Pod staat.
     record['_id'] = consent_id
     if 'dpv:hasConsentStatus' in record:
         record['dpv:hasConsentStatus'] = normalize_consent_status(record['dpv:hasConsentStatus'])
@@ -3292,6 +3322,7 @@ def consent_detail(consent_id):
 
     return render_template('consent_detail.html',
         consent=record,
+        raw_json=raw_json,
         links=links,
         expiry_date=format_date_nl_iso(consent_expiry_time(record)),
     )
@@ -3360,6 +3391,15 @@ def consent_delete(consent_id):
     if not os.path.exists(fpath):
         flash_t('flash_consent_not_found', 'error')
         return redirect(url_for('consent_list'))
+
+    # B5 (besluit 21-09-2026, optie A): een record met mysolido:agreement is bewijs van een
+    # gesloten afspraak en kan alleen worden ingetrokken, niet verwijderd (zoals bij de intentie).
+    # Handmatige toestemmingen zonder Agreement blijven verwijderbaar.
+    with open(fpath, 'r', encoding='utf-8') as f:
+        existing = _json.load(f)
+    if existing.get('mysolido:agreement'):
+        flash_t('flash_consent_has_agreement', 'error')
+        return redirect(url_for('consent_detail', consent_id=consent_id))
 
     os.remove(fpath)
     flash_t('flash_consent_deleted')
@@ -5281,6 +5321,20 @@ def ai_status():
     except Exception as exc:
         return jsonify({"ollama": {"running": False, "error": str(exc)}, "index": {"total_chunks": 0, "status": "error"}, "missing_deps": {},
                         "provider": "local", "claude_configured": False, "claude_model": None}), 500
+
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    """B8 (21-09-2026): geen kale Engelse Flask-pagina meer; in Bridge-modus zijn schrijf- en
+    eigenaarsroutes bewust afgesloten."""
+    return render_template('error.html', heading=translate('error_403_heading'),
+                           error=translate('error_403_bridge' if BRIDGE_MODE else 'error_403_text')), 403
+
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('error.html', heading=translate('error_404_heading'),
+                           error=translate('error_404_text')), 404
 
 
 @app.errorhandler(500)

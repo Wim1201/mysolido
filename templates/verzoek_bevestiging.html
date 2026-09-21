@@ -1,6 +1,6 @@
 {% extends "base_public.html" %}
 
-{% block title %}{{ t.req_confirm_title }} - MySolido{% endblock %}
+{% block title %}{% if accepted %}{{ t.req_int_accepted_title }}{% else %}{{ t.req_confirm_title }}{% endif %} - MySolido{% endblock %}
 
 {% block content %}
     <div class="card" style="text-align: center; padding: 40px 20px;">

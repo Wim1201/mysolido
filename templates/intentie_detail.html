@@ -66,7 +66,7 @@
                 <input type="text" class="form-input" id="offer-link-input" readonly value="{{ offer_url }}" style="flex: 1; min-width: 240px; font-size: 0.85rem;">
                 <button type="button" class="btn btn-compact" id="offer-link-copy" onclick="copyOfferLink()">{{ t.int_copy }}</button>
             </div>
-            <p class="snapshot-note" style="margin-top: 6px;">{{ t.int_offer_link_hint }}</p>
+            <p class="snapshot-note" style="margin-top: 6px;" id="offer-link-hint">{% if bridge_mode %}{{ t.int_offer_link_hint_bridge }}{% else %}{{ t.int_offer_link_hint }}{% endif %}</p>
         </div>
         <script>
         function copyOfferLink() {
@@ -197,8 +197,11 @@
     {% endif %}
     {% endif %}
 
-    {% if not read_only %}
-    <div class="card" style="margin-bottom: 20px;">
+    {# Kaart Acties alleen als er een actie is (cosmetisch, 21-09-2026): een ingetrokken of verlopen
+       intentie met Agreement heeft er geen #}
+    {% set has_actions = intention._status in ['concept', 'actief'] or (intention._status in ['ingetrokken', 'verlopen'] and not accepted_by) %}
+    {% if not read_only and has_actions %}
+    <div class="card" style="margin-bottom: 20px;" id="intention-actions">
         <h3>{{ t.int_actions }}</h3>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
             {% if intention._status == 'concept' %}

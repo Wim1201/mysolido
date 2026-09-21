@@ -43,9 +43,12 @@
                 </form>
                 {% endif %}
                 {% if not bridge_mode %}
+                {% if not c.get('mysolido:agreement') %}
+                {# B5 (21-09-2026): records met Agreement alleen intrekken, niet verwijderen #}
                 <form action="{{ url_for('consent_delete', consent_id=c._id) }}" method="post" style="display:inline;" onsubmit="return confirm('{{ t.consent_confirm_delete }}')">
                     <button type="submit" class="btn btn-sm btn-danger">{{ t.consent_delete }}</button>
                 </form>
+                {% endif %}
                 {% endif %}
             </div>
         </div>

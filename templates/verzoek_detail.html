@@ -107,7 +107,7 @@
             </div>
             <div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_accepted_at }}</div>
-                <p style="margin: 0;">{{ acceptance.accepted_at }} <span style="color: var(--color-text-muted); font-size: 0.85rem;">({{ acceptance.accepted_at_raw }})</span></p>
+                <p style="margin: 0;"><span id="accepted-at-local">{{ acceptance.accepted_at_raw|nl_datetime }}</span> <span style="color: var(--color-text-muted); font-size: 0.85rem;">({{ t.time_local_note }}: {{ acceptance.accepted_at_raw }})</span></p>
             </div>
             <div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 4px;">{{ t.req_accepted_policy }}</div>

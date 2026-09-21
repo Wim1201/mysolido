@@ -107,6 +107,34 @@ latere acceptatie met een redirect ("te veel verzoeken"). Let op: als de Pod nog
 geen `profiel/profiel.jsonld` heeft, vult deze run de Pod met de demodata van
 `scripts/seed_demo.py` en laat die staan.
 
+## Geautomatiseerd, aparte run: visuele test (Playwright)
+
+`python scripts/regressietest.py --phase visueel` meet in een headless browser wat het oog anders
+moet doen (ronde 2b, 21-09-2026): elke statusbadge binnen de omtrek van zijn kaart of lijstitem,
+`scrollWidth ≤ clientWidth` op elke pagina, geen zichtbaar element boven de bovenrand, het
+tellertje op de bel over het belicoon, de teller in de knop *Inkomende verzoeken*, lange titel met
+badge op 390 px, de zelfverversende syncstatus (statusadres via Playwright-routing, geen echte
+sync), de knoppen op het profiel lokaal en op de Bridge, de 403 op de Bridge, *Verwijderen* alleen
+bij een toestemming zonder Agreement, en de bevestigingspagina na acceptatie. Elke meting telt
+eerst wat hij vindt en faalt bij nul. Twee viewports: desktop in Chromium (1366×768) en iPhone in
+WebKit met het apparaatprofiel iPhone 13 (390×844). Let op: dat is de WebKit-build van Playwright
+op Windows, niet Safari op iOS; de echte iPhone blijft handmatig. Schermafbeeldingen per pagina en
+viewport komen in `regressietest-schermen/` (in `.gitignore`).
+
+Playwright is alleen een ontwikkelafhankelijkheid en staat niet in `requirements.txt` of de
+installers. Eenmalig installeren:
+
+```
+pip install -r requirements-dev.txt
+python -m playwright install chromium webkit
+```
+
+Ontbreekt Playwright of een browser, dan slaat de fase zichzelf over met één regel (`SKIP`) en
+telt niet als gefaald. De fase start net als 13h een tweede Flask-proces op poort 5001 en maakt
+zijn testdata zelf aan (twee acceptaties, een intrekking, een handmatige toestemming, een generiek
+verzoek en een ongelezen melding) en ruimt die weer op; `notifications.json` wordt teruggezet.
+Draai hem tegen een vers proces met `REQUEST_RATE_LIMIT=100` (vier POSTs op `/verzoek…`).
+
 ## Geautomatiseerd, aparte run: Bridge read-only modus
 
 De Bridge is dezelfde Flask-app met `--bridge`. Omdat Flask altijd op poort 5000 draait, kan
@@ -132,6 +160,7 @@ dit niet tegelijk met de normale modus.
 | Wachtwoord wijzigen | Profile-pagina, nieuw CSS-wachtwoord | `.env` bijgewerkt, inloggen met nieuw wachtwoord werkt |
 | Watermerk op deellink | Deel een PDF of afbeelding met watermerk aan | Gedownload bestand toont watermerk |
 | Browser-UI | Open http://127.0.0.1:5000 en klik door dashboard, map, bestand, deellink | Geen foutpagina's, flash-meldingen kloppen |
+| Echte iPhone (Safari op iOS) na uitrol op de Bridge | Intentielijst en -detail, verzoek-/responspagina, consentrecord, profiel | Geen badge over de iOS-statusbalk of in de safe-area; pagina laat zich niet zijwaarts slepen; knop *Toestemmingen* op het profiel. De `--phase visueel` meet dit in WebKit op Windows, niet op het toestel |
 | Stoppen | `stop-mysolido.bat` | Beide poorten vrij, geen zombie-processen |
 
 ## Rapportage

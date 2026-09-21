@@ -1,0 +1,3 @@
+# Alleen voor ontwikkeling: de visuele regressietest (python scripts/regressietest.py --phase visueel).
+# Niet in requirements.txt en niet in de installers. Na pip install ook: python -m playwright install chromium webkit
+playwright>=1.53

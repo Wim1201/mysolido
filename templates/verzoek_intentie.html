@@ -45,7 +45,7 @@
 
     <div class="verzoek-intro">
         <h2>{{ t.req_int_title }}: {{ intention.get('mysolido:categoryLabel', '') }}</h2>
-        <p>{% if acceptable %}{{ t.req_int_intro }}{% else %}{{ t.req_int_intro_inactive }}{% endif %}</p>
+        <p>{% if acceptable %}{{ t.req_int_intro }}{% elif bridge_mode and policy and status == 'actief' %}{{ t.req_int_intro_bridge }}{% else %}{{ t.req_int_intro_inactive }}{% endif %}</p>
     </div>
 
     {# === Voorwaarden (Offer) === #}

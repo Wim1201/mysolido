@@ -8,7 +8,7 @@
         <svg class="profile-avatar" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <h2 style="font-size: 1.2rem;">{{ t.profile_user }}</h2>
         <p class="profile-webid">{{ webid }}</p>
-        <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px;">Pod: {{ pod_url }}</p>
+        {% if not bridge_mode %}<p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 4px;">Pod: {{ pod_url }}</p>{% endif %}
 
         <div class="profile-stats">
             <div class="stat-item">
@@ -29,12 +29,17 @@
     <div style="text-align: center; margin-top: 16px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
         <a href="{{ url_for('profiel_data') }}" class="btn btn-primary">{{ icon_user() }} {{ t.my_data }}</a>
         <a href="{{ url_for('intenties_overview') }}" class="btn">{{ t.my_intentions }}</a>
-        <a href="{{ url_for('verzoeken_overview') }}" class="btn">
+        {# B2 (21-09-2026): Toestemmingen bereikbaar vanaf het profiel, ook op de telefoon en op de Bridge #}
+        <a href="{{ url_for('consent_list') }}" class="btn" id="btn-consent">{{ t.nav_consent }}</a>
+        {% if not bridge_mode %}
+        {# B8: inkomende verzoeken zijn eigenaarswerk; op de Bridge geeft de route 403 #}
+        <a href="{{ url_for('verzoeken_overview') }}" class="btn" id="btn-requests">
             {{ t.incoming_requests }}
             {% if new_requests_count > 0 %}
             <span class="badge badge-nieuw" style="margin-left: 4px;">{{ new_requests_count }}</span>
             {% endif %}
         </a>
+        {% endif %}
         <a href="{{ url_for('settings') }}" class="btn">{{ icon_settings() }} {{ t.settings }}</a>
         {% if not bridge_mode %}
         <a href="{{ url_for('ai_chat') }}" class="btn btn-primary">&#129302; {{ t.ai_assistant }}</a>
@@ -136,9 +141,10 @@
         <div class="bridge-info">
             <div class="info-row">
                 <span class="info-label">{{ t.bridge_sync_status }}</span>
-                <span class="info-value">
+                <span class="info-value" id="sync-status" data-running="{{ 'true' if bridge_sync_status.running else 'false' }}">
                     {% if bridge_sync_status.running %}
                         <span class="sync-badge sync-running">{{ t.bridge_sync_running }}</span>
+                        <span class="text-secondary" style="font-size: 0.8rem;" id="sync-refresh-note">({{ t.bridge_sync_refreshing }})</span>
                     {% elif bridge_sync_status.last_result == 'success' %}
                         <span class="sync-badge sync-success">{{ t.bridge_sync_success }}</span>
                     {% elif bridge_sync_status.last_result == 'error' %}
@@ -148,22 +154,20 @@
                     {% endif %}
                 </span>
             </div>
-            {% if bridge_sync_status.last_sync %}
-            <div class="info-row">
+            {# last_sync is lokale tijd zonder tijdzone (sync_bridge.py); nl_datetime verschuift die niet #}
+            <div class="info-row" {% if not bridge_sync_status.last_sync %}style="display: none;"{% endif %}>
                 <span class="info-label">{{ t.bridge_last_sync }}</span>
-                <span class="info-value">{{ bridge_sync_status.last_sync[:19] }}</span>
+                <span class="info-value" id="sync-last-sync">{{ bridge_sync_status.last_sync|nl_datetime if bridge_sync_status.last_sync else '' }}</span>
             </div>
-            {% endif %}
-            {% if bridge_sync_status.error %}
-            <div class="info-row">
+            <div class="info-row" {% if not bridge_sync_status.error %}style="display: none;"{% endif %}>
                 <span class="info-label">{{ t.bridge_error_label }}</span>
-                <span class="info-value" style="color: var(--color-danger);">{{ bridge_sync_status.error }}</span>
+                <span class="info-value" style="color: var(--color-danger);" id="sync-error">{{ bridge_sync_status.error or '' }}</span>
             </div>
-            {% endif %}
             <div class="info-row">
                 <span class="info-label">{{ t.bridge_auto_sync }}</span>
-                <span class="info-value">
-                    {% if bridge_sync_status.running is not none %}
+                <span class="info-value" id="sync-auto">
+                    {# B7 (21-09-2026): de .env-instelling BRIDGE_AUTO_SYNC, niet meer altijd "Aan" #}
+                    {% if bridge_auto_sync %}
                         {{ t.bridge_auto_sync_on }}
                     {% else %}
                         {{ t.bridge_auto_sync_off }}
@@ -174,6 +178,30 @@
         <form action="{{ url_for('trigger_bridge_sync') }}" method="post" style="margin-top: 12px;">
             <button type="submit" class="btn btn-primary">{{ t.bridge_sync_now }}</button>
         </form>
+        <script>
+        // B7 (21-09-2026): zolang de sync loopt, elke 3 s de status ophalen; herladen is niet nodig.
+        (function () {
+            var status = document.getElementById('sync-status');
+            if (!status || status.dataset.running !== 'true') return;   // startstand uit het data-attribuut (testbaar, ronde 2b)
+            var labels = { success: {{ t.bridge_sync_success|tojson }}, error: {{ t.bridge_sync_error|tojson }} };
+            function fmt(iso) { return iso ? iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4) + ' ' + iso.slice(11, 16) : ''; }
+            function poll() {
+                fetch({{ url_for('bridge_sync_status')|tojson }}, { cache: 'no-store' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (st) {
+                        if (st.running) { setTimeout(poll, 3000); return; }
+                        var ok = st.last_result === 'success';
+                        status.innerHTML = '<span class="sync-badge ' + (ok ? 'sync-success' : 'sync-error') + '">' + (ok ? labels.success : labels.error) + '</span>';
+                        var last = document.getElementById('sync-last-sync');
+                        if (last && st.last_sync) { last.textContent = fmt(st.last_sync); last.parentNode.style.display = ''; }
+                        var err = document.getElementById('sync-error');
+                        if (err) { err.textContent = st.error || ''; err.parentNode.style.display = st.error ? '' : 'none'; }
+                    })
+                    .catch(function () { setTimeout(poll, 5000); });
+            }
+            setTimeout(poll, 3000);
+        })();
+        </script>
         {% endif %}
     </div>
     {% endif %}
