@@ -1984,9 +1984,110 @@ def phase_finishing(ctx: Ctx):
 
 BRIDGE_TEST_PORT = 5001
 
+# Opmaakelementen van de kluis (base.html) die op een pagina voor de wederpartij niet mogen voorkomen
+NAV_MARKERS = ('class="header-nav"', 'class="bottom-nav"', 'bridge-banner', '/bridge-logout',
+               'bell-link', 'id="sync-btn"', 'header-subtitle')
+
+# Testwaarden voor url_map-parameters die niet uit de testketen komen
+ROUTE_SAMPLE_VALUES = {'filename': 'css/style.css', 'folder_path': 'documenten',
+                       'file_path': 'documenten/regressietest.txt', 'token': 'regressietest-token'}
+
+
+def _app_routes():
+    """url_map en BRIDGE_PUBLIC_ENDPOINTS uit app.py, gelezen in een apart proces (import, geen server)."""
+    code = ("import sys, json; sys.argv = ['app.py']; import app; "
+            "print('ROUTES ' + json.dumps({'rules': [{'endpoint': r.endpoint, 'rule': r.rule, "
+            "'methods': sorted(m for m in r.methods if m not in ('HEAD', 'OPTIONS'))} "
+            "for r in app.app.url_map.iter_rules()], 'public': sorted(app.BRIDGE_PUBLIC_ENDPOINTS)}))")
+    env = dict(os.environ, PYTHONIOENCODING='utf-8')
+    try:
+        out = subprocess.run([sys.executable, '-c', code], cwd=ROOT, env=env, capture_output=True,
+                             text=True, encoding='utf-8', errors='replace', timeout=60)
+    except (subprocess.SubprocessError, OSError):
+        return None
+    for line in out.stdout.splitlines():
+        if line.startswith('ROUTES '):
+            return json.loads(line[7:])
+    return None
+
+
+def _route_path(rule: str, values: dict) -> str:
+    """Concreet pad voor een url_map-regel: <naam> en <conv:naam> vervangen door een testwaarde."""
+    return re.sub(r'<(?:[^<>:]+:)?([^<>]+)>',
+                  lambda m: str(values.get(m.group(1)) or ROUTE_SAMPLE_VALUES.get(m.group(1)) or 'x'), rule)
+
+
+def _to_login(resp) -> bool:
+    return resp.status_code in REDIRECT and '/bridge-login' in resp.headers.get('Location', '')
+
+
+def _check_route_table(rep, bridge_base: str, routes: dict, values: dict):
+    """Elke route zonder sessie tegen de Bridge: redirect naar /bridge-login, tenzij op de openbare lijst.
+
+    Een nieuwe route die niet op BRIDGE_PUBLIC_ENDPOINTS staat, hoort dicht te vallen; staat hij toch
+    open, dan meldt de tweede check hem. Een naam op de lijst zonder route (dode regel) meldt de eerste.
+    """
+    public = set(routes['public'])
+    endpoints = {r['endpoint'] for r in routes['rules']}
+    dead = sorted(public - endpoints)
+    rep.check('Bridge lokaal: routetabel: elke naam op de openbare lijst bestaat als endpoint',
+              not dead, '', 'zonder route: ' + ', '.join(dead))
+    closed_ok, closed_bad, open_ok, open_bad = [], [], [], []
+    for r in routes['rules']:
+        path = _route_path(r['rule'], values)
+        method = 'GET' if 'GET' in r['methods'] else r['methods'][0]
+        try:
+            resp = requests.request(method, bridge_base + path, timeout=TIMEOUT, allow_redirects=False)
+        except requests.RequestException as exc:
+            (open_bad if r['endpoint'] in public else closed_bad).append(f'{method} {path}: {exc}')
+            continue
+        label = f'{method} {path} -> {resp.status_code}'
+        if r['endpoint'] in public:
+            (open_bad if _to_login(resp) else open_ok).append(label)
+        else:
+            (closed_ok if _to_login(resp) else closed_bad).append(label)
+    rep.check(f'Bridge lokaal: routetabel: {len(closed_ok) + len(closed_bad)} routes buiten de openbare lijst '
+              f'vallen zonder sessie dicht (redirect /bridge-login)',
+              not closed_bad, '', 'open zonder sessie: ' + '; '.join(closed_bad))
+    rep.check(f'Bridge lokaal: routetabel: {len(open_ok) + len(open_bad)} openbare routes antwoorden zonder sessie',
+              not open_bad, '', 'toch naar inlog: ' + '; '.join(open_bad))
+    rep.info(f'Bridge lokaal: routetabel: {len(routes["rules"])} routes in app.url_map, '
+             f'{len(public)} openbare endpointnamen', ', '.join(sorted(public)))
+    resp = requests.get(bridge_base + '/share-password/x', timeout=TIMEOUT, allow_redirects=False)
+    rep.check('Bridge lokaal: dode prefix /share-password/ valt dicht', _to_login(resp), '', f'status {resp.status_code}')
+
+
+def _check_public_pages_bare(rep, base: str, sess: requests.Session, pages, label: str):
+    """De vier wederpartij-pagina's: 200, geen kluisnavigatie (NAV_MARKERS), wel de versieregel."""
+    bad = []
+    for path, name in pages:
+        r = sess.get(base + path, timeout=TIMEOUT)
+        found = [m for m in NAV_MARKERS if m in r.text]
+        if r.status_code != 200 or found or 'id="app-version"' not in r.text:
+            bad.append(f'{name} status {r.status_code} navigatie {found}')
+    rep.check(f"Bridge lokaal: wederpartij-pagina's zonder navigatie-elementen, met versieregel ({label})",
+              not bad, '', '; '.join(bad))
+
+
+def _make_concept_intention(ctx: Ctx, description: str):
+    """Intentie aanmaken zonder te activeren (status concept); geeft het intentiebestand of None."""
+    idir = ctx.pod_dir / 'intenties'
+    before = {p.name for p in idir.glob('*.jsonld')} if idir.exists() else set()
+    flask(ctx, 'POST', '/intenties/nieuw', data={'category': 'autoverzekering', 'description': description,
+                                                 'validity': '2w', 'attributes': list(SCENARIO_ATTRIBUTES),
+                                                 'purpose': 'quote_calculation', 'no_onward_transfer': '1', 'offer_mode': 'open'})
+    new = [p for p in idir.glob('*.jsonld') if p.name not in before and not p.name.startswith('.')
+           and not p.name.endswith('.policy.jsonld')]
+    return new[0] if len(new) == 1 else None
+
 
 def phase_bridge_local(ctx: Ctx):
-    """Bridge-modus lokaal (subtaak 5): tweede proces met --bridge op poort 5001 tegen dezelfde Pod."""
+    """Bridge-modus lokaal (subtaak 5): tweede proces met --bridge op poort 5001 tegen dezelfde Pod.
+
+    Sinds 21-09-2026 ook: lus over app.url_map (alles dicht behalve BRIDGE_PUBLIC_ENDPOINTS), Offer-JSON
+    openbaar bij status actief en anders achter de inlog, en de wederpartij-pagina's zonder kluisnavigatie
+    (lokaal, Bridge zonder login, Bridge met eigenaarssessie).
+    """
     import bcrypt
     rep = ctx.report
     bridge_base = f'http://127.0.0.1:{BRIDGE_TEST_PORT}'
@@ -1997,7 +2098,7 @@ def phase_bridge_local(ctx: Ctx):
     except requests.RequestException:
         pass
     anon = requests.Session()
-    intention_file = request_file = None
+    intention_file = request_file = concept_file = None
     cid = ''
     proc = None
     log_path = Path(os.environ.get('TEMP', str(ROOT))) / f'mysolido-bridge-test-{ctx.run_id}.log'
@@ -2064,6 +2165,48 @@ def phase_bridge_local(ctx: Ctx):
         rep.check('Bridge lokaal: versieregel met "Bridge"', r.status_code == 200 and 'id="app-version"' in r.text
                   and 'Bridge' in r.text.split('id="app-version"')[1][:400] and (not git_hash or git_hash in r.text),
                   git_hash, f'status {r.status_code}')
+
+        # --- Routetabel (21-09-2026): elke route zonder sessie, dicht tenzij op BRIDGE_PUBLIC_ENDPOINTS ---
+        token = str(json.loads(request_file.read_text(encoding='utf-8')).get('mysolido:statusToken', ''))
+        routes = _app_routes()
+        if rep.check('Bridge lokaal: routetabel: app.url_map en BRIDGE_PUBLIC_ENDPOINTS uit app.py gelezen',
+                     routes is not None, '', 'import van app.py mislukt'):
+            _check_route_table(rep, bridge_base, routes,
+                               {'intention_id': iid, 'request_id': rid, 'consent_id': cid, 'status_token': token})
+
+        # --- Wederpartij-pagina's: kale opmaak, lokaal en op de Bridge, ook met eigenaarssessie ---
+        pages = [('/verzoek', 'verzoekformulier'), (f'/verzoek/intentie/{iid}', 'acceptatiepagina'),
+                 (f'/verzoek/status/{token}', 'statuspagina'), (f'/verzoek/response/{token}', 'responspagina')]
+        _check_public_pages_bare(rep, ctx.flask_base, requests.Session(), pages, 'lokaal')
+        _check_public_pages_bare(rep, bridge_base, requests.Session(), pages, 'Bridge zonder login')
+        _check_public_pages_bare(rep, bridge_base, s, pages, 'Bridge met eigenaarssessie')
+        r = s.get(bridge_base + '/', timeout=TIMEOUT)
+        rep.check('Bridge lokaal: kluispagina met eigenaarssessie behoudt de navigatie',
+                  r.status_code == 200 and all(m in r.text for m in ('class="header-nav"', 'class="bottom-nav"', 'bridge-banner')),
+                  '', f'status {r.status_code}')
+
+        # --- Offer-JSON: openbaar bij status actief, anders achter de inlog ---
+        r = requests.get(f'{bridge_base}/intenties/{iid}/policy.jsonld', timeout=TIMEOUT, allow_redirects=False)
+        rep.check('Bridge lokaal: Offer-JSON van een actieve intentie zonder sessie als application/ld+json',
+                  r.status_code == 200 and 'ld+json' in r.headers.get('Content-Type', '')
+                  and f'urn:mysolido:policy:intention:{iid}' in r.text, '', f'status {r.status_code}')
+        r = requests.get(f'{bridge_base}/intenties/bestaat-niet-{ctx.run_id}/policy.jsonld', timeout=TIMEOUT, allow_redirects=False)
+        rep.check('Bridge lokaal: Offer-JSON van een onbekend id zonder sessie naar het inlogscherm', _to_login(r), '', f'status {r.status_code}')
+        concept_file = _make_concept_intention(ctx, 'Regressietest Bridge concept')
+        if rep.check('Bridge lokaal: concept-intentie op de lokale app aangemaakt', concept_file is not None, '', 'geen bestand'):
+            r = requests.get(f'{bridge_base}/intenties/{concept_file.stem}/policy.jsonld', timeout=TIMEOUT, allow_redirects=False)
+            rep.check('Bridge lokaal: Offer-JSON van een concept-intentie zonder sessie naar het inlogscherm', _to_login(r), '', f'status {r.status_code}')
+            r = s.get(f'{bridge_base}/intenties/{concept_file.stem}/policy.jsonld', timeout=TIMEOUT, allow_redirects=False)
+            rep.check('Bridge lokaal: Offer-JSON van een concept-intentie met eigenaarssessie niet naar het inlogscherm',
+                      not _to_login(r) and r.status_code in (200, 404), '', f'status {r.status_code}')
+        flask(ctx, 'POST', f'/intenties/{iid}/withdraw')
+        withdrawn = json.loads(intention_file.read_text(encoding='utf-8')).get('mysolido:status') == 'ingetrokken'
+        r = requests.get(f'{bridge_base}/intenties/{iid}/policy.jsonld', timeout=TIMEOUT, allow_redirects=False)
+        rep.check('Bridge lokaal: Offer-JSON na intrekken van de intentie zonder sessie naar het inlogscherm',
+                  withdrawn and _to_login(r), '', f'ingetrokken {withdrawn}, status {r.status_code}')
+        r = s.get(f'{bridge_base}/intenties/{iid}/policy.jsonld', timeout=TIMEOUT, allow_redirects=False)
+        rep.check('Bridge lokaal: Offer-JSON na intrekken met eigenaarssessie als application/ld+json',
+                  r.status_code == 200 and 'ld+json' in r.headers.get('Content-Type', ''), '', f'status {r.status_code}')
     finally:
         if proc is not None:
             proc.kill()
@@ -2077,6 +2220,7 @@ def phase_bridge_local(ctx: Ctx):
             except requests.RequestException:
                 rep.ok('Bridge lokaal: tweede proces gestopt')
         _cleanup_case(ctx, intention_file, request_file, cid)
+        _cleanup_case(ctx, concept_file, None, '')
 
 
 # --- main --------------------------------------------------------------------------------

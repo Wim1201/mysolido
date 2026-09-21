@@ -74,6 +74,25 @@ APP_VERSION = _git_short_hash() or VERSION
 APP_MODE = 'Bridge' if BRIDGE_MODE else 'lokaal'
 APP_PORT = int(os.getenv('MYSOLIDO_PORT', '5000'))   # tweede proces (bijv. --bridge naast lokaal) op een andere poort
 
+# === OPENBARE ROUTES OP DE BRIDGE (21-09-2026) ===
+# check_bridge_auth() staat in Bridge-modus standaard dicht: elk verzoek zonder eigenaarssessie gaat naar
+# /bridge-login, behalve de endpointnamen hieronder. Per regel de reden. Een nieuwe route die hier niet
+# staat, valt dus vanzelf dicht; regressietest 13h loopt over app.url_map en bewaakt dat.
+# Nooit openbaar: Agreement-JSON (/verzoeken/<id>/agreement.jsonld), consentrecords en alles onder /verzoeken.
+BRIDGE_PUBLIC_ENDPOINTS = {
+    'bridge_login':         'het inlogscherm zelf (GET en POST /bridge-login)',
+    'static':               "css, js en iconen; ook het inlogscherm en de openbare pagina's hebben ze nodig",
+    'view_shared_file':     '/share/<token>: deellink voor een ontvanger; het token en het eigen wachtwoord van de link beschermen de inhoud',
+    'verzoek_formulier':    'GET /verzoek: vrij verzoekformulier voor een wederpartij',
+    'verzoek_submit':       'POST /verzoek: indienen van dat verzoek (rate limit per IP)',
+    'verzoek_status':       '/verzoek/status/<token>: statuspagina van de wederpartij, alleen met het geheime statustoken',
+    'verzoek_response':     '/verzoek/response/<token>: vrijgegeven gegevens voor de wederpartij, alleen met het geheime statustoken',
+    'verzoek_intentie':     'GET/POST /verzoek/intentie/<id>: voorwaarden van een intentie lezen; accepteren blokkeert de route zelf op de Bridge',
+    'crash_report_receive': 'POST /crash-report: anonieme crashmelding van een lokale MySolido, zonder sessie',
+    'intentie_policy_file': '/intenties/<id>/policy.jsonld: de Offer machineleesbaar (MyTerms), ALLEEN bij status actief; '
+                            'concept, ingetrokken en verlopen blijven achter de inlog (zie bridge_endpoint_is_public)',
+}
+
 # Ensure temp directory exists
 os.makedirs(TEMP_DIR, exist_ok=True)
 
@@ -761,22 +780,28 @@ FOLDER_ICONS = {
 }
 
 
+def bridge_endpoint_is_public(endpoint, view_args):
+    """Staat dit endpoint op BRIDGE_PUBLIC_ENDPOINTS, inclusief de voorwaarde voor de Offer-JSON?
+
+    De Offer (policy.jsonld) is alleen openbaar zolang de intentie de status 'actief' heeft: de Offer
+    bevat geen profielwaarden en de openbare voorwaardenpagina toont dezelfde JSON al. Een concept,
+    ingetrokken of verlopen intentie (of een onbekend id) blijft achter de inlog.
+    """
+    if endpoint not in BRIDGE_PUBLIC_ENDPOINTS:
+        return False
+    if endpoint == 'intentie_policy_file':
+        record = load_intention_record((view_args or {}).get('intention_id', '')) or {}
+        return record.get('mysolido:status') == 'actief'
+    return True
+
+
 @app.before_request
 def check_bridge_auth():
+    """Bridge-modus: standaard dicht, alleen BRIDGE_PUBLIC_ENDPOINTS zonder eigenaarssessie."""
     if not BRIDGE_MODE:
         return
 
-    public_routes = [
-        'bridge_login', 'view_shared_file', 'static',
-        'verzoek_formulier', 'verzoek_submit', 'verzoek_status', 'verzoek_response',
-        'verzoek_intentie',   # intentiegebonden formulier (subtaak 4a): voorwaarden lezen; accepteren blokkeert de route zelf
-        'crash_report_receive',
-    ]
-
-    if request.endpoint in public_routes:
-        return
-
-    if request.path.startswith('/share/') or request.path.startswith('/share-password/'):
+    if bridge_endpoint_is_public(request.endpoint, request.view_args):
         return
 
     if not session.get('bridge_authenticated'):
@@ -4249,7 +4274,10 @@ def intentie_detail(intention_id):
 
 @app.route('/intenties/<intention_id>/policy.jsonld')
 def intentie_policy_file(intention_id):
-    """De Offer van een intentie als application/ld+json (na eigenaarslogin, ook in Bridge-modus)."""
+    """De Offer van een intentie als application/ld+json.
+
+    Op de Bridge openbaar zolang de intentie actief is (BRIDGE_PUBLIC_ENDPOINTS); anders na eigenaarslogin.
+    """
     path = safe_pod_path(intention_policy_relpath(intention_id))
     if not path or not os.path.isfile(path):
         abort(404)

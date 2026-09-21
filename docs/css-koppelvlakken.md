@@ -162,7 +162,7 @@ De inhoud van deze bestanden is standaard (ODRL 2.2, DPV, JSON-LD). De opslag is
 |---|---|---|---|
 | `sync_bridge.py:43-53` | `get_pod_data_path()` → `.data/<podnaam>` relatief aan de werkmap | C | Zelfde indelingsaanname als `app.py`, maar zonder `PROJECT_DIR`. |
 | `sync_bridge.py:56-120` | `scp -r` van de hele pod-map naar `BRIDGE_PATH` (`/home/bridge/.data/`) | C | De Bridge draait dezelfde Flask in `--bridge`-modus op een kopie van de CSS-map, zonder CSS en zonder `.internal/`. |
-| `app.py:41`, `app.py:764-786` | `BRIDGE_MODE` blokkeert schrijfroutes | B | Context: de Bridge heeft geen CSS-account nodig omdat hij nooit via HTTP naar CSS praat. |
+| `app.py:41`, `app.py:82-97`, `app.py:783-833` | `BRIDGE_MODE`, de openbare lijst `BRIDGE_PUBLIC_ENDPOINTS` (standaard dicht, per endpointnaam een reden; Offer-JSON alleen bij status actief) en de blokkade van schrijfroutes | B | Context: de Bridge heeft geen CSS-account nodig omdat hij nooit via HTTP naar CSS praat. Regressietest 13h loopt over `app.url_map` en bewaakt dat alles buiten de lijst achter de inlog blijft (21-09-2026). |
 
 ## 11. CSS-interne bestanden die MySolido niet aanraakt maar wel nodig heeft
 
