@@ -2528,7 +2528,7 @@ def edit_policy(folder_path):
 
 # === INTENTIEPOLICY: ODRL-Offer per intentie (MyTerms-demo, subtaak 3) ===
 # Los van build_policy(): de mapregels hierboven blijven ongemoeid. Vorm en namen staan
-# in docs/mysolido_notitie_datamodel-myterms_20-09-2026.md (§3). Eén Offer per intentie,
+# in ontwikkeling/mysolido_notitie_datamodel-myterms_20-09-2026.md (§3). Eén Offer per intentie,
 # bestand intenties/<uuid>.policy.jsonld, uid urn:mysolido:policy:intention:<uuid>.
 # De constanten PROFILE_ATTRIBUTES en INTENTION_PURPOSES staan verderop in dit bestand;
 # de functies hier gebruiken ze alleen op het moment van aanroepen.
@@ -2737,7 +2737,7 @@ def intention_policy_summary_nl(policy, record):
 # De wederpartij accepteert de Offer van een actieve intentie via /verzoek/intentie/<uuid>.
 # conclude_agreement() is het sluitmoment: bij offerMode open direct bij acceptatie, bij
 # targeted pas na bevestiging door de eigenaar in verzoek_approve(). Eén functie, twee
-# aanroepplekken. Vorm en namen: docs/mysolido_notitie_datamodel-myterms_20-09-2026.md (§3).
+# aanroepplekken. Vorm en namen: ontwikkeling/mysolido_notitie_datamodel-myterms_20-09-2026.md (§3).
 # In 4b komt het consentrecord als één toevoeging in conclude_agreement().
 
 AGREEMENT_UID_PREFIX = 'urn:mysolido:agreement:'
@@ -3412,7 +3412,7 @@ def consent_delete(consent_id):
 
 # === PROFIEL-ATTRIBUTEN (MyTerms-demo, subtaak 2) ===
 # Eén bron van waarheid voor de deelbare profielvelden; zie
-# docs/mysolido_notitie_datamodel-myterms_20-09-2026.md (punt 1 en 2).
+# ontwikkeling/mysolido_notitie_datamodel-myterms_20-09-2026.md (punt 1 en 2).
 # Een nieuw attribuut is één regel in PROFILE_ATTRIBUTES: per-veldselectie in het
 # intentieformulier en het snapshot in het intentierecord volgen daaruit. Alleen
 # attributen met 'form_field' hebben een eigen invoerveld in profiel_data.html dat
@@ -4912,7 +4912,7 @@ def verzoek_approve(request_id):
 
         # Generieke goedkeuring (verzoek zonder intentie): er wordt bewust géén consentrecord
         # geschreven. Alleen intentiegebonden acceptaties krijgen een 27560-record, via
-        # conclude_agreement() (subtaak 4b). Zie docs/mysolido_verslag_myterms-demo-subtaak4b.
+        # conclude_agreement() (subtaak 4b). Zie ontwikkeling/archief/mysolido_verslag_myterms-demo-subtaak4b.
         log_action('request_approve_generic', {'id': request_id, 'consent_record': None,
                                                'note': 'generieke goedkeuring zonder consentrecord'})
         requester = record.get('mysolido:requester', {})

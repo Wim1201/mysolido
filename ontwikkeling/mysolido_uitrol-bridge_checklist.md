@@ -4,7 +4,7 @@
 |---|---|
 | **Versie** | 20 september 2026; hoort bij branch `myterms-demo` vanaf commit `5bfacf3` (of later, na commit van subtaak 5) |
 | **Doel** | De Bridge op `bridge.mysolido.com` draait dezelfde code als de pc, zodat de telefoon intenties met Offer-kaart, Agreements en 27560-consentrecords toont. Lokaal bewezen met de regressietestfase "Bridge-modus lokaal" (13h); deze checklist is voor de VPS zelf |
-| **Uitgangspunten** | De VPS is niet aangeraakt tijdens subtaak 2 t/m 5. Inloggegevens, host en sleutel staan in `.env` (`BRIDGE_HOST`, `BRIDGE_SSH_KEY`, `BRIDGE_PATH`) en worden hier niet herhaald. De Bridge draait dezelfde `app.py` met `--bridge` op een kopie van `.data/<pod>/` (zie `docs/css-koppelvlakken.md` §10). Doe dit niet vlak voor de demo; plan een uur, inclusief terugdraaien |
+| **Uitgangspunten** | De VPS is niet aangeraakt tijdens subtaak 2 t/m 5. Inloggegevens, host en sleutel staan in `.env` (`BRIDGE_HOST`, `BRIDGE_SSH_KEY`, `BRIDGE_PATH`) en worden hier niet herhaald. De Bridge draait dezelfde `app.py` met `--bridge` op een kopie van `.data/<pod>/` (zie `ontwikkeling/css-koppelvlakken.md` §10). Doe dit niet vlak voor de demo; plan een uur, inclusief terugdraaien |
 
 Elke stap heeft een **Verwacht** en een **Terug** (hoe je de stap ongedaan maakt). Stop bij de eerste afwijking en draai terug.
 

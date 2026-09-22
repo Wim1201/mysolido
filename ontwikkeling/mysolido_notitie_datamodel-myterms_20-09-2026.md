@@ -4,7 +4,7 @@
 |---|---|
 | **Datum** | 20 september 2026 |
 | **Status** | Werkafspraak: de namen hieronder zijn leidend voor subtaak 2 (gegevensselectie), 3 (ODRL-policy) en 4 (acceptatie en consentrecord). Subtaak 2 bouwde punt 1 en 2; subtaak 3 (20-09, later op de dag) bouwde de intentiepolicy uit punt 3 en voegde `mysolido:policy` en `targetedParty.@id` toe aan punt 2. Subtaak 4a (20-09, derde sessie) bouwde acceptatie, verzoekvelden en Agreement uit punt 3 en `mysolido:acceptedBy` in punt 2. Subtaak 4b (20-09, vierde sessie) bouwde het consentrecord in 27560-structuur, de statuscorrectie en "Toestemming intrekken". Daarmee is punt 3 gebouwd; alleen het generieke goedkeuringspad (verzoeken zonder intentie) schrijft geen consentrecord. |
-| **Vervolg op** | `docs/mysolido_verslag_myterms-demo-inventarisatie_19-09-2026.md` (§6, "datamodel-notitie") |
+| **Vervolg op** | `ontwikkeling/archief/mysolido_verslag_myterms-demo-inventarisatie_19-09-2026.md` (§6, "datamodel-notitie") |
 | **Besluiten 20-09 die hierin verwerkt zijn** | open Offer als standaard maar `offerMode` nu al in het model; vier scenariovelden vast maar generiek gebouwd (één constante); snapshot boven verwijzing; Bridge-variant A |
 | **DPV-PD-controle** | DPV-PD 2.1 (16 maart 2025, w3c-cg.github.io/dpv/2.1/pd/), alleen de termen in de tabellen bij punt 1 gecontroleerd |
 
@@ -94,7 +94,7 @@ Nieuwe velden naast de bestaande (`@id` `urn:mysolido:intention:<uuid>`, `mysoli
 
 ## 5. Besluiten van 21-09-2026 (na de generale repetitie, ronde 2)
 
-Uitgangspunt: `docs/mysolido_verslag_generale-repetitie-myterms_21-09-2026.md`, bevindingen B4, B5 en B6. Gebouwd in `docs/mysolido_verslag_repetitiebevindingen-ronde2_21-09-2026.md`.
+Uitgangspunt: `ontwikkeling/mysolido_verslag_generale-repetitie-myterms_21-09-2026.md`, bevindingen B4, B5 en B6. Gebouwd in `ontwikkeling/mysolido_verslag_repetitiebevindingen-ronde2_21-09-2026.md`.
 
 | # | Besluit | Reden | Waar |
 |---|---|---|---|

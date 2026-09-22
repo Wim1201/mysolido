@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Versie** | 20 september 2026, bijgewerkt 21 september 2026 na de generale repetitie (ronde 2: B1, B2, B4-B9 en cosmetiek), bij branch `myterms-demo` (versieregel onderaan elke pagina toont de commit-hash) |
-| **Scenario** | Autoverzekering: intentie → Offer → acceptatie door "Verzekeraar X" → Agreement → consentrecord (ISO/IEC TS 27560) → intrekken. Stappen 0 t/m 8 uit `docs/mysolido_verslag_myterms-demo-inventarisatie_19-09-2026.md` §5 |
+| **Scenario** | Autoverzekering: intentie → Offer → acceptatie door "Verzekeraar X" → Agreement → consentrecord (ISO/IEC TS 27560) → intrekken. Stappen 0 t/m 8 uit `ontwikkeling/archief/mysolido_verslag_myterms-demo-inventarisatie_19-09-2026.md` §5 |
 | **Rollen** | Eigenaar (Wim) in een gewoon browservenster op `http://127.0.0.1:5000`; wederpartij "Verzekeraar X" in een **andere browser** (repetitie 21-09: Edge voor de eigenaar, Chrome Incognito voor de wederpartij werkte goed en voorkomt verwarring); telefoon met `bridge.mysolido.com` als spiegel |
 | **Inhoud** | Alleen handelingen en schermen. De spreektekst staat hier niet in |
 
@@ -22,11 +22,11 @@
    python scripts/seed_demo.py --reset --yes
    ```
    Verwacht: het script toont eerst wat het verwijdert (alle intenties, verzoeken, Agreements, responses, toestemmingen), maakt het logboek, de prullenbak en het deelregister leeg en zet het demoprofiel opnieuw (35-44, postcodegebied 5611, auto benzine 2019, 5 schadevrije jaren, geen claims). De laatste regel zegt "Schone demostand". Controle: `http://127.0.0.1:5000/intenties` is leeg, `/verzoeken` is leeg, `/consent` is leeg, *Logboek* is leeg.
-   **Ook de VPS:** de sync kopieert wel, maar wist niet. Na een eerdere run staan `intenties/`, `verzoeken/` en `toestemmingen/` op de Bridge nog vol; leeg ze daar (zie `docs/mysolido_uitrol-bridge_checklist.md`) vóór de eerste sync, anders toont de telefoon oude records.
+   **Ook de VPS:** de sync kopieert wel, maar wist niet. Na een eerdere run staan `intenties/`, `verzoeken/` en `toestemmingen/` op de Bridge nog vol; leeg ze daar (zie `ontwikkeling/mysolido_uitrol-bridge_checklist.md`) vóór de eerste sync, anders toont de telefoon oude records.
 4. **Vensters klaarzetten.**
    - Gewoon venster (eigenaar): `http://127.0.0.1:5000/profile` open, tabblad *Mijn gegevens* al eens bekeken.
    - Privévenster (wederpartij): leeg tabblad; de aanbodlink komt via het klembord (stap 4).
-   - Telefoon: `https://bridge.mysolido.com` open en ingelogd met het Bridge-wachtwoord (sessie blijft 24 uur geldig). De Bridge moet de nieuwe code draaien: onderaan elke pagina staat "MySolido <hash> · Bridge" met dezelfde hash als op de pc ("· lokaal"). Klopt dat niet, eerst `docs/mysolido_uitrol-bridge_checklist.md` doorlopen.
+   - Telefoon: `https://bridge.mysolido.com` open en ingelogd met het Bridge-wachtwoord (sessie blijft 24 uur geldig). De Bridge moet de nieuwe code draaien: onderaan elke pagina staat "MySolido <hash> · Bridge" met dezelfde hash als op de pc ("· lokaal"). Klopt dat niet, eerst `ontwikkeling/mysolido_uitrol-bridge_checklist.md` doorlopen.
 5. **Eerste sync.** Op de pc: *Profiel → Nu synchroniseren*. De status op het profiel ververst vanzelf van "Bezig…" naar "Gesynchroniseerd" met een nieuw tijdstip (Nederlandse tijd); dat kan enkele minuten duren, herladen is niet nodig. Op de telefoon herladen: lege intenties, lege toestemmingen. De schone stand staat nu op beide.
    **Altijd handmatig synchroniseren.** Auto-sync staat uit (`BRIDGE_AUTO_SYNC=false`) en zou intenties, verzoeken en toestemmingen ook niet meenemen: hij reageert alleen op bestandswijzigingen in de kluis. Sync 1 t/m 4 hieronder dus met de knop, en op de telefoon herladen tot het nieuwe tijdstip er staat.
 
@@ -111,7 +111,7 @@ Per stap: **Pc** (eigenaar), **Privé** (wederpartij), **Telefoon** (Bridge) en 
 | Aanbodlink ontbreekt op de intentie | intentie is nog concept, of al ingetrokken | *Activeren*; bij ingetrokken een nieuwe intentie aanmaken |
 | Formulier zegt "niet actief (status: …)" | idem | idem |
 | Telefoon toont oude stand | geen sync gedaan sinds de laatste handeling, of de sync loopt nog | *Nu synchroniseren* op de pc; de status op het profiel ververst vanzelf en kan enkele minuten op "Bezig…" staan (de hele pod gaat met `scp -r`); daarna herladen op de telefoon |
-| Telefoon toont geen Offer-kaart, geen 27560-tabel of geen versieregel | oude code op de VPS | versieregel vergelijken; `docs/mysolido_uitrol-bridge_checklist.md` |
+| Telefoon toont geen Offer-kaart, geen 27560-tabel of geen versieregel | oude code op de VPS | versieregel vergelijken; `ontwikkeling/mysolido_uitrol-bridge_checklist.md` |
 | Telefoon vraagt opnieuw om het Bridge-wachtwoord | sessie verlopen (24 uur) | inloggen; niets verloren |
 | "Voor deze intentie zijn nog geen voorwaarden opgesteld." | record zonder Offer (alleen bij oude records) | knop *Voorwaarden opstellen* op de intentiepagina |
 | Verwijderen van een intentie of een consentrecord weigert, of de knop ontbreekt | er rust een Agreement op | bedoeld gedrag; toon het als voorbeeld van "afspraken blijven" (intrekken kan wel) |
